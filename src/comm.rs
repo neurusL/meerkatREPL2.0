@@ -10,7 +10,7 @@ pub async fn process_remote() -> Result<(), Box<dyn Error>> {
     let (mut socket, _) = listener.accept().await?;
     loop {
         let mut data = vec![0; 1024];
-        let foo = socket.read(&mut data).await?;
+        let _ = socket.read(&mut data).await?;
         println!("{}", String::from_utf8(data).unwrap());
     }
 }

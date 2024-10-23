@@ -1,5 +1,6 @@
-xuse crate::meerast::{ReplInput, Program, Service, Decl, Stmt, SglStmt, Expr,
-                     Uop, Binop};
+use crate::frontend::meerast::{
+    ReplInput, Program, Service, Decl, Stmt, SglStmt, Expr, Uop, Binop
+};
 use std::str::FromStr;
 
 grammar;

@@ -1,5 +1,6 @@
-#[allow(dead_code)]
+use std::collections::HashSet;
 
+#[allow(dead_code)]
 trait AstNode {}
 
 impl AstNode for ReplInput {}
@@ -97,6 +98,71 @@ pub enum Expr {
         pars: Vec<Expr>,
         body: Box<Expr>,
     },
+}
+
+impl Expr {
+    pub fn names_contained(&self) -> HashSet<String> {
+        fn compute_names_contained(names: &mut HashSet<String>, expr: &Expr) {
+            match expr {
+                Expr::IdExpr { ident } => {
+                    names.insert(ident.clone());
+                }
+                Expr::IntConst { val: _ } | Expr::BoolConst { val: _ } => {}
+                Expr::Action { stmt } => {
+                    let sgls = match stmt {
+                        Stmt::Stmt { sgl_stmts } => sgl_stmts,
+                    };
+                    for sgl in sgls.iter() {
+                        match sgl {
+                            SglStmt::Do { act } => {
+                                compute_names_contained(names, act);
+                            }
+                            SglStmt::Ass { dst: _, src } => {
+                                compute_names_contained(names, src);
+                            }
+                        }
+                    }
+                }
+                Expr::Member {
+                    srv_name: _,
+                    member: _,
+                } => panic!("not yet support multi service"),
+                Expr::Apply { fun, args } => {
+                    compute_names_contained(names, fun);
+                    for arg_expr in args.iter() {
+                        compute_names_contained(names, arg_expr);
+                    }
+                }
+                Expr::BopExpr { opd1, opd2, bop: _ } => {
+                    compute_names_contained(names, opd1);
+                    compute_names_contained(names, opd2);
+                }
+                Expr::UopExpr { opd, uop: _ } => {
+                    compute_names_contained(names, opd);
+                }
+                Expr::IfExpr { cond, then, elze } => {
+                    compute_names_contained(names, cond);
+                    compute_names_contained(names, then);
+                    compute_names_contained(names, elze);
+                }
+                Expr::Lambda { pars, body } => {
+                    let mut par_names: HashSet<String> = HashSet::new();
+                    for par in pars.iter() {
+                        let par_name = match par {
+                            Expr::IdExpr { ident } => ident.clone(),
+                            _ => panic!(),
+                        };
+                        par_names.insert(par_name);
+                    }
+                    compute_names_contained(names, body);
+                    *names = names.difference(&par_names).cloned().collect();
+                }
+            }
+        }
+        let mut deps: HashSet<String> = HashSet::new();
+        compute_names_contained(&mut deps, self);
+        deps
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
