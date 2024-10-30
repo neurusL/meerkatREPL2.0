@@ -361,3 +361,18 @@ var_name={:?}, result={:?}, result_provides={:?}{color_reset}",
         }
     }
 }
+
+#[tokio::test]
+async fn batch_writes_to_a_and_b_mutually_independent() {
+    // creat var workers a and b
+    // write Val::Int(3) to a, Val::Int(5) to b
+    todo!()
+}
+
+#[tokio::test]
+async fn try_reading_after_granted_write_lock() {
+    // create var worker a
+    // request write lock for txn 1, receive lock granted message
+    // then send read lock request for a younger txn 2
+    // should get lock abort message!
+}
