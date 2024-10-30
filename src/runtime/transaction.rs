@@ -1,7 +1,5 @@
 use core::fmt;
-
 use std::hash::{Hash, Hasher};
-
 use tokio::time::Instant;
 
 use crate::frontend::meerast::Expr;
