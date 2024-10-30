@@ -7,7 +7,7 @@ use crate::{
 
 use tokio::sync::mpsc::Sender;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Val {
     Int(i32),
     Bool(bool),
@@ -46,7 +46,7 @@ pub enum Message {
     },
     Propagate {
         from_name: String,
-        new_val: i32,
+        new_val: Val,
         provide: HashSet<Txn>,
         require: HashSet<Txn>,
     },

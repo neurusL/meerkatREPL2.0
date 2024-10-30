@@ -45,20 +45,20 @@ pub enum Decl {
 }
 
 impl AstNode for Stmt {}
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Stmt {
     Stmt { sgl_stmts: Vec<SglStmt> },
 }
 
 impl AstNode for SglStmt {}
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SglStmt {
     Do { act: Expr },
     Ass { dst: Expr, src: Expr },
 }
 
 impl AstNode for Expr {}
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
     IdExpr {
         ident: String,
@@ -165,13 +165,13 @@ impl Expr {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Uop {
     Neg,
     Not,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Binop {
     Add,
     Sub,
