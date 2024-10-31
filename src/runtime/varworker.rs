@@ -95,6 +95,7 @@ impl VarWorker {
                         .unwrap();
                 }
             }
+            // TODO: apply pending writes, the remove lock
             Message::VarLockRelease { txn } => {
                 let to_be_removed: HashSet<Lock> = self
                     .locks
@@ -206,6 +207,10 @@ impl VarWorker {
         }
     }
 
+    // TODO: still move lock into pending write (not yet applied)
+    // but only apply when receive release request
+    // otherwise, if another lock request for this txn aborted
+    // whole txn invalid but `immature` write cannot be recovered
     pub async fn tick(&mut self) {
         let mut has_granted_write_lock = false;
         for lk in self.locks.iter() {
@@ -280,8 +285,8 @@ impl VarWorker {
 }
 
 #[tokio::test]
-async fn reate_write_read() {
-    let (sndr_to_worker, mut rcvr_from_manager) = mpsc::channel(1024);
+async fn write_then_read() {
+    let (sndr_to_worker, rcvr_from_manager) = mpsc::channel(1024);
     let (sndr_to_manager, mut rcvr_from_worker) = mpsc::channel(1024);
     let worker = VarWorker::new("a", rcvr_from_manager, sndr_to_manager.clone());
     tokio::spawn(worker.run());
