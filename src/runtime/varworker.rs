@@ -4,7 +4,7 @@ use crate::{
     frontend::meerast::Expr,
     runtime::{
         lock::{Lock, LockKind},
-        message::{Message, Val},
+        message::{Message, Val, PropaChange},
         transaction::{Txn, TxnId, WriteToName},
     },
 };
@@ -23,6 +23,7 @@ pub struct VarWorker {
     pub receiver_from_manager: Receiver<Message>,
     pub sender_to_manager: Sender<Message>,
     pub senders_to_subscribers: HashMap<String, Sender<Message>>,
+    // Can abstract all four into Worker, see hig-demo repo
 
     pub value: Option<Val>,
     pub latest_write_txn: Option<Txn>,
@@ -107,7 +108,7 @@ impl VarWorker {
                     self.locks.remove(tbr);
                 }
             }
-            Message::ReadVarRequest { txn } => {
+            Message::UsrReadVarRequest { txn } => {
                 let mut self_r_locks_held_by_txn: HashSet<Lock> = HashSet::new();
                 // let mut self_w_locks_held_by_txn: HashSet<Lock> = HashSet::new();
                 for rl in self.locks.iter() {
@@ -121,7 +122,7 @@ impl VarWorker {
                 // self.pred_txns.insert(txn.clone());
                 let _ = self
                     .sender_to_manager
-                    .send(Message::ReadVarResult {
+                    .send(Message::UsrReadVarResult {
                         var_name: self.name.clone(),
                         result: self.value.clone(),
                         result_provides: if self.latest_write_txn == None {
@@ -162,7 +163,7 @@ impl VarWorker {
                 };
                 let _ = sender_to_subscriber.send(respond_msg).await.unwrap();
             }
-            Message::WriteVarRequest {
+            Message::UsrWriteVarRequest {
                 txn,
                 write_val,
                 requires,
@@ -229,11 +230,12 @@ impl VarWorker {
             self.value = Some(pending_w.value.clone());
             for (_, sndr) in self.senders_to_subscribers.iter() {
                 let _ = sndr
-                    .send(Message::Propagate {
+                    .send(Message::Propagate { propa_change: PropaChange {
                         from_name: self.name.clone(),
                         new_val: pending_w.value.clone(),
-                        provide: propa_pvds.clone(),
-                        require: propa_reqs.clone(),
+                        provides: propa_pvds.clone(),
+                        requires: propa_reqs.clone(),
+                        }
                     })
                     .await
                     .unwrap();
@@ -276,7 +278,7 @@ impl VarWorker {
         }
     }
 
-    pub async fn run(mut self) {
+    pub async fn run_varworker(mut self) {
         while let Some(msg) = self.receiver_from_manager.recv().await {
             let _ = self.handle_message(msg).await;
             let _ = self.tick().await;
@@ -289,7 +291,7 @@ async fn write_then_read() {
     let (sndr_to_worker, rcvr_from_manager) = mpsc::channel(1024);
     let (sndr_to_manager, mut rcvr_from_worker) = mpsc::channel(1024);
     let worker = VarWorker::new("a", rcvr_from_manager, sndr_to_manager.clone());
-    tokio::spawn(worker.run());
+    tokio::spawn(worker.run_varworker());
     let write_txn = Txn {
         id: TxnId::new(),
         writes: vec![WriteToName {
@@ -313,7 +315,7 @@ async fn write_then_read() {
             _ => panic!(),
         }
     }
-    let write_msg = Message::WriteVarRequest {
+    let write_msg = Message::UsrWriteVarRequest {
         txn: write_txn.clone(),
         write_val: Val::Int(5),
         requires: HashSet::new(),
@@ -337,13 +339,13 @@ async fn write_then_read() {
             _ => panic!(),
         }
     }
-    let read_msg = Message::ReadVarRequest {
+    let read_msg = Message::UsrReadVarRequest {
         txn: read_txn.clone(),
     };
     let _ = sndr_to_worker.send(read_msg).await.unwrap();
     if let Some(msg) = rcvr_from_worker.recv().await {
         match msg {
-            Message::ReadVarResult {
+            Message::UsrReadVarResult {
                 var_name,
                 result,
                 result_provides,
