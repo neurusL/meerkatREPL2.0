@@ -20,6 +20,11 @@ pub enum BinOp {
     Or,
 }
 
+pub struct Assn {
+    dest: Expr,
+    src: Expr,
+}
+
 pub enum Expr {
     /// Basic Lambda Core expressions
     Number { val: i32 },
@@ -52,7 +57,42 @@ pub enum Expr {
     },
 
     /// Action 
-    // Action {
-    //     stmt: Stmt
-    // }
+    Action {
+        stmt: Vec<Assn>
+    },
+}
+
+pub enum Decl {
+    Import {
+        srv_name: String,
+    },
+    VarDecl {
+        name: String,
+        val: Expr,
+    },
+    DefDecl {
+        name: String,
+        val: Expr,
+        is_pub: bool,
+    },
+}
+
+pub struct Service {
+    name: String,
+    decls: Vec<Decl>,
+}
+
+pub struct Prog {
+    services: Vec<Service>,
+}
+
+pub enum ReplCmd {
+    Do(Expr),
+    Decl(Vec<Decl>),
+    Exit,
+
+    // service related commands 
+    // Service(Service),
+    // Open(String),
+    // Close,
 }
