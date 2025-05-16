@@ -1,0 +1,188 @@
+use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp};
+
+grammar;
+
+pub Prog: Prog = {
+    <services: Services> => Prog { services }
+}
+    
+
+Service: Service = {
+    "service" <i:Ident> "{" <ds:Decls> "}" => {
+        Service { name: i, decls: ds }
+    },
+}
+
+Services: Vec<Service> = Service*;
+
+Decl: Decl = {
+    "import" <i:Ident> => {
+        Decl::Import { srv_name: i }
+    },
+    "var" <i:Ident> "=" <e:Expr> => {
+        Decl::VarDecl { name: i, val: e }
+    },
+    "pub" "def" <i:Ident> "=" <e:Expr> => {
+        Decl::DefDecl { name: i, val: e, is_pub: true }
+    },
+    "def" <i:Ident> "=" <e:Expr> => {
+        Decl::DefDecl { name: i, val: e, is_pub: false }
+    },
+}
+
+Decls: Vec<Decl> = Decl*;
+
+Assn: Assn = {
+    <i:Ident> "=" <e:Expr> => Assn { dest: i, src: e }
+}
+
+Assns: Vec<Assn> = Assn*;
+
+Params: Vec<Expr> = {
+    <mut v:(<Ident> ",")*> <e:Ident?> => 
+    match e {
+        None => v,
+        Some(e) => {
+            v.push(Expr::Variable{ident: e});
+            v
+        }
+    }
+}
+
+Args: Vec<Expr> = {
+    <mut v:(<Expr> ",")*> <e:Expr?> => 
+    match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+}
+
+SubExpr: Expr = {
+    <n:Number> => Expr::Number { val: n },
+    <b:Bool> => Expr::Bool { val: b },
+    <i:Ident> => Expr::Variable { ident: i },
+    "(" <Expr> ")" => <>,
+    
+    <expr:SubExpr> "(" <args:Args> ")" => 
+        Expr::FuncApply { func: Box::new(expr), args },
+
+    "action" "{" <assns: Assns> "}" => Action { assns },
+    
+
+}
+
+Expr: Expr = {
+    #[precedence(level="0")]
+    SubExpr => <>,
+
+    #[precedence(level="1")] #[assoc(side="right")]
+    "-" <e:Expr> => {
+        Expr::Unop { expr: Box::new(e), op: UnOp::Neg }
+    },
+    "!" <e:Expr> => {
+        Expr::Unop { expr: Box::new(e), op: UnOp::Not }
+    },
+
+    #[precedence(level="2")] #[assoc(side="left")]
+    <e1:Expr> "*" <e2:Expr> => {
+        Expr::Binop { 
+            expr1: Box::new(e1), 
+            expr2: Box::new(e2), 
+            op: Binop::Mul 
+        }
+    },
+    <e1:Expr> "/" <e2:Expr> => {
+        Expr::Binop { 
+            expr1: Box::new(e1), 
+            expr2: Box::new(e2), 
+            op: Binop::Div 
+        }
+    },
+
+    #[precedence(level="3")] #[assoc(side="left")]
+    <e1:Expr> "+" <e2:Expr> => {
+        Expr::Binop { 
+            expr1: Box::new(e1), 
+            expr2: Box::new(e2), 
+            op: Binop::Add 
+        }
+    },
+    <e1:Expr> "-" <e2:Expr> => {
+        Expr::Binop { 
+            expr1: Box::new(e1), 
+            expr2: Box::new(e2), 
+            op: Binop::Sub 
+        }
+    },
+
+    #[precedence(level="4")] #[assoc(side="left")]
+    <e1:Expr> "==" <e2:Expr> => {
+        Expr::Binop { 
+            expr1: Box::new(e1), 
+            expr2: Box::new(e2), 
+            op: Binop::Eq 
+        }
+    },
+    <e1:Expr> "<" <e2:Expr> => {
+        Expr::Binop { 
+            expr1: Box::new(e1), 
+            expr2: Box::new(e2), 
+            op: Binop::Lt 
+        }
+    },
+    <e1:Expr> ">" <e2:Expr> => {
+        Expr::Binop { 
+            expr1: Box::new(e1), 
+            expr2: Box::new(e2), 
+            op: Binop::Gt 
+        }
+    },
+
+    #[precedence(level="5")] #[assoc(side="left")]
+    <e1:Expr> "&&" <e2:Expr> => {
+        Expr::Binop { 
+            expr1: Box::new(e1), 
+            expr2: Box::new(e2), 
+            op: Binop::And 
+        }
+    },
+
+    #[precedence(level="6")] #[assoc(side="left")]
+    <e1:Expr> "||" <e2:Expr> => {
+        Expr::Binop { 
+            expr1: Box::new(e1), 
+            expr2: Box::new(e2), 
+            op: Binop::Or 
+        }
+    },
+
+    #[precedence(level="7")] #[assoc(side="left")]
+    "if" <e1:Expr> "then" <e2:Expr> "else" <e3:Expr> => {
+        Expr::If { 
+            cond: Box::new(e1),
+            expr1: Box::new(e2), 
+            expr2: Box::new(e3), 
+        }    
+    },
+
+    #[precedence(level="8")] #[assoc(side="left")]
+    "fn" <params:Params> "=>" <e:Expr> => Func {
+        params, body: e
+    },
+}
+
+Bool: bool = {
+    "true" => true,
+    "false" => false, 
+}
+
+Number: i32 = {
+    <s:r"[0-9]+"> => i32::from_str(s).unwrap()
+}
+
+Ident: String = {
+    <i:r"[a-z_A-Z][0-9_a-z_A-Z]*"> => i
+}
