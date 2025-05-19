@@ -9,7 +9,7 @@
 <expr> ::= <ident> | <const> 
 | <unop> <expr> | <expr> <binop> <expr>
 | if <expr> then <expr> else <expr>
-| fn ( <params> ) => <expr>
+| fn <params> => <expr>
 | action { <assign>* }
 
 <decl> ::=
@@ -29,12 +29,12 @@
 <repl_input> ::= do <expr>
 ```
 
-## Example of uses 
+## Example of common uses 
 Meerkat source code:
 ``` 
 var x = 1;
 var y = 2;
-var foo = fn (id) => id
+var foo = fn id => id
 
 def xy = x * y;
 def inc_x_by_1 = action { x = x + 1 };
@@ -59,3 +59,6 @@ do inc_x_by_1
 do dec_cond_x
 exit
 ```
+
+## Edge case behaviors 
+TODO: think about how action interact with functions?

@@ -20,11 +20,13 @@ pub enum BinOp {
     Or,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Assn {
-    dest: Expr,
-    src: Expr,
+    pub dest: String,
+    pub src: Expr,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
     /// Basic Lambda Core expressions
     Number { val: i32 },
@@ -43,12 +45,12 @@ pub enum Expr {
 
     If {
         cond: Box<Expr>,
-        br1: Box<Expr>,
-        br2: Box<Expr>,
+        expr1: Box<Expr>,
+        expr2: Box<Expr>,
     },
 
     Func {
-        pars: Vec<Expr>,
+        params: Vec<String>,
         body: Box<Expr>
     },
     FuncApply {
@@ -58,10 +60,11 @@ pub enum Expr {
 
     /// Action 
     Action {
-        stmt: Vec<Assn>
+        assns: Vec<Assn>
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Decl {
     Import {
         srv_name: String,
@@ -77,15 +80,18 @@ pub enum Decl {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Service {
-    name: String,
-    decls: Vec<Decl>,
+    pub name: String,
+    pub decls: Vec<Decl>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Prog {
-    services: Vec<Service>,
+    pub services: Vec<Service>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ReplCmd {
     Do(Expr),
     Decl(Vec<Decl>),

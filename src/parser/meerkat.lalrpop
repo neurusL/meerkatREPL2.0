@@ -4,8 +4,7 @@ grammar;
 
 pub Prog: Prog = {
     <services: Services> => Prog { services }
-}
-    
+}   
 
 Service: Service = {
     "service" <i:Ident> "{" <ds:Decls> "}" => {
@@ -16,16 +15,16 @@ Service: Service = {
 Services: Vec<Service> = Service*;
 
 Decl: Decl = {
-    "import" <i:Ident> => {
+    "import" <i:Ident> ";" => {
         Decl::Import { srv_name: i }
     },
-    "var" <i:Ident> "=" <e:Expr> => {
+    "var" <i:Ident> "=" <e:Expr> ";" => {
         Decl::VarDecl { name: i, val: e }
     },
-    "pub" "def" <i:Ident> "=" <e:Expr> => {
+    "pub" "def" <i:Ident> "=" <e:Expr> ";" => {
         Decl::DefDecl { name: i, val: e, is_pub: true }
     },
-    "def" <i:Ident> "=" <e:Expr> => {
+    "def" <i:Ident> "=" <e:Expr> ";" => {
         Decl::DefDecl { name: i, val: e, is_pub: false }
     },
 }
@@ -38,12 +37,12 @@ Assn: Assn = {
 
 Assns: Vec<Assn> = Assn*;
 
-Params: Vec<Expr> = {
+Params: Vec<String> = {
     <mut v:(<Ident> ",")*> <e:Ident?> => 
     match e {
         None => v,
         Some(e) => {
-            v.push(Expr::Variable{ident: e});
+            v.push(e);
             v
         }
     }
@@ -69,7 +68,7 @@ SubExpr: Expr = {
     <expr:SubExpr> "(" <args:Args> ")" => 
         Expr::FuncApply { func: Box::new(expr), args },
 
-    "action" "{" <assns: Assns> "}" => Action { assns },
+    "action" "{" <assns: Assns> "}" => Expr::Action { assns },
     
 
 }
@@ -91,14 +90,14 @@ Expr: Expr = {
         Expr::Binop { 
             expr1: Box::new(e1), 
             expr2: Box::new(e2), 
-            op: Binop::Mul 
+            op: BinOp::Mul 
         }
     },
     <e1:Expr> "/" <e2:Expr> => {
         Expr::Binop { 
             expr1: Box::new(e1), 
             expr2: Box::new(e2), 
-            op: Binop::Div 
+            op: BinOp::Div 
         }
     },
 
@@ -107,14 +106,14 @@ Expr: Expr = {
         Expr::Binop { 
             expr1: Box::new(e1), 
             expr2: Box::new(e2), 
-            op: Binop::Add 
+            op: BinOp::Add 
         }
     },
     <e1:Expr> "-" <e2:Expr> => {
         Expr::Binop { 
             expr1: Box::new(e1), 
             expr2: Box::new(e2), 
-            op: Binop::Sub 
+            op: BinOp::Sub 
         }
     },
 
@@ -123,21 +122,21 @@ Expr: Expr = {
         Expr::Binop { 
             expr1: Box::new(e1), 
             expr2: Box::new(e2), 
-            op: Binop::Eq 
+            op: BinOp::Eq 
         }
     },
     <e1:Expr> "<" <e2:Expr> => {
         Expr::Binop { 
             expr1: Box::new(e1), 
             expr2: Box::new(e2), 
-            op: Binop::Lt 
+            op: BinOp::Lt 
         }
     },
     <e1:Expr> ">" <e2:Expr> => {
         Expr::Binop { 
             expr1: Box::new(e1), 
             expr2: Box::new(e2), 
-            op: Binop::Gt 
+            op: BinOp::Gt 
         }
     },
 
@@ -146,7 +145,7 @@ Expr: Expr = {
         Expr::Binop { 
             expr1: Box::new(e1), 
             expr2: Box::new(e2), 
-            op: Binop::And 
+            op: BinOp::And 
         }
     },
 
@@ -155,7 +154,7 @@ Expr: Expr = {
         Expr::Binop { 
             expr1: Box::new(e1), 
             expr2: Box::new(e2), 
-            op: Binop::Or 
+            op: BinOp::Or 
         }
     },
 
@@ -169,8 +168,9 @@ Expr: Expr = {
     },
 
     #[precedence(level="8")] #[assoc(side="left")]
-    "fn" <params:Params> "=>" <e:Expr> => Func {
-        params, body: e
+    "fn" <params:Params> "=>" <e:Expr> => 
+    Expr::Func {
+        params, body: Box::new(e)
     },
 }
 
@@ -180,9 +180,9 @@ Bool: bool = {
 }
 
 Number: i32 = {
-    <s:r"[0-9]+"> => i32::from_str(s).unwrap()
+    <s:r"[0-9]+"> => s.parse::<i32>().expect("Not a valid number") // i32::from_str(s).unwrap()
 }
 
 Ident: String = {
-    <i:r"[a-z_A-Z][0-9_a-z_A-Z]*"> => i
+    <i:r"[a-z_A-Z][0-9_a-z_A-Z]*"> => i.to_string()
 }
