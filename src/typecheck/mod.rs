@@ -78,7 +78,7 @@ impl Type {
 
 pub struct TypecheckEnv {
     
-    pub var_to_typ: HashMap<String, Type>, // Expr::Var to type, todo: change this to more efficient stack of hashmap
+    pub var_context: HashMap<String, Type>, // Expr::Var to type, todo: change this to more efficient stack of hashmap
     // pub var_to_typ_scheme: HashMap<String, TypeScheme>,
 
     // counter to generate new type var

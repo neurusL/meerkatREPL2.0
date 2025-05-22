@@ -10,7 +10,7 @@ impl TypecheckEnv {
             Expr::Number { val } => Int,
             Expr::Bool { val } => Bool,
             Expr::Variable { ident } => {
-                self.var_to_typ.get(ident)
+                self.var_context.get(ident)
                 .cloned()
                 .expect(&format!("cannot find var {:?} in context", ident))
             },
@@ -34,13 +34,13 @@ impl TypecheckEnv {
 
             Expr::Func { params, body } => {
                 // frozen current context 
-                let old_context = self.var_to_typ.clone();
+                let old_context = self.var_context.clone();
 
                 // first generate type variables for param, update context 
                 let mut param_types = vec![];
                 for param in params.iter() {
                     let typevar = self.gen_new_typevar();
-                    self.var_to_typ.insert(param.clone(), typevar.clone());
+                    self.var_context.insert(param.clone(), typevar.clone());
                     param_types.push(typevar);
                 }
                 // type infer func body mutates acc_subst
@@ -51,6 +51,9 @@ impl TypecheckEnv {
                     *param_typ = self.find(param_typ);
                 }
                 ret_typ = self.find(&ret_typ);
+
+                // restore old context
+                self.var_context = old_context;
 
                 Fun(param_types, Box::new(ret_typ))
             },
