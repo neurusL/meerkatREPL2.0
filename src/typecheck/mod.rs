@@ -2,8 +2,10 @@
 //! resource: https://course.ccs.neu.edu/cs4410sp19/lec_type-inference_notes.html
 //! 
 
-use std::{collections::{HashMap, HashSet}, fmt::format};
-use crate::ast::*;
+mod tc_expr;
+
+use std::{collections::{HashMap, HashSet}, fmt::format, iter::zip};
+
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Type {
@@ -75,10 +77,12 @@ impl Type {
 
 
 pub struct TypecheckEnv {
-    pub typevar_id: u64,
-    pub var_to_typ: HashMap<String, Type>, // Expr::Var to type
+    
+    pub var_to_typ: HashMap<String, Type>, // Expr::Var to type, todo: change this to more efficient stack of hashmap
     // pub var_to_typ_scheme: HashMap<String, TypeScheme>,
 
+    // counter to generate new type var
+    pub typevar_id: u64,
     // Type::var to type (canonical form)
     pub acc_subst: HashMap<String, Type> 
     
@@ -104,17 +108,26 @@ impl TypecheckEnv {
     }
 
 
-    // union-find based unify of two types
-    fn find(&self, name: &String) -> Type {
-        let typ = self.acc_subst.get(name)
-        .expect("cannot find typevar in accumulated subst map");
+    // union-find based unification
+    fn find(&self, typ: &Type) -> Type {
+        match typ {
+            Type::Int |
+            Type::Bool |
+            Type::Unit |
+            Type::Action |
+            Type::Fun(_, _) => typ.clone(),
 
-        if let Type::TypVar(subst_by_name) = typ {
-            if subst_by_name != name {
-                return self.find(subst_by_name)
-            }
-        } 
-        return typ.clone()
+            Type::TypVar(name) => {
+                let canonical_typ = self.acc_subst.get(name)
+                .expect("cannot find typevar in accumulated subst map");
+
+                if canonical_typ != typ {
+                    self.find(canonical_typ)
+                } else {
+                    canonical_typ.clone()
+                }
+            },
+        }
     }
 
     fn unify(&mut self, typ1: &Type, typ2: &Type) -> bool {
@@ -124,22 +137,26 @@ impl TypecheckEnv {
             (Type::Unit, Type::Unit) |
             (Type::Action, Type::Action) => true,
 
-            (Type::Fun(args1, ret1), Type::Fun(args2, ret2)) => {
-                todo!()
+            (Type::Fun(args1, ret_typ1), 
+             Type::Fun(args2, ret_typ2)) => {
+                if args1.len() != args2.len() { return false }
+                zip(args1, args2)
+                .all(|(typ1, typ2)| self.unify(typ1, typ2))
+                && self.unify(ret_typ1, ret_typ2)
             },
  
-            (Type::TypVar(name1), Type::TypVar(name2)) => {
-                let typ1 = self.find(name1);
-                let typ2 = self.find(name2);
+            (Type::TypVar(_), Type::TypVar(_)) => {
+                let cano_typ1 = self.find(typ1);
+                let cano_typ2 = self.find(typ2);
 
-                if let Type::TypVar(subst_by_name1) = typ1 {
-                    self.acc_subst.insert(subst_by_name1, typ2);
+                if let Type::TypVar(subst_by_name1) = cano_typ1 {
+                    self.acc_subst.insert(subst_by_name1, cano_typ2);
                     true
-                } else if let Type::TypVar(subst_by_name2) = typ2 {
-                    self.acc_subst.insert(subst_by_name2, typ1);
+                } else if let Type::TypVar(subst_by_name2) = cano_typ2 {
+                    self.acc_subst.insert(subst_by_name2, cano_typ1);
                     true
                 } else {
-                    self.unify(&typ1, &typ2)
+                    self.unify(&cano_typ1, &cano_typ2)
                 }
             },
 
