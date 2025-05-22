@@ -34,6 +34,14 @@ impl Type {
 }
 
 impl TypecheckEnv {
+    pub fn new() -> TypecheckEnv {
+        TypecheckEnv { 
+            var_context: HashMap::new(), 
+            typevar_id: 0, 
+            acc_subst: HashMap::new() 
+        }
+    }
+    
     pub fn gen_new_typevar(&mut self) -> Type {
         self.typevar_id += 1;
         let typevar_name = format!("tau{:?}", self.typevar_id);
@@ -108,5 +116,11 @@ impl TypecheckEnv {
 
             _ => false
         }
+    }
+}
+
+impl Default for TypecheckEnv {
+    fn default() -> Self {
+        Self::new()
     }
 }

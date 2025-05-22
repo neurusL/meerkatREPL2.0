@@ -6,8 +6,12 @@
 
 mod utils;
 mod tc_expr;
+mod tc_stmt;
+mod tc_srvs;
 
 use std::{collections::{HashMap, HashSet}, iter::zip};
+
+use crate::ast::Prog;
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -46,5 +50,12 @@ pub struct TypecheckEnv {
     // Type::var to type (canonical form)
     pub acc_subst: HashMap<String, Type> 
     
+}
+
+pub fn typecheck_prog(prog: &Prog) {
+    for srvs in prog.services.iter() {
+        let mut typ_env = TypecheckEnv::new();
+        typ_env.typecheck_service(srvs);
+    }
 }
 

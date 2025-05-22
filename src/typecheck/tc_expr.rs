@@ -4,7 +4,7 @@ use super::{Type, TypecheckEnv};
 use crate::ast::*;
 
 impl TypecheckEnv {
-    pub fn type_infer(&mut self, expr: &Expr) -> Type {
+    pub fn infer_expr(&mut self, expr: &Expr) -> Type {
         use Type::*;
         match expr {
             Expr::Number { val: _ } => Int,
@@ -18,12 +18,12 @@ impl TypecheckEnv {
             Expr::Unop { op, expr } => {
                 match op {
                     UnOp::Neg => {
-                        let typ = self.type_infer(expr);
+                        let typ = self.infer_expr(expr);
                         if self.unify(&typ, &Int) { Int }
                         else { panic!("cannot unify {:?} and int", typ) }
                     },
                     UnOp::Not => {
-                        let typ = self.type_infer(expr);
+                        let typ = self.infer_expr(expr);
                         if self.unify(&typ, &Bool) { Bool }
                         else { panic!("cannot unify {:?} and bool", typ) }
                     },
@@ -33,8 +33,8 @@ impl TypecheckEnv {
             Expr::Binop { op, expr1, expr2 } => {
                 match op {
                     BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div => {
-                        let typ1 = self.type_infer(expr1);
-                        let typ2 = self.type_infer(expr2);
+                        let typ1 = self.infer_expr(expr1);
+                        let typ2 = self.infer_expr(expr2);
                         if !self.unify(&typ1, &Int) {
                             panic!("cannot unify left hand side {:?} and int", typ1)
                         } else if !self.unify(&typ2, &Int) {
@@ -42,8 +42,8 @@ impl TypecheckEnv {
                         } else { Int }
                     },
                     BinOp::Lt | BinOp::Gt => {
-                        let typ1 = self.type_infer(expr1);
-                        let typ2 = self.type_infer(expr2);
+                        let typ1 = self.infer_expr(expr1);
+                        let typ2 = self.infer_expr(expr2);
                         if !self.unify(&typ1, &Int) {
                             panic!("cannot unify left hand side {:?} and int", typ1)
                         } else if !self.unify(&typ2, &Int) {
@@ -52,8 +52,8 @@ impl TypecheckEnv {
                     },
 
                     BinOp::And | BinOp::Or => {
-                        let typ1 = self.type_infer(expr1);
-                        let typ2 = self.type_infer(expr2);
+                        let typ1 = self.infer_expr(expr1);
+                        let typ2 = self.infer_expr(expr2);
                         if !self.unify(&typ1, &Bool) {
                             panic!("cannot unify left hand side {:?} and bool", typ1)
                         } else if !self.unify(&typ2, &Bool) {
@@ -62,8 +62,8 @@ impl TypecheckEnv {
                     },
 
                     BinOp::Eq => {
-                        let typ1 = self.type_infer(expr1);
-                        let typ2 = self.type_infer(expr2);
+                        let typ1 = self.infer_expr(expr1);
+                        let typ2 = self.infer_expr(expr2);
                         if !self.unify(&typ1, &typ2) {
                             panic!("cannot unify {:?} and {:?}", typ1, typ2)
                         } else { Bool }
@@ -72,12 +72,12 @@ impl TypecheckEnv {
             },
 
             Expr::If { cond, expr1, expr2 } => {
-                let cond_typ = self.type_infer(cond);
+                let cond_typ = self.infer_expr(cond);
                 if !self.unify(&cond_typ, &Bool) {
                     panic!("cannot unify {:?} and bool", cond_typ);
                 } 
-                let typ1 = self.type_infer(expr1);
-                let typ2: Type = self.type_infer(expr2);
+                let typ1 = self.infer_expr(expr1);
+                let typ2: Type = self.infer_expr(expr2);
                 if !self.unify(&typ1, &typ2) {
                     panic!("cannot unify {:?} and {:?}", typ1, typ2);
                 }
@@ -99,7 +99,7 @@ impl TypecheckEnv {
                 }
 
                 // type infer func body mutates acc_subst
-                let mut ret_typ = self.type_infer(&body);
+                let mut ret_typ = self.infer_expr(&body);
 
                 // generate function type signature of canonical form 
                 for param_typ in param_types.iter_mut() {
@@ -114,14 +114,14 @@ impl TypecheckEnv {
             },
 
             Expr::FuncApply { func, args } => {
-                let func_typ = self.type_infer(func);
+                let func_typ = self.infer_expr(func);
                 if let Type::Fun(arg_typs, ret_typ) = func_typ {
                     if arg_typs.len() != args.len() {
                         panic!("wrong number of argument to apply");
                     } else {
                         for (i, arg) in args.iter().enumerate() {
                             let typ_i: &Type = &arg_typs[i];
-                            let typ_i_actual = self.type_infer(arg);
+                            let typ_i_actual = self.infer_expr(arg);
                             if !self.unify(typ_i, &typ_i_actual) {
                                 panic!("cannot unify {:?}th argument, 
                                     expect {:?} got {:?}",
@@ -140,5 +140,6 @@ impl TypecheckEnv {
 }
 
 // TODO List 
+// (priority) implement statics for actions
 // 1. more efficient implementation of var context 
 // 2. add language feature: let binding
