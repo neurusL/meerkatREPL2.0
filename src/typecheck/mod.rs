@@ -9,7 +9,7 @@ mod tc_expr;
 mod tc_stmt;
 mod tc_srvs;
 
-use std::{collections::{HashMap, HashSet}, iter::zip};
+use std::{collections::{HashMap, HashSet}, iter::zip, fmt::Display};
 
 use crate::ast::Prog;
 
@@ -52,10 +52,21 @@ pub struct TypecheckEnv {
     
 }
 
+impl Display for TypecheckEnv {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "------------------\n")?;
+        for (var_name, var_typ) in self.var_context.iter() {
+            write!(f, "{:?}: {:?}\n", var_name, var_typ)?;
+        }
+        write!(f, "------------------\n")
+    }
+}
+
 pub fn typecheck_prog(prog: &Prog) {
     for srvs in prog.services.iter() {
         let mut typ_env = TypecheckEnv::new();
         typ_env.typecheck_service(srvs);
+        print!("service: {:?}\n {}", srvs.name, typ_env);
     }
 }
 

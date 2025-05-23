@@ -41,10 +41,15 @@ impl TypecheckEnv {
             acc_subst: HashMap::new() 
         }
     }
-    
+
     pub fn gen_new_typevar(&mut self) -> Type {
         self.typevar_id += 1;
         let typevar_name = format!("tau{:?}", self.typevar_id);
+        self.acc_subst.insert(
+            typevar_name.clone(), 
+            Type::TypVar(typevar_name.clone())
+        );
+
         Type::TypVar(typevar_name)
     }
 
@@ -72,7 +77,7 @@ impl TypecheckEnv {
 
             Type::TypVar(name) => {
                 let canonical_typ = self.acc_subst.get(name)
-                .expect("cannot find typevar in accumulated subst map");
+                .expect(&format!("cannot find {:?} in accumulated subst map", name));
 
                 if canonical_typ != typ {
                     self.find(canonical_typ)
@@ -99,7 +104,7 @@ impl TypecheckEnv {
                 && self.unify(ret_typ1, ret_typ2)
             },
  
-            (Type::TypVar(_), Type::TypVar(_)) => {
+            (Type::TypVar(_), _) | (_, Type::TypVar(_))  => {
                 let cano_typ1 = self.find(typ1);
                 let cano_typ2 = self.find(typ2);
 

@@ -3,25 +3,17 @@ service test1 {
     var y = 2;
     def f = x + y;
     pub def g = f * f;
-    pub def h = mult(f,g);
 
-    pub def inc_x = action { x = x + 1};
     pub def mult = (fn x,y => (
         x * y
     ));
-    pub def id = (fn x => x);
-}
 
-service test2 {
-    var x = 1;
-    var y = 2;
-    def f = (((x + y)));
-    pub def g = f * (((((f)))));
     pub def h = mult(f,g);
 
     pub def inc_x = action { x = x + 1};
-    pub def mult = (fn x,y => (
-        mult(x, y)
-    ));
+    
     pub def id = (fn x => x);
+    pub def a_b_ab = fn x, z => fn y => x (y, z);
+    pub def h = id(g);
 }
+

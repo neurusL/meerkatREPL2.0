@@ -93,9 +93,9 @@ impl TypecheckEnv {
                 // first generate type variables for param, update context 
                 let mut param_types = vec![];
                 for param in params.iter() {
-                    let typevar = self.gen_new_typevar();
-                    self.var_context.insert(param.clone(), typevar.clone());
-                    param_types.push(typevar);
+                    let typ = self.gen_new_typevar();
+                    self.var_context.insert(param.clone(), typ.clone());
+                    param_types.push(typ);
                 }
 
                 // type infer func body mutates acc_subst
@@ -129,8 +129,19 @@ impl TypecheckEnv {
                             } 
                         }
                         self.find(&ret_typ)
+
                     }
-                } else { panic!("cannot apply a non-function") }
+                } else {
+                    let ret_typ = self.gen_new_typevar();
+                    let arg_typs = args.iter()
+                    .map(|a| self.infer_expr(a))
+                    .collect();
+
+                    let func_typ_actual = Type::Fun(arg_typs, Box::new(ret_typ.clone()));
+                    self.unify(&func_typ, &func_typ_actual);
+                    self.find(&ret_typ)
+                }
+
             },
 
             // more todo on Action type

@@ -20,9 +20,13 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     let file_content = fs::read_to_string(file_name).expect("Couldn't read file");
 
     let meerkat_parser = meerkat::ProgParser::new();
-    let ast = meerkat_parser.parse(&file_content).map_err(|e|
-    format!("Couldn't parse file. Fail with message {:?}", e));
-    println!("{:?}", ast);
+    let prog = match meerkat_parser.parse(&file_content) {
+        Ok(ast) => ast,
+        Err(e) => panic!("Parse Error: {:?}", e)
+    };
+
+    let _ = typecheck::typecheck_prog(&prog);
+    
     // runtime.repl
     Ok(())
 }
