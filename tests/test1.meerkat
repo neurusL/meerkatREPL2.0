@@ -7,13 +7,22 @@ service test1 {
     pub def mult = (fn x,y => (
         x * y
     ));
+    pub def proj_5 = fn x1,x2,x3,x4,x5 => x5;
 
     pub def h = mult(f,g);
 
-    pub def inc_x = action { x = x + 1};
+    pub def inc_x = action { x = x + x; y = y; };
     
     pub def id = (fn x => x);
-    pub def a_b_ab = fn x, z => fn y => x (y, z);
-    pub def h = id(g);
+    pub def unit = (fn => 1);
+    pub def a_b_ab = fn x, z => fn y => x && (y && z);
+    
+    pub def add = fn x => fn y => x + y;
+    pub def add_5 = add(5);
+
+    pub def h1 = id(g);
+    pub def h2 = a_b_ab(true, false);
+    pub def h3 = h2(false);
+    pub def h4 = add_5(6);
 }
 

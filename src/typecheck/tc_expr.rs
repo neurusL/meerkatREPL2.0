@@ -145,7 +145,10 @@ impl TypecheckEnv {
             },
 
             // more todo on Action type
-            Expr::Action { assns } => Action,
+            Expr::Action { assns } => {
+                assns.iter().for_each(|assn| self.typecheck_assn(assn));
+                Action
+            },
         }
     }
 }

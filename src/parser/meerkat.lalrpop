@@ -32,7 +32,7 @@ Decl: Decl = {
 Decls: Vec<Decl> = Decl*;
 
 Assn: Assn = {
-    <i:Ident> "=" <e:Expr> => Assn { dest: i, src: e }
+    <i:Ident> "=" <e:Expr> ";" => Assn { dest: i, src: e }
 }
 
 Assns: Vec<Assn> = Assn*;

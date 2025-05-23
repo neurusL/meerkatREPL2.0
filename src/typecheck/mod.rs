@@ -39,6 +39,28 @@ pub enum Type {
 //     }
 // }
 
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::Int => write!(f, "int"),
+            Type::Bool => write!(f, "bool"),
+            Type::Unit => write!(f, "unit"),
+            Type::Action => write!(f, "action"),
+            Type::Fun(args, ret) => {
+                let joined = args.iter()
+                .map(|t| format!("{}",t))
+                .collect::<Vec<_>>() 
+                .join(",");
+                if args.len() > 1 {
+                    write!(f, "({})->{}", joined, ret)
+                } else {
+                    write!(f, "{}->{}", joined, ret)
+                }
+            },
+            Type::TypVar(name) => write!(f, "{}",name),
+        }
+    }
+}
 
 pub struct TypecheckEnv {
     
@@ -56,7 +78,7 @@ impl Display for TypecheckEnv {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "------------------\n")?;
         for (var_name, var_typ) in self.var_context.iter() {
-            write!(f, "{:?}: {:?}\n", var_name, var_typ)?;
+            write!(f, "{}: {}\n", var_name, var_typ)?;
         }
         write!(f, "------------------\n")
     }
