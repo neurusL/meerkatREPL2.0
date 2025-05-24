@@ -1,8 +1,9 @@
-use std::{collections::HashSet, fmt::Display};
+use std::{collections::{HashMap, HashSet}, fmt::Display};
 use crate::ast::{Assn, Expr};
 
 mod utils;
 mod eval_expr;
+mod eval_stmt;
 
 #[derive(Debug, Clone)] 
 pub enum Val {
@@ -31,8 +32,9 @@ impl Display for Val {
 
 
 pub struct Evaluator {
-    var_id_cnt: i32,
-    reactive_names: HashSet<String>,
+    pub var_id_cnt: i32,
+    pub reactive_names: HashSet<String>,
+    pub env: HashMap<String, Val>,
 }
 
 impl Evaluator {
