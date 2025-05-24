@@ -3,7 +3,9 @@ use std::collections::{HashMap, HashSet};
 use super::Expr;
 
 impl Expr {
-    pub fn free_var(&self, var_binded: &HashSet<String>) -> HashSet<String> {
+    pub fn free_var(&self, 
+        var_binded: &HashSet<String>, // should be initialized by all reactive name declared in the service
+    ) -> HashSet<String> {
         match self {
             Expr::Number { .. } |
             Expr::Bool { .. } => HashSet::new(),
@@ -43,9 +45,10 @@ impl Expr {
             Expr::Action { assns } => {
                 let mut free_vars = HashSet::new();
                 for assn in assns {
-                    if var_binded.contains(&assn.dest) { 
-                        free_vars.insert(assn.dest.clone());
-                    }
+                    // dest should never be free, each dest should be declared before use 
+                    // if var_binded.contains(&assn.dest) { 
+                    //     free_vars.insert(assn.dest.clone());
+                    // }
                     free_vars.extend(assn.src.free_var(var_binded));
                 }
                 free_vars
@@ -55,7 +58,10 @@ impl Expr {
 
     /// alpha renaming of expression e
     /// rename x1, x2, ..., x_n to y1, y2, ..., y_n if x is free in expresion e
-    pub fn alpha_rename(&mut self, var_binded: &HashSet<String>, renames: &HashMap<String, String>) {
+    pub fn alpha_rename(&mut self, 
+        var_binded: &HashSet<String>, 
+        renames: &HashMap<String, String>
+    ) {
         match self {
             Expr::Number { .. } |
             Expr::Bool { .. } => {},
@@ -87,13 +93,14 @@ impl Expr {
                     arg.alpha_rename(var_binded, renames);
                 }
             },
-            
+
             Expr::Action { assns } => {
                 for assn in assns {
-                    let dest = &mut assn.dest;
-                    if !var_binded.contains(dest) && renames.contains_key(dest){
-                        *dest = renames.get(dest).unwrap().clone();
-                    }
+                    // dest should never be renamed, not influenced by capture
+                    // let dest = &mut assn.dest;
+                    // if !var_binded.contains(dest) && renames.contains_key(dest){
+                    //     *dest = renames.get(dest).unwrap().clone();
+                    // }
                     assn.src.alpha_rename(var_binded, renames);
                 }
             },

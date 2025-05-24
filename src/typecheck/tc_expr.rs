@@ -93,7 +93,7 @@ impl TypecheckEnv {
                 // first generate type variables for param, update context 
                 let mut param_types = vec![];
                 for param in params.iter() {
-                    let typ = self.gen_new_typevar();
+                    let typ = self.gen_typevar();
                     self.var_context.insert(param.clone(), typ.clone());
                     param_types.push(typ);
                 }
@@ -132,7 +132,7 @@ impl TypecheckEnv {
 
                     }
                 } else {
-                    let ret_typ = self.gen_new_typevar();
+                    let ret_typ = self.gen_typevar();
                     let arg_typs = args.iter()
                     .map(|a| self.infer_expr(a))
                     .collect();

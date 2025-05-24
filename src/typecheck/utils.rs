@@ -42,7 +42,7 @@ impl TypecheckEnv {
         }
     }
 
-    pub fn gen_new_typevar(&mut self) -> Type {
+    pub fn gen_typevar(&mut self) -> Type {
         self.typevar_id += 1;
         let typevar_name = format!("tau{:?}", self.typevar_id);
         self.acc_subst.insert(

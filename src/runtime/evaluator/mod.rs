@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashSet, fmt::Display};
 use crate::ast::{Assn, Expr};
 
 mod utils;
@@ -26,5 +26,20 @@ impl From<Val> for Expr {
 impl Display for Val {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Expr::from(self.clone()))
+    }
+}
+
+
+pub struct Evaluator {
+    var_id_cnt: i32,
+    reactive_names: HashSet<String>,
+}
+
+impl Evaluator {
+    pub fn new(reactive_names: HashSet<String>) -> Evaluator {
+        Evaluator { 
+            var_id_cnt: 0,
+            reactive_names
+        }
     }
 }
