@@ -24,5 +24,7 @@ service test1 {
     pub def h2 = a_b_ab(true, false);
     pub def h3 = h2(false);
     pub def h4 = add_5(6);
+
+    pub def func_on_action = fn x => fn y => action { x = y; };
 }
 
