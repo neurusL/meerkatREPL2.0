@@ -11,13 +11,13 @@ impl Evaluator {
         var
     }
 
-    pub fn subst(&mut self, expr: &mut Expr, var_to_expr: &HashMap<String, Val>) {
+    pub fn subst(&mut self, expr: &mut Expr, var_to_expr: &HashMap<String, Expr>) {
         match expr {
             Expr::Number { val } => {},
             Expr::Bool { val } => {},
             Expr::Variable { ident } => {
                 if let Some(e) = var_to_expr.get(ident) {
-                    *expr = Expr::from(e.clone());
+                    *expr = e.clone();
                 }
             },
             Expr::Unop { op, expr } => {
@@ -41,9 +41,9 @@ impl Evaluator {
     
                     // - if params contain free var in M, alpha-rename such params 
                     // expr to avoid "capture"
-                    let free_var_in_m = Expr::from(m.clone())
+                    let free_var_in_m = m
                     .free_var(&self.reactive_names);
-                
+
                     let mut renames = HashMap::new();
                     for param in params.iter_mut() {
                         if free_var_in_m.contains(param) {

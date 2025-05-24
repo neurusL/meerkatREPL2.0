@@ -1,90 +1,118 @@
 
-use std::{collections::HashMap, iter::zip};
+use std::{collections::HashMap, iter::zip, ops::Deref};
 use crate::ast::{Assn, BinOp, Expr, UnOp};
 
 use super::{Evaluator, Val};
 
 impl Evaluator {
-    pub fn eval_expr(&mut self, expr: &mut Expr) -> Result<Val, String> {
+
+    pub fn calc_unop(op: UnOp, expr: &Expr) -> Result<Expr, String> {
+        if let Expr::Number { val } = expr {
+            match op {
+                UnOp::Neg => Ok(Expr::Number { val: -val }),
+                _ => panic!()
+            }
+        } else if let Expr::Bool { val } = expr {
+            match op {
+                UnOp::Not => Ok(Expr::Bool { val: !val }),
+                _ => panic!()
+            }
+        } else { Err(format!("calculate unop expression cannot be 
+                applied to {}", *expr))
+        }
+    }
+
+    pub fn calc_binop(op: BinOp, expr1: &Expr, expr2: &Expr) -> Result<Expr, String> {
+        if let (Expr::Number { val: val1 }, Expr::Number { val: val2 }) = (expr1, expr2) {
+            let (val1, val2) = (*val1, *val2);
+            match op {
+                BinOp::Add => Ok(Expr::Number { val: val1 + val2 }),
+                BinOp::Sub => Ok(Expr::Number { val: val1 - val2 }),
+                BinOp::Mul => Ok(Expr::Number { val: val1 * val2 }),
+                BinOp::Div => Ok(Expr::Number { val: val1 / val2 }),
+                BinOp::Eq => Ok(Expr::Bool { val: val1 == val2 }),
+                BinOp::Lt => Ok(Expr::Bool { val: val1 < val2 }),
+                BinOp::Gt => Ok(Expr::Bool { val: val1 > val2 }),
+                _ => panic!()
+            }
+        } else if let (Expr::Bool { val: val1 }, Expr::Bool { val: val2 }) = (expr1, expr2) {
+            let (val1, val2) = (*val1, *val2);
+            match op {
+                BinOp::And => Ok(Expr::Bool { val: val1 && val2 }),
+                BinOp::Or => Ok(Expr::Bool { val: val1 || val2 }),
+                _ => panic!()
+            }
+        } else {
+            Err(format!("calculate binop expression cannot be applied 
+                on {} {:?} {}", *expr1, op, *expr2))
+        }
+    }
+    
+    /// inplace evaluator of Expr
+    pub fn eval_expr(&mut self, expr: &mut Expr) -> Result<(), String> {
         match expr {
-            Expr::Number { val } => Ok(Val::Number(*val)),
-            Expr::Bool { val } => Ok(Val::Bool(*val)),
-            Expr::Variable { ident } => self.env.get(ident).cloned().ok_or_else(|| format!("variable '{}' not found", ident)),
-            Expr::Unop { op, expr } => {
-                let val = &self.eval_expr(expr)?;
-                match op {
-                    UnOp::Neg => match val {
-                        Val::Number(i) => Ok(Val::Number(-i)),
-                        _ => Err(format!("unary operator {:?} cannot be applied to {}", op, val)),
+            Expr::Number { val } => Ok(()),
+            Expr::Bool { val } => Ok(()),
+            Expr::Variable { ident } => {
+                let val = self.env
+                .get(ident).cloned()
+                .ok_or_else(|| format!("variable '{}' not found", ident));
+
+                val.map(|val| *expr = val)
+            },
+
+            Expr::Unop { op, expr: expr1 } => {
+                self.eval_expr(expr1)?;
+                match expr1.as_mut() { // note: as_mut() has same effect as &mut **expr1 here
+                    Expr::Number {..} | Expr::Bool{..} => {
+                        *expr = Self::calc_unop(*op, expr)?;
+                        Ok(())
                     },
-                    UnOp::Not => match val {
-                        Val::Bool(b) => Ok(Val::Bool(!b)),
-                        _ => Err(format!("unary operator {:?} cannot be applied to {}", op, val)),
-                    },
+                    _ => Err(format!("unary operator {:?} cannot be applied to 
+                        {}", op, **expr1))
                 }
             },
-            Expr::Binop { op, expr1, expr2 } => {
-                let val1 = &self.eval_expr(expr1)?;
-                let val2 = &self.eval_expr(expr2)?;
-                match op {
-                    BinOp::Add => match (val1, val2) {
-                        (Val::Number(i1), Val::Number(i2)) => Ok(Val::Number(i1 + i2)),
-                        _ => Err(format!("binary operator {:?} cannot be applied to {} and {}", op, val1, val2)),
-                    },
-                    BinOp::Sub => match (val1, val2) {
-                        (Val::Number(i1), Val::Number(i2)) => Ok(Val::Number(i1 - i2)),
-                        _ => Err(format!("binary operator {:?} cannot be applied to {} and {}", op, val1, val2)),
-                    },
-                    BinOp::Mul => match (val1, val2) {
-                        (Val::Number(i1), Val::Number(i2)) => Ok(Val::Number(i1 * i2)),
-                        _ => Err(format!("binary operator {:?} cannot be applied to {} and {}", op, val1, val2)),
-                    },
-                    BinOp::Div => match (val1, val2) {
-                        (Val::Number(i1), Val::Number(i2)) => Ok(Val::Number(i1 / i2)),
-                        _ => Err(format!("binary operator {:?} cannot be applied to {} and {}", op, val1, val2)),
-                    },
-                    BinOp::Eq => match (val1, val2) {
-                        (Val::Number(i1), Val::Number(i2)) => Ok(Val::Bool(i1 == i2)),
-                        (Val::Bool(b1), Val::Bool(b2)) => Ok(Val::Bool(b1 == b2)),
-                        _ => Err(format!("binary operator {:?} cannot be applied to {} and {}", op, val1, val2)),
-                    },
-                    BinOp::Gt => match (val1, val2) {
-                        (Val::Number(i1), Val::Number(i2)) => Ok(Val::Bool(i1 > i2)),
-                        _ => Err(format!("binary operator {:?} cannot be applied to {} and {}", op, val1, val2)),
-                    },
-                    BinOp::Lt => match (val1, val2) {
-                        (Val::Number(i1), Val::Number(i2)) => Ok(Val::Bool(i1 < i2)),
-                        _ => Err(format!("binary operator {:?} cannot be applied to {} and {}", op, val1, val2)),  
-                    },
-                    BinOp::And => match (val1, val2) {
-                        (Val::Bool(b1), Val::Bool(b2)) => Ok(Val::Bool(*b1 && *b2)),
-                        _ => Err(format!("binary operator {:?} cannot be applied to {} and {}", op, val1, val2)),
-                    },
-                    BinOp::Or => match (val1, val2) {
-                        (Val::Bool(b1), Val::Bool(b2)) => Ok(Val::Bool(*b1 || *b2)),
-                        _ => Err(format!("binary operator {:?} cannot be applied to {} and {}", op, val1, val2)),
-                    },
 
+            Expr::Binop { op, expr1, expr2 } => {
+                self.eval_expr(expr1)?;
+                self.eval_expr(expr2)?;
+                use Expr::*;
+                match (expr1.as_mut(), expr2.as_mut()) {
+                    (Number {..}, Number {..}) | (Bool{..}, Bool{..}) => {
+                        *expr = Self::calc_binop(*op, expr1, expr2)?;
+                        Ok(())
+                    },
+                    _ => Err(format!("binary operator {:?} cannot be applied to 
+                        {} and {}", op, **expr1, **expr2))
                 }
             },
 
             Expr::If { cond, expr1, expr2 } => {
-                let val = &self.eval_expr(cond)?;
-                match val {
-                    Val::Bool(b) => if *b { self.eval_expr(expr1) } else { self.eval_expr(expr2) },
-                    _ => Err(format!("if condition must be a boolean, got {}", val)),
+                self.eval_expr(cond)?;
+                match **cond {
+                    Expr::Bool{val} => {
+                        let new_expr = if val { 
+                            std::mem::take(expr1)
+                        } else { 
+                            std::mem::take(expr2)
+                        };
+                        *expr = *new_expr;
+                        self.eval_expr(expr)
+                    },
+                    _ => Err(format!("if condition must be a boolean, got {}", **cond)),
                 }
             },
 
             Expr::Func { params, body } => {
-                Ok(Val::Func(params.clone(), body.clone()))
+                // functions are values
+                Ok(())
             },
 
             Expr::FuncApply { func, args } => {
-                let func_val = self.eval_expr(func)?;
+                self.eval_expr(func)?;
 
-                match func_val {
-                    Val::Func(params, mut body) => {
+                match func.as_mut() {
+                    Expr::Func{params, body} => {
                         if params.len() != args.len() {
                             Err(format!("function expects {} arguments, got {}", 
                                 params.len(), args.len()))
@@ -94,20 +122,21 @@ impl Evaluator {
                             // 1. functional: by immediate substitution 
                             // 2. imperative: by maintaining a stack of environments
 
-                            let arg_vals = args.iter_mut()
-                                .map(|arg| self.eval_expr(arg))
-                                .collect::<Result<Vec<Val>, String>>()?;
+                            for arg in args.iter_mut() {
+                                self.eval_expr(arg)?;
+                            }
 
-                            let var_to_expr= zip(params, arg_vals)
-                                .map(|(arg, val)| (arg.clone(), val))
-                                .collect::<HashMap<String, Val>>();
+                            let var_to_expr= zip(params, args)
+                                .map(|(arg, val)| (arg.clone(), val.clone()))
+                                .collect::<HashMap<String, Expr>>();
 
-                            self.subst(&mut body, &var_to_expr);
-                            
-                            self.eval_expr(&mut body)
+                            self.subst(body, &var_to_expr);
+
+                            *expr = std::mem::take(body);
+                            self.eval_expr(expr)
                         }
                     },
-                    _ => Err(format!("cannot apply non-function {}", func_val)),
+                    _ => Err(format!("cannot apply non-function")),
                 }
             },
 
@@ -115,7 +144,7 @@ impl Evaluator {
                 for assn in assns.iter_mut() {
                     self.eval_assn(assn)?;
                 }
-                Ok(Val::Action(assns.clone()))
+                Ok(())
             }, 
         }
     }

@@ -25,6 +25,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let _ = typecheck::typecheck_prog(&prog);
+    let _ = runtime::evaluator::eval_prog(&prog);
     
     // runtime.repl
     Ok(())

@@ -1,5 +1,5 @@
 use std::{collections::{HashMap, HashSet}, fmt::Display};
-use crate::ast::{Assn, Expr};
+use crate::ast::{Assn, Expr, Prog};
 
 mod utils;
 mod eval_expr;
@@ -34,14 +34,26 @@ impl Display for Val {
 pub struct Evaluator {
     pub var_id_cnt: i32,
     pub reactive_names: HashSet<String>,
-    pub env: HashMap<String, Val>,
+    pub env: HashMap<String, Expr>,
 }
 
 impl Evaluator {
     pub fn new(reactive_names: HashSet<String>) -> Evaluator {
         Evaluator { 
             var_id_cnt: 0,
-            reactive_names
+            reactive_names,
+            env: HashMap::new(),
+        }
+    }
+}
+
+pub fn eval_prog(prog: &Prog) {
+    let mut prog = prog.clone();
+    for srvs in prog.services.iter_mut() {
+        let mut eval = Evaluator::new(HashSet::new());
+        for decl in srvs.decls.iter_mut() {
+            eval.eval_decl(decl);
+            println!("{}", decl);
         }
     }
 }

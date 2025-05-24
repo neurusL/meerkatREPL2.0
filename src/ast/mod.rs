@@ -106,24 +106,79 @@ pub enum ReplCmd {
     // Close,
 }
 
+impl Default for Expr {
+    fn default() -> Self {
+        Expr::Number { val: 0 }
+    }
+}
+
+impl Display for UnOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UnOp::Neg => write!(f, "-"),
+            UnOp::Not => write!(f, "!"),
+        }
+    }
+}
+
+impl Display for BinOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BinOp::Add => write!(f, "+"),
+            BinOp::Sub => write!(f, "-"),
+            BinOp::Mul => write!(f, "*"),
+            BinOp::Div => write!(f, "/"),
+            BinOp::Eq => write!(f, "=="),
+            BinOp::Lt => write!(f, "<"),
+            BinOp::Gt => write!(f, ">"),
+            BinOp::And => write!(f, "&&"),
+            BinOp::Or => write!(f, "||"),
+        }
+    }
+}
+
 impl Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expr::Number { val } => write!(f, "Int({})", val),
-            Expr::Bool { val } => write!(f, "Bool({})", val),
-            Expr::Variable { ident } => write!(f, "Var({})", ident),
+            Expr::Number { val } => write!(f, "{}", val),
+            Expr::Bool { val } => write!(f, "{}", val),
+            Expr::Variable { ident } => write!(f, "{}", ident),
             Expr::Unop { op, expr } => 
-                write!(f, "{:?}{}", op, expr),
+                write!(f, "{}{}", op, expr),
             Expr::Binop { op, expr1, expr2 } => 
-                write!(f, "{} {:?} {}", expr1, op, expr2),
+                write!(f, "{} {} {}", expr1, op, expr2),
             Expr::If { cond, expr1, expr2 } => 
                 write!(f, "if {} then {} else {}", cond, expr1, expr2),
             Expr::Func { params, body } => 
-                write!(f, "Func({:?})[{}]", params, body),
+                write!(f, "fn({})[{}]", params.join(","), body),
             Expr::FuncApply { func, args } => 
-                write!(f, "{}({:?})", func, args),
+                write!(f, "{}({})", func, args.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")),
             Expr::Action { assns } => 
-                write!(f, "Action({:?})", assns),
+                write!(f, "Action({:?})", assns.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")),
+        }
+    }
+}
+
+impl Display for Assn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} = {}", self.dest, self.src)
+    }
+}
+
+impl Display for Decl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Decl::Import { srv_name } => todo!(),
+            Decl::VarDecl { name, val } => {
+                write!(f, "var {} = {}", name, val)
+            },
+            Decl::DefDecl { name, val, is_pub } => {
+                if *is_pub {
+                    write!(f, "pub def {} = {}", name, val)
+                } else {
+                    write!(f, "def {} = {}", name, val)
+                }
+            },
         }
     }
 }
