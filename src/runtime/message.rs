@@ -87,11 +87,11 @@ pub enum Message {
         propa_change: PropaChange, // a small change, make batch valid easier
     },
     Subscribe {
-        subscriber_name: String,
+        subscriber: String,
         sender_to_subscriber: Sender<Message>,
     },
     SubscriptionGranted {
-        from_name: String,
+        subscribe: String,
         value: Option<Val>,
         provides: HashSet<Txn>,
     },

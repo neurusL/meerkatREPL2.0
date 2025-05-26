@@ -46,12 +46,15 @@ impl LockState {
         }
     }
 
-    pub fn add_wait(&mut self, lock: Lock) {
-        // only allow lock older than all granted locks to wait
+    /// only allow lock older than all granted locks to wait
+    /// return true if lock added to waiting list
+    pub fn add_wait(&mut self, lock: Lock) -> bool {
         if let Some(oldest_lock) = &self.oldest_granted_lock {
-            if lock.txn_id > oldest_lock.txn_id { return }
+            // if receive lock younger than oldest granted lock, ignore 
+            if lock.txn_id > oldest_lock.txn_id { return false; }
         } 
-        self.waiting_locks.push(Reverse(lock));
+        self.waiting_locks.push(Reverse(lock)); // Reverse for min-heap
+        return true;
     }
 
     pub fn pop_oldest_wait(&mut self) -> Option<Lock> {
