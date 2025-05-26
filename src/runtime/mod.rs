@@ -1,7 +1,7 @@
 // pub mod instr;
-// pub mod lock;
+pub mod lock;
 // pub mod message;
-// pub mod transaction;
+pub mod transaction;
 // pub mod varworker;
 // pub mod defworker;
 // pub mod def_batch_utils;
@@ -9,3 +9,5 @@
 
 
 pub mod evaluator;
+
+pub mod var_actor;

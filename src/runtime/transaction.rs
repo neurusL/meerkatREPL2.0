@@ -2,7 +2,7 @@ use core::fmt;
 use std::hash::{Hash, Hasher};
 use tokio::time::Instant;
 
-use crate::frontend::meerast::Expr;
+use crate::ast::Expr;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Hash)]
 pub struct TxnId {
