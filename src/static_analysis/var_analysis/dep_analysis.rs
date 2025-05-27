@@ -1,0 +1,104 @@
+use std::{collections::{HashMap, HashSet}};
+
+use crate::ast;
+
+use super::DependAnalysis;
+
+
+impl DependAnalysis {
+    pub fn new(ast: &ast::Service) -> DependAnalysis {
+
+        let mut vars: HashSet<String> = HashSet::new();
+        let mut defs: HashSet<String> = HashSet::new();
+
+        let mut dep_graph: HashMap<String, HashSet<String>> = HashMap::new();
+
+        for decl in ast.decls.iter() {
+            match decl {
+                ast::Decl::VarDecl{name, ..} => {
+                    vars.insert(name.clone());
+                    dep_graph.insert(name.clone(), HashSet::new());
+                }
+                ast::Decl::DefDecl{name, val, ..} => {
+                    defs.insert(name.clone());
+                    let deps = val.free_var(&HashSet::new());
+                    dep_graph.insert(name.clone(), deps);
+                }
+                _ => {}
+            }
+        }
+
+        DependAnalysis {
+            vars, defs,
+            dep_graph,
+            dep_transtive: HashMap::new(),
+            dep_vars: HashMap::new(),
+        }
+    }
+
+    /// Performs a depth-first search on the dependency graph to calculate
+    /// the transitive dependencies for a given variable or definition.
+    /// # Arguments
+    /// * `vars` - set of variable names (no dependencies).
+    /// * `visited` - set of visited nodes in dfs.
+    /// * `calced` - map of def to their computed dependencies, only appeared 
+    ///    when finished computing for a def.
+    /// # Panics
+    /// * panic if a cycle is detected in the graph.
+    fn dfs_helper(
+        graph: &HashMap<String, HashSet<String>>, 
+        vars: &HashSet<String>,
+        visited: &mut HashSet<String>,
+        calced: &mut HashMap<String, HashSet<String>>,
+        name: &String
+    ) {
+        if calced.contains_key(name) {
+            return;
+        }
+
+        if visited.contains(name) {
+            panic!("Cycle detected in dependency graph of var and defs");
+        }
+        
+        visited.insert(name.clone());
+        let mut dep = HashSet::new();
+
+        for dep_name in graph.get(name)
+            .expect(&format!("No such name in dep graph: {}", name)) 
+        {
+            if !vars.contains(dep_name) {
+                Self::dfs_helper(graph, vars, visited, calced, dep_name);
+                dep.extend(calced.get(dep_name)
+                .expect(&format!("Not finished transitive dependency 
+                calculation of: {}", dep_name)).clone());
+            }
+            dep.insert(dep_name.clone());
+        }
+
+        calced.insert(name.clone(), dep);
+        
+    }
+
+    pub fn calc_dep_vars(&mut self) {
+        let mut visited = HashSet::new();
+
+        for name in self.defs.iter() {
+            Self::dfs_helper(
+                &self.dep_graph, 
+                &self.vars, 
+                &mut visited, 
+                &mut self.dep_transtive, 
+                name);
+        }
+
+        for name in self.defs.iter() {
+            self.dep_vars.insert(
+            name.clone(), 
+            self.dep_transtive.get(name)
+                .expect(&format!("cannot find def {} in trans dep", name))
+                .intersection(&self.vars)
+                .cloned().collect());
+        }
+    }
+}
+

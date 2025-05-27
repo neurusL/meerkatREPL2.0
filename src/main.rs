@@ -6,7 +6,7 @@ use tokio;
 
 pub mod ast;
 pub mod parser;
-pub mod typecheck;
+pub mod static_analysis;
 pub mod runtime;
 
 
@@ -24,7 +24,8 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
         Err(e) => panic!("Parse Error: {:?}", e)
     };
 
-    let _ = typecheck::typecheck_prog(&prog);
+    let _ = static_analysis::typecheck::typecheck_prog(&prog);
+    let _ = static_analysis::var_analysis::calc_dep_prog(&prog);
     let _ = runtime::evaluator::eval_prog(&prog);
     
     // runtime.repl

@@ -1,7 +1,5 @@
 use std::fmt::Display;
 
-mod utils;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UnOp {
     Neg, // negate

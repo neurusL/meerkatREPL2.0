@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::ast::{Assn, Decl, Expr};
 
 use super::{Evaluator, Val};
@@ -8,6 +10,10 @@ impl Evaluator {
             Decl::Import { srv_name } => todo!(),
             Decl::VarDecl { name, val } => {
                 self.reactive_names.insert(name.clone());
+
+                // var should have no depend
+                assert!(val.free_var(&HashSet::new()).is_empty());
+
                 self.eval_expr(val);
                 self.env.insert(name.clone(), val.clone());
             },

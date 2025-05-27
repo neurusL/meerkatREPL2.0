@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use crate::{
-    frontend::meerast::Expr,
+    ast::Expr,
     runtime::{lock::LockKind, transaction::Txn},
 };
 
