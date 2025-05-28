@@ -47,10 +47,11 @@ pub enum Msg {
         lock: Lock,
     },
     LockGranted {
-        txn: TxnId,
+        from_name: String,
+        lock: Lock,
     },
     LockAbort {
-        txn: TxnId,
+        lock: Lock,
     },
 }
 

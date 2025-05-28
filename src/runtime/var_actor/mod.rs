@@ -38,21 +38,27 @@ impl kameo::prelude::Message<Msg> for VarActor {
         match msg {
             Msg::LockRequest { lock } => {
                 if !self.lock_state.add_wait(lock.clone()) {
-                    return Some(Msg::LockAbort { txn: lock.txn_id });
+                    return Some(Msg::LockAbort { lock });
                 } else {
-                    return Some(Msg::LockGranted { txn: lock.txn_id });
+                    return Some(Msg::LockGranted { 
+                        from_name: self.name.clone(),
+                        lock
+                     });
                 }
             },
 
             Msg::LockRelease { lock } => {
-                self.lock_state.remove_granted(&lock);
+                self.lock_state.remove_granted_or_wait(&lock);
+                todo!("more logic to be added");
                 None
             },
 
             Msg::LockGranted {..} => { 
                 None
              },
-            Msg::LockAbort { txn } => todo!(),
+            Msg::LockAbort {..} => {
+                panic!("VarActor should not receive LockAbort message");
+            },
 
 
             Msg::UsrReadVarRequest { txn } => todo!(),

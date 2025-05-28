@@ -1,4 +1,4 @@
-use std::{cmp::Reverse, collections::{BinaryHeap, HashSet, VecDeque}};
+use std::{cmp::Reverse, collections::{BTreeSet, BinaryHeap, HashSet}};
 
 use super::transaction::{Txn, TxnId};
 
@@ -34,7 +34,7 @@ impl Ord for Lock {
 pub struct LockState {
     pub granted_locks: HashSet<Lock>,             // current lock granted
     pub oldest_granted_lock: Option<Lock>,
-    pub waiting_locks: BinaryHeap<Reverse<Lock>>, // locks waiting to be granted
+    pub waiting_locks: BTreeSet<Lock>, // locks waiting to be granted
 }
 
 impl LockState {
@@ -42,7 +42,7 @@ impl LockState {
         LockState {
             granted_locks: HashSet::new(),
             oldest_granted_lock: None,
-            waiting_locks: BinaryHeap::new(),
+            waiting_locks: BTreeSet::new(),
         }
     }
 
@@ -53,12 +53,12 @@ impl LockState {
             // if receive lock younger than oldest granted lock, ignore 
             if lock.txn_id > oldest_lock.txn_id { return false; }
         } 
-        self.waiting_locks.push(Reverse(lock)); // Reverse for min-heap
+        self.waiting_locks.insert(lock); // Reverse for min-heap
         return true;
     }
 
     fn pop_oldest_wait(&mut self) -> Option<Lock> {
-        self.waiting_locks.pop().map(|Reverse(l)| l)
+        self.waiting_locks.pop_first()
     }
 
     pub fn grant_oldest_wait(&mut self) {
@@ -83,8 +83,7 @@ impl LockState {
 
     pub fn remove_granted_or_wait(&mut self, lock: &Lock) {
         self.remove_granted(lock);
-
-        todo!("now I need a data structure efficiently support removing arbitrary waiting lock")
+        self.waiting_locks.remove(lock);
 
     }
 
