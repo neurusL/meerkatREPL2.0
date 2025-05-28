@@ -1,125 +1,82 @@
 use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
+
+use kameo::Reply;
+
 use crate::{
     ast::Expr,
-    runtime::{lock::LockKind, transaction::Txn},
+    runtime::{lock::Lock, transaction::TxnId},
 };
 
-use tokio::sync::mpsc::Sender;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Val {
-    Int(i32),
-    Bool(bool),
-    Action(Expr), // Expr have to be Action
-    Lambda(Expr), // Expr have to be Lambda
-}
-
-#[derive(Debug, Clone)]
-pub enum Message {
+#[derive(Debug, Clone, Reply)]
+pub enum Msg {
     UsrReadVarRequest {
-        txn: Txn,
+        txn: TxnId,
     },
     UsrReadVarResult {
+        txn: TxnId,
         var_name: String,
-        result: Option<Val>,
-        result_provides: HashSet<Txn>,
-        txn: Txn,
+        result: Option<Expr>,
+        result_provides: HashSet<TxnId>,
     },
     UsrWriteVarRequest {
-        txn: Txn,
-        write_val: Val,
-        requires: HashSet<Txn>,
+        txn: TxnId,
+        write_val: Expr,
+        requires: HashSet<TxnId>,
     },
+
     UsrReadDefRequest {
-        txn: Txn,
-        requires: HashSet<Txn>, // ?? Why we need this
+        txn: TxnId,
+        requires: HashSet<TxnId>, // ?? Why we need this
     },
     UsrReadDefResult {
-        txn: Txn,
+        txn: TxnId,
         name: String,
-        result: Option<Val>,
-        result_provide: HashSet<Txn>,
+        result: Option<Expr>,
+        result_provides: HashSet<TxnId>,
     },
 
-    DevReadRequest {
-        txn: Txn, 
-    },
-    DevReadResult { // grant access to Delta(name)
-        name: String,
-        txn: Txn,
-    },
+    // Propagate {
+    //     propa_change: PropaChange, // a small change, make batch valid easier
+    // },
 
-    DevWriteDefRequest {
-        txn: Txn,
-        write_expr: Expr,
+    LockRequest {
+        lock: Lock,
     },
-
-    VarLockRequest {
-        lock_kind: LockKind,
-        txn: Txn,
+    LockRelease {
+        lock: Lock,
     },
-    VarLockRelease {
-        txn: Txn,
+    LockGranted {
+        txn: TxnId,
     },
-    VarLockGranted {
-        txn: Txn,
-    },
-    VarLockAbort {
-        txn: Txn,
-    },
-
-    DefLockRequest {
-        lock_kind: LockKind,
-        txn: Txn,
-    },
-    DefLockRelease {
-        txn: Txn,
-    },
-    DefLockGranted {
-        txn: Txn,
-    },
-    DefLockAbort {
-        txn: Txn,
-    },
-
-    Propagate {
-        propa_change: PropaChange, // a small change, make batch valid easier
-    },
-    Subscribe {
-        subscriber: String,
-        sender_to_subscriber: Sender<Message>,
-    },
-    SubscriptionGranted {
-        subscribe: String,
-        value: Option<Val>,
-        provides: HashSet<Txn>,
+    LockAbort {
+        txn: TxnId,
     },
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct PropaChange {
-    pub from_name: String,
-    pub new_val: Val,
-    pub provides: HashSet<Txn>,
-    pub requires: HashSet<Txn>,
-}
+// #[derive(PartialEq, Eq, Clone, Debug)]
+// pub struct PropaChange {
+//     pub from_name: String,
+//     pub new_val: Val,
+//     pub provides: HashSet<Txn>,
+//     pub requires: HashSet<Txn>,
+// }
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub struct TxnAndName {
-    pub txn: Txn,
-    pub name: String,
-}
+// #[derive(PartialEq, Eq, Hash, Clone, Debug)]
+// pub struct TxnAndName {
+//     pub txn: Txn,
+//     pub name: String,
+// }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct _PropaChange {
-    pub propa_id: i32,
-    pub propa_change: PropaChange,
-    pub deps: HashSet<TxnAndName>,
-}
+// #[derive(PartialEq, Eq, Clone, Debug)]
+// pub struct _PropaChange {
+//     pub propa_id: i32,
+//     pub propa_change: PropaChange,
+//     pub deps: HashSet<TxnAndName>,
+// }
 
-impl Hash for _PropaChange {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.propa_id.hash(state);
-    }
-}
+// impl Hash for _PropaChange {
+//     fn hash<H: Hasher>(&self, state: &mut H) {
+//         self.propa_id.hash(state);
+//     }
+// }

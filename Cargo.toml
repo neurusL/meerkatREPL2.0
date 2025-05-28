@@ -11,6 +11,7 @@ lalrpop-util = { version = "0.20.2", features = ["lexer", "unicode"] }
 # pretty = "0.12.3"
 inline_colorization = "0.1.5"
 # petgraph = "0.6.5"
+kameo = "0.16"
 tokio = { version = "1", features = ["full"] }
 json = "0.12.4"
 # tokio-util = "0.7.11"

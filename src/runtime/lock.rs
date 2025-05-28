@@ -30,7 +30,7 @@ impl Ord for Lock {
 /// lock state for an actor
 /// where support:
 /// 1. peek min granted lock 
-/// 2. peek and pop min waiting lock
+/// 2. peek and pop min, delete arbitrary waiting lock
 pub struct LockState {
     pub granted_locks: HashSet<Lock>,             // current lock granted
     pub oldest_granted_lock: Option<Lock>,
@@ -57,7 +57,7 @@ impl LockState {
         return true;
     }
 
-    pub fn pop_oldest_wait(&mut self) -> Option<Lock> {
+    fn pop_oldest_wait(&mut self) -> Option<Lock> {
         self.waiting_locks.pop().map(|Reverse(l)| l)
     }
 
@@ -72,6 +72,20 @@ impl LockState {
             }
         }
         assert!(self.check_granted_isvalid());
+    }
+
+    pub fn remove_granted(&mut self, lock: &Lock) {
+        self.granted_locks.remove(&lock);
+        if self.oldest_granted_lock.as_ref() == Some(lock) {
+            self.oldest_granted_lock = None;
+        }
+    }
+
+    pub fn remove_granted_or_wait(&mut self, lock: &Lock) {
+        self.remove_granted(lock);
+
+        todo!("now I need a data structure efficiently support removing arbitrary waiting lock")
+
     }
 
     pub fn clear_granted(&mut self) {
