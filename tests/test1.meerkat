@@ -2,6 +2,7 @@ service test1 {
     var x = 1;
     var y = 2;
     def f = x + y;
+    def z = if x + y == 3 then true else false;
     pub def g = f * f;
 
     pub def mult = (fn x,y => (
@@ -28,3 +29,8 @@ service test1 {
     pub def func_on_action = fn x => fn y => action { x = y; };
 }
 
+service test2 {
+    var x = 1;
+    var y = 2;
+    def z = if x + y == 3 then true else false;   
+}

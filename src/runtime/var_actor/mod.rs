@@ -1,3 +1,4 @@
+use core::panic;
 use std::collections::HashSet;
 
 use kameo::Actor;
@@ -9,11 +10,49 @@ use crate::ast::Expr;
 
 use super::lock::LockState;
 use super::message::Msg;
+use super::transaction::TxnId;
 
+#[derive(Debug, Clone)]
 pub enum VarValueState {
-    Uninit,
-    Val(Expr),
-    Trans(Expr, Expr),
+    Uninit,            // uninitialized
+    Val(Expr),         // stable state of a var actor value
+    Trans(Option<Expr>, Expr), // when receive write request, var actor is in transition
+}
+
+impl VarValueState {
+    pub fn update(&mut self, new_val: Expr) {
+        use self::VarValueState::*;
+        match self {
+            VarValueState::Uninit => *self = Trans(None, new_val),
+            VarValueState::Val(expr) => *self = Trans(Some(expr.clone()), new_val),
+            VarValueState::Trans(_, _) => panic!("unrosolved transient state"),
+        }
+    }
+    pub fn confirm_update(&mut self) {
+        if let VarValueState::Trans(_, new_val) = self {
+            *self = VarValueState::Val(new_val.clone());
+        }
+    }
+
+    pub fn roll_back(&mut self) {
+        if let VarValueState::Trans(old_val, _) = self {
+            if let Some(val) = old_val {
+                *self = VarValueState::Val(val.clone());
+            } else {
+                *self = VarValueState::Uninit;
+            }
+        }
+    }
+}
+
+impl Into<Option<Expr>> for VarValueState {
+    fn into(self) -> Option<Expr> {
+        match self {
+            VarValueState::Uninit => None,
+            VarValueState::Val(val) => Some(val),
+            VarValueState::Trans(_, _) => panic!("transient var value"),
+        }
+    }
 }
 
 #[derive(Actor)]
@@ -22,7 +61,7 @@ pub struct VarActor {
 
     pub value: VarValueState,
     pub latest_write_txn: Option<Expr>,
-    pub pred_txns: HashSet<Expr>, 
+    pub preds: HashSet<TxnId>, 
 
     pub lock_state: LockState,
 }
@@ -38,36 +77,62 @@ impl kameo::prelude::Message<Msg> for VarActor {
         match msg {
             Msg::LockRequest { lock } => {
                 if !self.lock_state.add_wait(lock.clone()) {
-                    return Some(Msg::LockAbort { lock });
+                    return Some(Msg::LockAbort { 
+                        from_name: self.name.clone(),
+                        txn: lock.txn_id
+                    });
                 } else {
                     return Some(Msg::LockGranted { 
                         from_name: self.name.clone(),
-                        lock
+                        txn: lock.txn_id
                      });
                 }
             },
+            Msg::LockAbort { from_name: _, txn } => {
+                self.lock_state.remove_granted_or_wait(&txn);
 
-            Msg::LockRelease { lock } => {
-                self.lock_state.remove_granted_or_wait(&lock);
-                todo!("more logic to be added");
+                // roll back to previous stable state of value 
+                self.value.roll_back();
+
+                None
+            }
+            Msg::LockRelease { txn, preds } => {
+                assert!(self.lock_state.has_granted(&txn));
+                self.lock_state.remove_granted_or_wait(&txn);
+
+                self.preds.extend(preds);
+
+                // confirm the updated value
+                self.value.confirm_update();
+
                 None
             },
 
-            Msg::LockGranted {..} => { 
-                None
-             },
-            Msg::LockAbort {..} => {
-                panic!("VarActor should not receive LockAbort message");
+            Msg::UsrReadVarRequest { txn } => {
+                assert!(self.lock_state.has_granted(&txn));
+
+                self.preds.insert(txn.clone());
+
+                // remove read lock immediately
+                self.lock_state.remove_granted_if_read(&txn);
+
+                Some(Msg::UsrReadVarResult {
+                    txn,
+                    var_name: self.name.clone(),
+                    result: self.value.clone().into(),
+                    result_preds: self.preds.clone(),
+                })
             },
 
+            Msg::UsrWriteVarRequest { txn, write_val, requires } => {
+                assert!(self.lock_state.has_granted_write(&txn));
 
-            Msg::UsrReadVarRequest { txn } => todo!(),
-            Msg::UsrReadVarResult { txn, var_name, result, result_provides } => todo!(),
-            Msg::UsrWriteVarRequest { txn, write_val, requires } => todo!(),
-            Msg::UsrReadDefRequest { txn, requires } => todo!(),
-            Msg::UsrReadDefResult { txn, name, result, result_provides } => todo!(),
+                self.value.update(write_val);
+                None
+            },
 
-            _ => todo!("unit shouldn't be handled, dev update messages to be implementedf"),
+            #[allow(unreachable_patterns)]
+            _ => panic!("VarActor should not receive message {:?}", msg),
         }
         
     }

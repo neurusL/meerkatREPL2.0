@@ -1,4 +1,4 @@
-use std::{cmp::Reverse, collections::{BTreeSet, BinaryHeap, HashSet}};
+use std::{cmp::Reverse, collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet}};
 
 use super::transaction::{Txn, TxnId};
 
@@ -32,73 +32,88 @@ impl Ord for Lock {
 /// 1. peek min granted lock 
 /// 2. peek and pop min, delete arbitrary waiting lock
 pub struct LockState {
-    pub granted_locks: HashSet<Lock>,             // current lock granted
-    pub oldest_granted_lock: Option<Lock>,
-    pub waiting_locks: BTreeSet<Lock>, // locks waiting to be granted
+    pub granted_locks: HashMap<TxnId, Lock>,  // current lock granted
+    pub oldest_granted_lock_txnid: Option<TxnId>,
+    pub waiting_locks: BTreeMap<TxnId, Lock>, // locks waiting to be granted
 }
 
 impl LockState {
     pub fn new() -> Self {
         LockState {
-            granted_locks: HashSet::new(),
-            oldest_granted_lock: None,
-            waiting_locks: BTreeSet::new(),
+            granted_locks: HashMap::new(),
+            oldest_granted_lock_txnid: None,
+            waiting_locks: BTreeMap::new(),
         }
     }
 
     /// only allow lock older than all granted locks to wait
     /// return true if lock added to waiting list
     pub fn add_wait(&mut self, lock: Lock) -> bool {
-        if let Some(oldest_lock) = &self.oldest_granted_lock {
+        if let Some(oldest) = &self.oldest_granted_lock_txnid {
             // if receive lock younger than oldest granted lock, ignore 
-            if lock.txn_id > oldest_lock.txn_id { return false; }
+            if lock.txn_id > *oldest { return false; }
         } 
-        self.waiting_locks.insert(lock); // Reverse for min-heap
+        self.waiting_locks.insert(lock.txn_id.clone(), lock); 
         return true;
     }
 
     fn pop_oldest_wait(&mut self) -> Option<Lock> {
-        self.waiting_locks.pop_first()
+        self.waiting_locks.pop_first().map(|(_, lock)| lock)
     }
 
     pub fn grant_oldest_wait(&mut self) {
         if let Some(lock) = self.pop_oldest_wait() {
-            self.granted_locks.insert(lock.clone());
+            self.granted_locks.insert(lock.txn_id.clone(), lock.clone());
             
-            if let Some(prev_oldest) = &self.oldest_granted_lock {
-                if lock.txn_id < prev_oldest.txn_id {
-                    self.oldest_granted_lock = Some(lock.clone());
+            if let Some(prev_oldest) = &self.oldest_granted_lock_txnid {
+                if lock.txn_id < *prev_oldest {
+                    self.oldest_granted_lock_txnid = Some(lock.txn_id);
                 }
             }
         }
         assert!(self.check_granted_isvalid());
     }
 
-    pub fn remove_granted(&mut self, lock: &Lock) {
-        self.granted_locks.remove(&lock);
-        if self.oldest_granted_lock.as_ref() == Some(lock) {
-            self.oldest_granted_lock = None;
+    pub fn remove_granted(&mut self, txn_id: &TxnId) {
+        self.granted_locks.remove(txn_id);
+        if self.oldest_granted_lock_txnid.as_ref() == Some(txn_id) {
+            self.oldest_granted_lock_txnid = None;
         }
     }
 
-    pub fn remove_granted_or_wait(&mut self, lock: &Lock) {
-        self.remove_granted(lock);
-        self.waiting_locks.remove(lock);
+    pub fn remove_granted_if_read(&mut self, txn_id: &TxnId) {
+        if let Some(Lock { lock_kind: LockKind::Read, .. }) = self.granted_locks.get(txn_id) {
+            self.remove_granted(txn_id);
+        }
+    }
+
+    pub fn remove_wait(&mut self, txn_id: &TxnId) {
+        self.waiting_locks.remove(txn_id);
+    }
+
+    pub fn remove_granted_or_wait(&mut self, txn_id: &TxnId) {
+        self.remove_granted(txn_id);
+        self.waiting_locks.remove(txn_id);
 
     }
 
     pub fn clear_granted(&mut self) {
         self.granted_locks.clear();
-        self.oldest_granted_lock = None;
+        self.oldest_granted_lock_txnid = None;
     }
 
-    pub fn has_granted(&self, lock: Lock) -> bool {
-        self.granted_locks.contains(&lock)
+    pub fn has_granted(&self, txn_id: &TxnId) -> bool {
+        self.granted_locks.contains_key(txn_id)
+    }
+
+    pub fn has_granted_write(&self, txn_id: &TxnId) -> bool {
+        self.granted_locks.contains_key(txn_id)
+        && self.granted_locks.get(txn_id).unwrap().lock_kind == LockKind::Write
     }
 
     pub fn check_granted_isvalid(&self) -> bool {
         //either all Read or unique Write lock 
-        self.granted_locks.iter().all(|lock| 
+        self.granted_locks.iter().all(|(_, lock)| 
             lock.lock_kind == LockKind::Read)
         || self.granted_locks.len() == 1
     }

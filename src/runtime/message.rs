@@ -17,7 +17,7 @@ pub enum Msg {
         txn: TxnId,
         var_name: String,
         result: Option<Expr>,
-        result_provides: HashSet<TxnId>,
+        result_preds: HashSet<TxnId>,
     },
     UsrWriteVarRequest {
         txn: TxnId,
@@ -33,25 +33,29 @@ pub enum Msg {
         txn: TxnId,
         name: String,
         result: Option<Expr>,
-        result_provides: HashSet<TxnId>,
+        result_preds: HashSet<TxnId>,
     },
 
     // Propagate {
     //     propa_change: PropaChange, // a small change, make batch valid easier
     // },
 
-    LockRequest {
+    LockRequest { // for notifying var/def that a lock is requested
         lock: Lock,
     },
-    LockRelease {
-        lock: Lock,
+    LockRelease { // for notifying var/def that a lock should be released
+        txn: TxnId,
+        preds: HashSet<TxnId>,
+
     },
-    LockGranted {
+    LockGranted { // for notifying manager that a lock request is granted
         from_name: String,
-        lock: Lock,
+        txn: TxnId,
     },
-    LockAbort {
-        lock: Lock,
+    LockAbort { // for notifying manager that a lock request is aborted
+                // then manager forward to peers that lock request is aborted
+        from_name: String,
+        txn: TxnId,
     },
 }
 
