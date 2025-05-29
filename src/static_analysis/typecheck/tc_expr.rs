@@ -87,6 +87,14 @@ impl TypecheckEnv {
             },
 
             Expr::Func { params, body } => {
+                // check params are unique
+                let mut param_set = std::collections::HashSet::new();
+                for param in params.iter() {
+                    if !param_set.insert(param) {
+                        panic!("duplicate param name: {}", param);
+                    }
+                }
+                
                 // frozen current context 
                 let old_context = self.var_context.clone();
 
