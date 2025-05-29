@@ -1,11 +1,13 @@
 use std::collections::HashSet;
 
-use kameo::Reply;
+use kameo::{actor::ActorRef, Reply};
 
 use crate::{
     ast::Expr,
     runtime::{lock::Lock, transaction::TxnId},
 };
+
+use super::{manager::Manager, var_actor::VarActor};
 
 
 #[derive(Debug, Clone, Reply)]
@@ -22,7 +24,7 @@ pub enum Msg {
     UsrWriteVarRequest {
         txn: TxnId,
         write_val: Expr,
-        requires: HashSet<TxnId>,
+        // requires: HashSet<TxnId>,
     },
 
     UsrReadDefRequest {
@@ -41,6 +43,7 @@ pub enum Msg {
     // },
 
     LockRequest { // for notifying var/def that a lock is requested
+        from_mgr: ActorRef<Manager>, 
         lock: Lock,
     },
     LockRelease { // for notifying var/def that a lock should be released
@@ -49,12 +52,12 @@ pub enum Msg {
 
     },
     LockGranted { // for notifying manager that a lock request is granted
-        from_name: String,
+        from_name: ActorRef<VarActor>,
         txn: TxnId,
     },
     LockAbort { // for notifying manager that a lock request is aborted
                 // then manager forward to peers that lock request is aborted
-        from_name: String,
+        from_name: ActorRef<VarActor>,
         txn: TxnId,
     },
 }

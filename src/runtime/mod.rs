@@ -12,3 +12,4 @@ pub mod evaluator;
 
 // pub mod actors;
 pub mod var_actor;
+pub mod manager;

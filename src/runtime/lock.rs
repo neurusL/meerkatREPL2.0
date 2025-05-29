@@ -1,6 +1,8 @@
-use std::{cmp::Reverse, collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet}};
+use std::collections::{BTreeMap, HashMap};
 
-use super::transaction::{Txn, TxnId};
+use kameo::actor::ActorRef;
+
+use super::{manager::Manager, transaction::TxnId};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum LockKind {
@@ -34,7 +36,7 @@ impl Ord for Lock {
 pub struct LockState {
     pub granted_locks: HashMap<TxnId, Lock>,  // current lock granted
     pub oldest_granted_lock_txnid: Option<TxnId>,
-    pub waiting_locks: BTreeMap<TxnId, Lock>, // locks waiting to be granted
+    pub waiting_locks: BTreeMap<TxnId, (Lock, ActorRef<Manager>)>, // locks waiting to be granted
 }
 
 impl LockState {
@@ -48,21 +50,21 @@ impl LockState {
 
     /// only allow lock older than all granted locks to wait
     /// return true if lock added to waiting list
-    pub fn add_wait(&mut self, lock: Lock) -> bool {
+    pub fn add_wait(&mut self, lock: Lock, who_request: ActorRef<Manager>) -> bool {
         if let Some(oldest) = &self.oldest_granted_lock_txnid {
             // if receive lock younger than oldest granted lock, ignore 
             if lock.txn_id > *oldest { return false; }
         } 
-        self.waiting_locks.insert(lock.txn_id.clone(), lock); 
+        self.waiting_locks.insert(lock.txn_id.clone(), (lock, who_request)); 
         return true;
     }
 
-    fn pop_oldest_wait(&mut self) -> Option<Lock> {
-        self.waiting_locks.pop_first().map(|(_, lock)| lock)
+    fn pop_oldest_wait(&mut self) -> Option<(Lock, ActorRef<Manager>)> {
+        self.waiting_locks.pop_first().map(|(_, res)| res)
     }
 
-    pub fn grant_oldest_wait(&mut self) {
-        if let Some(lock) = self.pop_oldest_wait() {
+    pub fn grant_oldest_wait(&mut self) -> Option<ActorRef<Manager>> {
+        if let Some((lock, mgr)) = self.pop_oldest_wait() {
             self.granted_locks.insert(lock.txn_id.clone(), lock.clone());
             
             if let Some(prev_oldest) = &self.oldest_granted_lock_txnid {
@@ -70,8 +72,11 @@ impl LockState {
                     self.oldest_granted_lock_txnid = Some(lock.txn_id);
                 }
             }
+
+            assert!(self.check_granted_isvalid());
+            return Some(mgr);
         }
-        assert!(self.check_granted_isvalid());
+        None
     }
 
     pub fn remove_granted(&mut self, txn_id: &TxnId) {
