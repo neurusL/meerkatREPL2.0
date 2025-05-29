@@ -138,7 +138,12 @@ impl TypecheckEnv {
                     .collect();
 
                     let func_typ_actual = Type::Fun(arg_typs, Box::new(ret_typ.clone()));
-                    self.unify(&func_typ, &func_typ_actual);
+
+                    if !self.unify(&func_typ, &func_typ_actual) {
+                        panic!("cannot unify function type, expected {:?} got {:?}",
+                            func_typ, func_typ_actual);
+                    }
+                    
                     self.find(&ret_typ)
                 }
 
