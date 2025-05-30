@@ -1,0 +1,9 @@
+service test6 {
+
+    var x = 3;  
+    var y = 1;
+    var z = false;    
+    def a = !z; 
+    def b = if a then x + y else x - y;
+
+}
