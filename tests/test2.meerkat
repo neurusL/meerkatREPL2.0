@@ -11,6 +11,7 @@ service test2 {
     pub def val = subtract(5,val);
     
     var val = 2;
+    pub def val = val + 1;
   
 }
 
