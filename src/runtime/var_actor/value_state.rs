@@ -10,20 +10,29 @@ pub enum VarValueState {
 }
 
 impl VarValueState {
+    /// when receive write (value update) request, 
+    /// var actor turns into transition state
     pub fn update(&mut self, new_val: Expr) {
         use self::VarValueState::*;
         match self {
             VarValueState::Uninit => *self = Trans(None, new_val),
             VarValueState::Val(expr) => *self = Trans(Some(expr.clone()), new_val),
-            VarValueState::Trans(_, _) => panic!("unrosolved transient state"),
-        }
-    }
-    pub fn confirm_update(&mut self) {
-        if let VarValueState::Trans(_, new_val) = self {
-            *self = VarValueState::Val(new_val.clone());
+            VarValueState::Trans(_, _) => panic!("unrosolved transition state"),
         }
     }
 
+
+    /// when receive lock release, any transition state should be confirmed 
+    /// and if value is updated, return the new value
+    pub fn confirm_update(&mut self) -> Option<Expr> {
+        if let VarValueState::Trans(_, new_val) = self.clone() {
+            *self = VarValueState::Val(new_val.clone());
+            return Some(new_val)
+        }
+        None 
+    }
+
+    /// when receive lock abort, transition state should be rolled back 
     pub fn roll_back(&mut self) {
         if let VarValueState::Trans(old_val, _) = self {
             if let Some(val) = old_val {
@@ -33,6 +42,7 @@ impl VarValueState {
             }
         }
     }
+
 }
 
 impl Into<Option<Expr>> for VarValueState {
@@ -40,7 +50,7 @@ impl Into<Option<Expr>> for VarValueState {
         match self {
             VarValueState::Uninit => None,
             VarValueState::Val(val) => Some(val),
-            VarValueState::Trans(_, _) => panic!("transient var value"),
+            VarValueState::Trans(_, _) => panic!("transition var value"),
         }
     }
 }

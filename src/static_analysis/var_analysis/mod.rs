@@ -13,6 +13,7 @@ pub struct DependAnalysis {
     pub vars: HashSet<String>,
     pub defs: HashSet<String>,
     pub dep_graph: HashMap<String, HashSet<String>>,
+    pub topo_order: Vec<String>,                          // topological order of vars/defs
     pub dep_transtive: HashMap<String, HashSet<String>>, // transitively dependent vars/defs 
     pub dep_vars: HashMap<String, HashSet<String>>,      // transitively dependent vars  
 }

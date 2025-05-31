@@ -7,7 +7,7 @@ use crate::{
     runtime::{lock::Lock, transaction::TxnId},
 };
 
-use super::{manager::Manager, var_actor::VarActor};
+use super::{def_actor::DefActor, manager::Manager, var_actor::VarActor};
 
 
 #[derive(Debug, Clone, Reply)]
@@ -19,7 +19,7 @@ pub enum Msg {
         txn: TxnId,
         var_name: String,
         result: Option<Expr>,
-        result_preds: HashSet<TxnId>,
+        preds: HashSet<TxnId>,
     },
     UsrWriteVarRequest {
         txn: TxnId,
@@ -35,7 +35,7 @@ pub enum Msg {
         txn: TxnId,
         name: String,
         result: Option<Expr>,
-        result_preds: HashSet<TxnId>,
+        preds: HashSet<TxnId>,
     },
 
     // Propagate {
@@ -43,7 +43,7 @@ pub enum Msg {
     // },
 
     LockRequest { // for notifying var/def that a lock is requested
-        from_mgr: ActorRef<Manager>, 
+        from_mgr_addr: ActorRef<Manager>, 
         lock: Lock,
     },
     LockRelease { // for notifying var/def that a lock should be released
@@ -52,14 +52,26 @@ pub enum Msg {
 
     },
     LockGranted { // for notifying manager that a lock request is granted
-        from_name: ActorRef<VarActor>,
+        from_name: String,
         txn: TxnId,
     },
     LockAbort { // for notifying manager that a lock request is aborted
                 // then manager forward to peers that lock request is aborted
-        from_name: ActorRef<VarActor>,
+        from_name: String,
         txn: TxnId,
     },
+
+
+    Subscribe {
+        from_name: String,
+        from_addr: ActorRef<DefActor>,
+    },
+
+    Change {
+        from_name: String,
+        val: Expr,
+        preds: HashSet<TxnId>,
+    }
 }
 
 // #[derive(PartialEq, Eq, Clone, Debug)]

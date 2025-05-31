@@ -10,6 +10,7 @@ pub mod transaction;
 
 pub mod evaluator;
 
-// pub mod actors;
+pub mod pubsub;
 pub mod var_actor;
+pub mod def_actor;
 pub mod manager;

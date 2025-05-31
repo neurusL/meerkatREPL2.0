@@ -31,6 +31,7 @@ impl DependAnalysis {
         DependAnalysis {
             vars, defs,
             dep_graph,
+            topo_order: Vec::new(),
             dep_transtive: HashMap::new(),
             dep_vars: HashMap::new(),
         }
@@ -49,6 +50,7 @@ impl DependAnalysis {
         graph: &HashMap<String, HashSet<String>>, 
         vars: &HashSet<String>,
         visited: &mut HashSet<String>,
+        finished: &mut Vec<String>,
         calced: &mut HashMap<String, HashSet<String>>,
         name: &String
     ) {
@@ -67,7 +69,7 @@ impl DependAnalysis {
             .expect(&format!("No such name in dep graph: {}", name)) 
         {
             if !vars.contains(dep_name) {
-                Self::dfs_helper(graph, vars, visited, calced, dep_name);
+                Self::dfs_helper(graph, vars, visited, finished, calced, dep_name);
                 dep.extend(calced.get(dep_name)
                 .expect(&format!("Not finished transitive dependency 
                 calculation of: {}", dep_name)).clone());
@@ -76,17 +78,20 @@ impl DependAnalysis {
         }
 
         calced.insert(name.clone(), dep);
+        finished.push(name.clone());
         
     }
 
     pub fn calc_dep_vars(&mut self) {
         let mut visited = HashSet::new();
+        let mut topo_order = Vec::new();
 
         for name in self.defs.iter() {
             Self::dfs_helper(
                 &self.dep_graph, 
                 &self.vars, 
                 &mut visited, 
+                &mut topo_order,
                 &mut self.dep_transtive, 
                 name);
         }

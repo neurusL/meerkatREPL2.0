@@ -1,6 +1,10 @@
 //! Logic for Var Actor
 //! 
 
+use std::collections::HashSet;
+
+use tokio::runtime::Handle;
+
 use crate::runtime:: message::Msg;
 use super::VarActor;
 
@@ -13,10 +17,15 @@ impl kameo::prelude::Message<Msg> for VarActor {
         _ctx: &mut kameo::prelude::Context<Self, Self::Reply>,
     ) -> Self::Reply {
         match msg {
-            Msg::LockRequest { lock, from_mgr: from_name } => {
+            Msg::Subscribe { from_name: _, from_addr } => {
+                self.pubsub.subscribe(from_addr);
+                None
+            }
+
+            Msg::LockRequest { lock, from_mgr_addr: from_name } => {
                 if !self.lock_state.add_wait(lock.clone(), from_name) {
                     return Some(Msg::LockAbort { 
-                        from_name: self.address.clone(),
+                        from_name: self.name.clone(),
                         txn: lock.txn_id
                     });
                 } 
@@ -37,10 +46,21 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 assert!(self.lock_state.has_granted(&txn));
                 self.lock_state.remove_granted_or_wait(&txn);
 
-                self.preds.extend(preds);
+                // preds in LockRelease are global info calculated by manager
+                self.preds.extend(preds);  // now we have accumulated 
+                                                // all pred required for txn
 
                 // confirm the updated value
-                self.value.confirm_update();
+                if let Some(new_value) = self.value.confirm_update() {
+                    self.pubsub.publish(Msg::Change {
+                        from_name: self.name.clone(),
+                        val: new_value,
+                        preds: self.preds.clone(),
+                    })
+                }
+
+                // clear pred set, and current txn should be the pred for next txn
+                self.preds = HashSet::from([txn]);
 
                 None
             },
@@ -48,7 +68,7 @@ impl kameo::prelude::Message<Msg> for VarActor {
             Msg::UsrReadVarRequest { txn } => {
                 assert!(self.lock_state.has_granted(&txn));
 
-                self.preds.insert(txn.clone()); // ?
+                // self.preds.insert(txn.clone()); // ? not sure
 
                 // remove read lock immediately
                 self.lock_state.remove_granted_if_read(&txn);
@@ -57,16 +77,18 @@ impl kameo::prelude::Message<Msg> for VarActor {
                     txn,
                     var_name: self.name.clone(),
                     result: self.value.clone().into(),
-                    result_preds: self.preds.clone(),
+                    preds: self.preds.clone(),
                 })
             },
 
             Msg::UsrWriteVarRequest { txn, write_val } => {
                 assert!(self.lock_state.has_granted_write(&txn));
 
-                self.preds.insert(txn.clone()); // ?
+                // any txn write to var actor should be added to pred 
+                self.preds.insert(txn.clone()); // ? not sure
 
                 self.value.update(write_val);
+
                 None
             },
 
@@ -82,7 +104,7 @@ impl VarActor {
         // if can grant new waiting lock 
         if let Some(mgr) = self.lock_state.grant_oldest_wait() {
             let msg = Msg::LockGranted {
-                from_name: self.address.clone(),
+                from_name: self.name.clone(),
                 txn: self.lock_state.oldest_granted_lock_txnid.clone().unwrap(),
             };
 
