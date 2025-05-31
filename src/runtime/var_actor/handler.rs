@@ -44,31 +44,27 @@ impl kameo::prelude::Message<Msg> for VarActor {
 
             Msg::LockRelease { txn, preds } => {
                 assert!(self.lock_state.has_granted(&txn));
-                self.lock_state.remove_granted_or_wait(&txn);
-
-                // preds in LockRelease are global info calculated by manager
-                self.preds.extend(preds);  // now we have accumulated 
-                                                // all pred required for txn
+                let lock = self.lock_state
+                .remove_granted_or_wait(&txn)
+                .expect("lock should be granted before release");
 
                 // confirm the updated value
                 if let Some(new_value) = self.value.confirm_update() {
                     self.pubsub.publish(Msg::Change {
                         from_name: self.name.clone(),
                         val: new_value,
-                        preds: self.preds.clone(),
+                        preds: preds.clone(),
                     })
                 }
 
                 // clear pred set, and current txn should be the pred for next txn
-                self.preds = HashSet::from([txn]);
+                if lock.is_write() { self.latest_write_txn = Some(txn.clone()); }
 
                 None
             },
 
             Msg::UsrReadVarRequest { txn } => {
                 assert!(self.lock_state.has_granted(&txn));
-
-                // self.preds.insert(txn.clone()); // ? not sure
 
                 // remove read lock immediately
                 self.lock_state.remove_granted_if_read(&txn);
@@ -77,15 +73,12 @@ impl kameo::prelude::Message<Msg> for VarActor {
                     txn,
                     var_name: self.name.clone(),
                     result: self.value.clone().into(),
-                    preds: self.preds.clone(),
+                    pred: self.latest_write_txn.clone(),
                 })
             },
 
             Msg::UsrWriteVarRequest { txn, write_val } => {
                 assert!(self.lock_state.has_granted_write(&txn));
-
-                // any txn write to var actor should be added to pred 
-                self.preds.insert(txn.clone()); // ? not sure
 
                 self.value.update(write_val);
 

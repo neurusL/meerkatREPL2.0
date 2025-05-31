@@ -16,13 +16,12 @@ pub mod handler;
 pub struct VarActor {
     pub name: String,                // this actor's var name 
     pub address: ActorRef<VarActor>, // this actor's address
-    
+
     pub pubsub: PubSub,
 
     pub value: value_state::VarValueState,
 
-    pub latest_write_txn: Option<Expr>,
-    pub preds: HashSet<TxnId>, 
+    pub latest_write_txn: Option<TxnId>,
 
     pub lock_state: LockState,
 }

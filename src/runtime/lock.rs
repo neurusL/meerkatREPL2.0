@@ -1,3 +1,4 @@
+use core::panic;
 use std::collections::{BTreeMap, HashMap};
 
 use kameo::actor::ActorRef;
@@ -26,6 +27,16 @@ impl PartialOrd for Lock {
 impl Ord for Lock {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.txn_id.cmp(&other.txn_id)
+    }
+}
+
+impl Lock {
+    pub fn is_read(&self) -> bool {
+        self.lock_kind == LockKind::Read
+    }
+
+    pub fn is_write(&self) -> bool {
+        self.lock_kind == LockKind::Write
     }
 }
 
@@ -79,11 +90,12 @@ impl LockState {
         None
     }
 
-    pub fn remove_granted(&mut self, txn_id: &TxnId) {
-        self.granted_locks.remove(txn_id);
+    pub fn remove_granted(&mut self, txn_id: &TxnId) -> Option<Lock> {
+        let lock = self.granted_locks.remove(txn_id);
         if self.oldest_granted_lock_txnid.as_ref() == Some(txn_id) {
             self.oldest_granted_lock_txnid = None;
         }
+        lock
     }
 
     pub fn remove_granted_if_read(&mut self, txn_id: &TxnId) {
@@ -96,10 +108,19 @@ impl LockState {
         self.waiting_locks.remove(txn_id);
     }
 
-    pub fn remove_granted_or_wait(&mut self, txn_id: &TxnId) {
-        self.remove_granted(txn_id);
-        self.waiting_locks.remove(txn_id);
-
+    pub fn remove_granted_or_wait(&mut self, txn_id: &TxnId) -> Option<Lock> {
+        let mut res = None;
+        if let Some(lock) = self.remove_granted(txn_id) {
+            res = Some(lock);
+        }
+        if let Some ((lock, _)) = self.waiting_locks.remove(txn_id) {
+            if res.is_none() {
+                res = Some(lock);
+            } else {
+                panic!("Txn {:?} has both granted and waiting lock", txn_id);
+            }
+        }
+        res
     }
 
     pub fn clear_granted(&mut self) {

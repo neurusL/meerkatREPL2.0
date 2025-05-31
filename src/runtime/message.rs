@@ -19,7 +19,7 @@ pub enum Msg {
         txn: TxnId,
         var_name: String,
         result: Option<Expr>,
-        preds: HashSet<TxnId>,
+        pred: Option<TxnId>,
     },
     UsrWriteVarRequest {
         txn: TxnId,
