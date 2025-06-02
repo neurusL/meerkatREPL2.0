@@ -73,7 +73,7 @@ impl Evaluator {
                 match expr1.as_mut() {
                     // note: as_mut() has same effect as &mut **expr1 here
                     Expr::Number { .. } | Expr::Bool { .. } => {
-                        *expr = Self::calc_unop(*op, expr)?;
+                        *expr = Self::calc_unop(*op, expr1)?;
                         Ok(())
                     }
                     _ => Err(format!(
