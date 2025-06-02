@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use tokio::runtime::Handle;
 
-use crate::runtime:: message::Msg;
+use crate::runtime::{lock::Lock,  message::Msg};
 use super::VarActor;
 
 impl kameo::prelude::Message<Msg> for VarActor {
@@ -19,25 +19,27 @@ impl kameo::prelude::Message<Msg> for VarActor {
         match msg {
             Msg::Subscribe { from_name: _, from_addr } => {
                 self.pubsub.subscribe(from_addr);
-                None
+                
+                Some(Msg::SubscribeGranted)
             }
 
             Msg::LockRequest { lock, from_mgr_addr: from_name } => {
                 if !self.lock_state.add_wait(lock.clone(), from_name) {
                     return Some(Msg::LockAbort { 
                         from_name: self.name.clone(),
-                        txn: lock.txn_id
+                        lock
                     });
                 } 
 
                 None
             },
 
-            Msg::LockAbort { from_name: _, txn } => {
-                self.lock_state.remove_granted_or_wait(&txn);
+            Msg::LockAbort { from_name: _, lock: Lock { txn_id, .. } } => {
+                self.lock_state.remove_granted_or_wait(&txn_id);
 
                 // roll back to previous stable state of value 
-                self.value.roll_back();
+                // unconfirmed write has same txn as aborted
+                self.value.roll_back_if_relevant(&txn_id);
 
                 None
             }
@@ -48,17 +50,21 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 .remove_granted_or_wait(&txn)
                 .expect("lock should be granted before release");
 
-                // confirm the updated value
-                if let Some(new_value) = self.value.confirm_update() {
+                // if lock is read then nothing else to do 
+                // else if lock is write: 
+                if lock.is_write() {  
+                    let (new_value, unconfirmed_txn) = self.value.confirm_update()
+                    .expect("should have unconfirmed value update");
+                    assert!(unconfirmed_txn == txn);
+
+                    self.latest_write_txn = Some(txn.clone());
+
                     self.pubsub.publish(Msg::Change {
                         from_name: self.name.clone(),
                         val: new_value,
                         preds: preds.clone(),
                     })
                 }
-
-                // clear pred set, and current txn should be the pred for next txn
-                if lock.is_write() { self.latest_write_txn = Some(txn.clone()); }
 
                 None
             },
@@ -71,7 +77,7 @@ impl kameo::prelude::Message<Msg> for VarActor {
 
                 Some(Msg::UsrReadVarResult {
                     txn,
-                    var_name: self.name.clone(),
+                    name: self.name.clone(),
                     result: self.value.clone().into(),
                     pred: self.latest_write_txn.clone(),
                 })
@@ -80,7 +86,7 @@ impl kameo::prelude::Message<Msg> for VarActor {
             Msg::UsrWriteVarRequest { txn, write_val } => {
                 assert!(self.lock_state.has_granted_write(&txn));
 
-                self.value.update(write_val);
+                self.value.update(write_val, txn);
 
                 None
             },
@@ -95,10 +101,10 @@ impl kameo::prelude::Message<Msg> for VarActor {
 impl VarActor {
     async fn tick(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // if can grant new waiting lock 
-        if let Some(mgr) = self.lock_state.grant_oldest_wait() {
+        if let Some((lock, mgr)) = self.lock_state.grant_oldest_wait() {
             let msg = Msg::LockGranted {
                 from_name: self.name.clone(),
-                txn: self.lock_state.oldest_granted_lock_txnid.clone().unwrap(),
+                lock,
             };
 
             mgr.tell(msg).await?;

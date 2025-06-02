@@ -5,7 +5,7 @@ use std::{collections::{HashMap, HashSet}, fmt::Display};
 
 use crate::ast;
 
-pub mod free_var;
+pub mod read_write;
 pub mod alpha_rename;
 pub mod dep_analysis;
 
@@ -44,10 +44,15 @@ impl Display for DependAnalysis {
     }
 }
 
+pub fn calc_dep_srv(ast: &ast::Service) -> DependAnalysis {
+    let mut da = DependAnalysis::new(ast);
+    da.calc_dep_vars();
+    da
+}
+
 pub fn calc_dep_prog(ast: &ast::Prog) {
     for srv in ast.services.iter() {
-        let mut da = DependAnalysis::new(srv);
-        da.calc_dep_vars();
+        let da = calc_dep_srv(srv);
         println!("{}", da);
     }
 

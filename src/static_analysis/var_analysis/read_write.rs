@@ -1,9 +1,11 @@
 
-use std::collections::HashSet;
+use std::{collections::HashSet, hash::Hash};
 
-use crate::ast::Expr;
+use crate::ast::{Assn, Expr};
 
 impl Expr {
+    /// return free variables in expr wrt var_binded, used in eval
+    /// can also be used as variables read by the expression when var_binded set to empty
     pub fn free_var(&self, 
         var_binded: &HashSet<String>, // should be initialized by all reactive name declared in the service
     ) -> HashSet<String> {
@@ -56,4 +58,20 @@ impl Expr {
             },
         }
     }
+}
+
+pub fn calc_read_set(assns: &Vec<Assn>) -> HashSet<String> {
+    let mut reads = HashSet::new();
+    for assn in assns {
+        reads.extend(assn.src.free_var(&HashSet::new()));
+    }
+    reads
+}
+
+pub fn calc_write_set(assns: &Vec<Assn>) -> HashSet<String> {
+    let mut writes = HashSet::new();
+    for assn in assns {
+        writes.insert(assn.dest.clone());
+    }
+    writes
 }

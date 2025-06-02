@@ -94,7 +94,7 @@ pub struct Prog {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ReplCmd {
-    Do(Expr),
+    Do(Vec<Assn>),
     Decl(Vec<Decl>),
     Exit,
 

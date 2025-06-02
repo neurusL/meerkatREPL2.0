@@ -1,5 +1,5 @@
 use std::{collections::{HashMap, HashSet}, fmt::Display};
-use crate::ast::{Assn, Expr, Prog};
+use crate::ast::{Assn, Expr, Prog, Service};
 
 mod utils;
 mod eval_expr;
@@ -11,6 +11,54 @@ pub enum Val {
     Bool(bool),
     Action(Vec<Assn>),
     Func(Vec<String>, Box<Expr>),
+}
+
+pub struct Evaluator {
+    var_id_cnt: i32,
+    pub reactive_names: HashSet<String>,
+
+    // context are modally separated into, we didn't use lambda expr var 
+    // as we subst directly in place when we eval expr  
+    // reactive def/var name -> val 
+    pub reactive_name_to_vals: HashMap<String, Expr>,
+    // lambda expr var name -> val
+    // pub exprvar_name_to_val: HashMap<String, Expr>,
+    
+}
+
+impl Evaluator {
+pub fn new(
+    reactive_names_to_vals: HashMap<String, Expr>
+) -> Evaluator {
+        Evaluator { 
+            var_id_cnt: 0,
+            reactive_names: HashSet::new(),
+            reactive_name_to_vals: reactive_names_to_vals,
+        }
+    }
+}
+
+pub fn eval_assns(assns: &mut Vec<Assn>, env: HashMap<String, Expr>) {
+    let mut eval = Evaluator::new(env); 
+    for assn in assns.iter_mut() {
+        eval.eval_assn(assn);
+    }
+}
+
+pub fn eval_srv(srv: &Service) -> Evaluator {
+    let mut srv = srv.clone();
+    let mut eval = Evaluator::new(HashMap::new());
+        for decl in srv.decls.iter_mut() {
+            eval.eval_decl(decl);
+            println!("{}", decl);
+        }
+    eval
+}
+
+pub fn eval_prog(prog: &Prog) {
+    for srv in prog.services.iter() {
+        eval_srv(srv);
+    }
 }
 
 impl From<Val> for Expr {
@@ -27,33 +75,5 @@ impl From<Val> for Expr {
 impl Display for Val {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Expr::from(self.clone()))
-    }
-}
-
-
-pub struct Evaluator {
-    pub var_id_cnt: i32,
-    pub reactive_names: HashSet<String>,
-    pub env: HashMap<String, Expr>,
-}
-
-impl Evaluator {
-    pub fn new(reactive_names: HashSet<String>) -> Evaluator {
-        Evaluator { 
-            var_id_cnt: 0,
-            reactive_names,
-            env: HashMap::new(),
-        }
-    }
-}
-
-pub fn eval_prog(prog: &Prog) {
-    let mut prog = prog.clone();
-    for srvs in prog.services.iter_mut() {
-        let mut eval = Evaluator::new(HashSet::new());
-        for decl in srvs.decls.iter_mut() {
-            eval.eval_decl(decl);
-            println!("{}", decl);
-        }
     }
 }

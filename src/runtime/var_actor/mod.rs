@@ -15,13 +15,23 @@ pub mod handler;
 #[derive(Actor)]
 pub struct VarActor {
     pub name: String,                // this actor's var name 
-    pub address: ActorRef<VarActor>, // this actor's address
-
-    pub pubsub: PubSub,
-
     pub value: value_state::VarValueState,
 
-    pub latest_write_txn: Option<TxnId>,
-
+    pub pubsub: PubSub,
     pub lock_state: LockState,
+
+    pub latest_write_txn: Option<TxnId>,
 }
+
+impl VarActor {
+    pub fn new(name: String, val: Expr) -> VarActor {
+        VarActor {
+            name,
+            value: value_state::VarValueState::new(val),
+            pubsub: PubSub::new(),
+            lock_state: LockState::new(),
+            latest_write_txn: None,
+        }
+    }
+}
+

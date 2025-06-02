@@ -31,6 +31,20 @@ impl Ord for Lock {
 }
 
 impl Lock {
+    pub fn new_read(txn_id: TxnId) -> Self {
+        Lock {
+            lock_kind: LockKind::Read,
+            txn_id,
+        }
+    }
+
+    pub fn new_write(txn_id: TxnId) -> Self {
+        Lock {
+            lock_kind: LockKind::Write,
+            txn_id,
+        }
+    }
+
     pub fn is_read(&self) -> bool {
         self.lock_kind == LockKind::Read
     }
@@ -42,7 +56,7 @@ impl Lock {
 
 /// lock state for an actor
 /// where support:
-/// 1. peek min granted lock 
+/// 1. peek min granted lock (for wait-die checking)
 /// 2. peek and pop min, delete arbitrary waiting lock
 pub struct LockState {
     pub granted_locks: HashMap<TxnId, Lock>,  // current lock granted
@@ -74,18 +88,18 @@ impl LockState {
         self.waiting_locks.pop_first().map(|(_, res)| res)
     }
 
-    pub fn grant_oldest_wait(&mut self) -> Option<ActorRef<Manager>> {
+    pub fn grant_oldest_wait(&mut self) -> Option<(Lock, ActorRef<Manager>)> {
         if let Some((lock, mgr)) = self.pop_oldest_wait() {
             self.granted_locks.insert(lock.txn_id.clone(), lock.clone());
             
             if let Some(prev_oldest) = &self.oldest_granted_lock_txnid {
                 if lock.txn_id < *prev_oldest {
-                    self.oldest_granted_lock_txnid = Some(lock.txn_id);
+                    self.oldest_granted_lock_txnid = Some(lock.txn_id.clone());
                 }
             }
 
             assert!(self.check_granted_isvalid());
-            return Some(mgr);
+            return Some((lock, mgr));
         }
         None
     }

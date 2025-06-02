@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use kameo::{actor::ActorRef, Reply};
 
 use crate::{
-    ast::Expr,
+    ast::{Expr, Prog},
     runtime::{lock::Lock, transaction::TxnId},
 };
 
@@ -17,8 +17,8 @@ pub enum Msg {
     },
     UsrReadVarResult {
         txn: TxnId,
-        var_name: String,
-        result: Option<Expr>,
+        name: String,
+        result: Expr,
         pred: Option<TxnId>,
     },
     UsrWriteVarRequest {
@@ -29,12 +29,12 @@ pub enum Msg {
 
     UsrReadDefRequest {
         txn: TxnId,
-        requires: HashSet<TxnId>, // ?? Why we need this
+        // requires: HashSet<TxnId>, // ?? Why we need this
     },
     UsrReadDefResult {
         txn: TxnId,
         name: String,
-        result: Option<Expr>,
+        result: Expr,
         preds: HashSet<TxnId>,
     },
 
@@ -53,12 +53,12 @@ pub enum Msg {
     },
     LockGranted { // for notifying manager that a lock request is granted
         from_name: String,
-        txn: TxnId,
+        lock: Lock,
     },
     LockAbort { // for notifying manager that a lock request is aborted
                 // then manager forward to peers that lock request is aborted
         from_name: String,
-        txn: TxnId,
+        lock: Lock,
     },
 
 
@@ -67,10 +67,17 @@ pub enum Msg {
         from_addr: ActorRef<DefActor>,
     },
 
+    SubscribeGranted,
+
     Change {
         from_name: String,
         val: Expr,
         preds: HashSet<TxnId>,
+    },
+
+    // Meerkat 2.0 only support non-distributed CodeUpdate
+    CodeUpdate {
+        prog: Prog,
     }
 }
 

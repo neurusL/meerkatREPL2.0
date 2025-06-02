@@ -1,7 +1,9 @@
 use std::error::Error;
 use std::{env, fs};
 
+use kameo::spawn;
 use parser::meerkat;
+use runtime::manager::Manager;
 use tokio;
 
 pub mod ast;
@@ -27,6 +29,9 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     let _ = static_analysis::typecheck::typecheck_prog(&prog);
     let _ = static_analysis::var_analysis::calc_dep_prog(&prog);
     let _ = runtime::evaluator::eval_prog(&prog);
+
+    let mgr = Manager::new();
+    let mgr_actor_ref = spawn(mgr);
     
     // runtime.repl
     Ok(())

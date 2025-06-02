@@ -54,7 +54,7 @@ impl Evaluator {
             Expr::Number { val } => Ok(()),
             Expr::Bool { val } => Ok(()),
             Expr::Variable { ident } => {
-                let val = self.env
+                let val = self.reactive_name_to_vals
                 .get(ident).cloned()
                 .ok_or_else(|| format!("variable '{}' not found", ident));
 
