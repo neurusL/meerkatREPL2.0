@@ -1,20 +1,19 @@
 use std::collections::HashSet;
 
-use kameo::Actor;
 use kameo::prelude::*;
+use kameo::Actor;
 
-use crate::ast::Expr;
 use super::lock::LockState;
 use super::pubsub::PubSub;
 use super::transaction::TxnId;
+use crate::ast::Expr;
 
-pub mod value_state;
 pub mod handler;
-
+pub mod value_state;
 
 #[derive(Actor)]
 pub struct VarActor {
-    pub name: String,                // this actor's var name 
+    pub name: String, // this actor's var name
     pub value: value_state::VarValueState,
 
     pub pubsub: PubSub,
@@ -34,4 +33,3 @@ impl VarActor {
         }
     }
 }
-

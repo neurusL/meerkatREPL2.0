@@ -3,12 +3,11 @@ use std::collections::HashSet;
 use kameo::{actor::ActorRef, Reply};
 
 use crate::{
-    ast::{Expr, Prog},
+    ast::{Expr, Prog, Service},
     runtime::{lock::Lock, transaction::TxnId},
 };
 
 use super::{def_actor::DefActor, manager::Manager, var_actor::VarActor};
-
 
 #[derive(Debug, Clone, Reply)]
 pub enum Msg {
@@ -41,26 +40,27 @@ pub enum Msg {
     // Propagate {
     //     propa_change: PropaChange, // a small change, make batch valid easier
     // },
-
-    LockRequest { // for notifying var/def that a lock is requested
-        from_mgr_addr: ActorRef<Manager>, 
+    LockRequest {
+        // for notifying var/def that a lock is requested
+        from_mgr_addr: ActorRef<Manager>,
         lock: Lock,
     },
-    LockRelease { // for notifying var/def that a lock should be released
+    LockRelease {
+        // for notifying var/def that a lock should be released
         txn: TxnId,
         preds: HashSet<TxnId>,
-
     },
-    LockGranted { // for notifying manager that a lock request is granted
+    LockGranted {
+        // for notifying manager that a lock request is granted
         from_name: String,
         lock: Lock,
     },
-    LockAbort { // for notifying manager that a lock request is aborted
-                // then manager forward to peers that lock request is aborted
+    LockAbort {
+        // for notifying manager that a lock request is aborted
+        // then manager forward to peers that lock request is aborted
         from_name: String,
         lock: Lock,
     },
-
 
     Subscribe {
         from_name: String,
@@ -77,8 +77,8 @@ pub enum Msg {
 
     // Meerkat 2.0 only support non-distributed CodeUpdate
     CodeUpdate {
-        prog: Prog,
-    }
+        srv: Service,
+    },
 }
 
 // #[derive(PartialEq, Eq, Clone, Debug)]

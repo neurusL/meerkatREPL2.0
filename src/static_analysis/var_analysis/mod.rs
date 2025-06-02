@@ -1,21 +1,24 @@
-//! dependency analysis for var/def node in meerkat 
-//! 
+//! dependency analysis for var/def node in meerkat
+//!
 
-use std::{collections::{HashMap, HashSet}, fmt::Display};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
 
 use crate::ast;
 
-pub mod read_write;
 pub mod alpha_rename;
 pub mod dep_analysis;
+pub mod read_write;
 
 pub struct DependAnalysis {
     pub vars: HashSet<String>,
     pub defs: HashSet<String>,
     pub dep_graph: HashMap<String, HashSet<String>>,
-    pub topo_order: Vec<String>,                          // topological order of vars/defs
-    pub dep_transtive: HashMap<String, HashSet<String>>, // transitively dependent vars/defs 
-    pub dep_vars: HashMap<String, HashSet<String>>,      // transitively dependent vars  
+    pub topo_order: Vec<String>, // topological order of vars/defs
+    pub dep_transtive: HashMap<String, HashSet<String>>, // transitively dependent vars/defs
+    pub dep_vars: HashMap<String, HashSet<String>>, // transitively dependent vars
 }
 
 impl Display for DependAnalysis {
@@ -55,5 +58,4 @@ pub fn calc_dep_prog(ast: &ast::Prog) {
         let da = calc_dep_srv(srv);
         println!("{}", da);
     }
-
 }

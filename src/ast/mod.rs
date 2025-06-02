@@ -13,7 +13,7 @@ pub enum BinOp {
     Mul,
     Div,
 
-    Eq, 
+    Eq,
     Lt,
     Gt,
 
@@ -30,13 +30,19 @@ pub struct Assn {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
     /// Basic Lambda Core expressions
-    Number { val: i32 },
-    Bool { val: bool},
-    Variable { ident: String },
+    Number {
+        val: i32,
+    },
+    Bool {
+        val: bool,
+    },
+    Variable {
+        ident: String,
+    },
 
     Unop {
         op: UnOp,
-        expr: Box<Expr>
+        expr: Box<Expr>,
     },
     Binop {
         op: BinOp,
@@ -52,16 +58,16 @@ pub enum Expr {
 
     Func {
         params: Vec<String>,
-        body: Box<Expr>
+        body: Box<Expr>,
     },
     FuncApply {
         func: Box<Expr>,
         args: Vec<Expr>,
     },
 
-    /// Action 
+    /// Action
     Action {
-        assns: Vec<Assn>
+        assns: Vec<Assn>,
     },
 }
 
@@ -97,8 +103,7 @@ pub enum ReplCmd {
     Do(Vec<Assn>),
     Decl(Vec<Decl>),
     Exit,
-
-    // service related commands 
+    // service related commands
     // Service(Service),
     // Open(String),
     // Close,
@@ -141,18 +146,30 @@ impl Display for Expr {
             Expr::Number { val } => write!(f, "{}", val),
             Expr::Bool { val } => write!(f, "{}", val),
             Expr::Variable { ident } => write!(f, "{}", ident),
-            Expr::Unop { op, expr } => 
-                write!(f, "{}{}", op, expr),
-            Expr::Binop { op, expr1, expr2 } => 
-                write!(f, "{} {} {}", expr1, op, expr2),
-            Expr::If { cond, expr1, expr2 } => 
-                write!(f, "if {} then {} else {}", cond, expr1, expr2),
-            Expr::Func { params, body } => 
-                write!(f, "fn({})[{}]", params.join(","), body),
-            Expr::FuncApply { func, args } => 
-                write!(f, "{}({})", func, args.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")),
-            Expr::Action { assns } => 
-                write!(f, "Action({:?})", assns.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")),
+            Expr::Unop { op, expr } => write!(f, "{}{}", op, expr),
+            Expr::Binop { op, expr1, expr2 } => write!(f, "{} {} {}", expr1, op, expr2),
+            Expr::If { cond, expr1, expr2 } => {
+                write!(f, "if {} then {} else {}", cond, expr1, expr2)
+            }
+            Expr::Func { params, body } => write!(f, "fn({})[{}]", params.join(","), body),
+            Expr::FuncApply { func, args } => write!(
+                f,
+                "{}({})",
+                func,
+                args.iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            Expr::Action { assns } => write!(
+                f,
+                "Action({:?})",
+                assns
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
         }
     }
 }
@@ -169,14 +186,14 @@ impl Display for Decl {
             Decl::Import { srv_name } => todo!(),
             Decl::VarDecl { name, val } => {
                 write!(f, "var {} = {}", name, val)
-            },
+            }
             Decl::DefDecl { name, val, is_pub } => {
                 if *is_pub {
                     write!(f, "pub def {} = {}", name, val)
                 } else {
                     write!(f, "def {} = {}", name, val)
                 }
-            },
+            }
         }
     }
 }

@@ -8,10 +8,8 @@ use tokio;
 
 pub mod ast;
 pub mod parser;
-pub mod static_analysis;
 pub mod runtime;
-
-
+pub mod static_analysis;
 
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn Error>> {
@@ -23,16 +21,16 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     let meerkat_parser = meerkat::ProgParser::new();
     let prog = match meerkat_parser.parse(&file_content) {
         Ok(ast) => ast,
-        Err(e) => panic!("Parse Error: {:?}", e)
+        Err(e) => panic!("Parse Error: {:?}", e),
     };
 
     let _ = static_analysis::typecheck::typecheck_prog(&prog);
     let _ = static_analysis::var_analysis::calc_dep_prog(&prog);
     let _ = runtime::evaluator::eval_prog(&prog);
 
-    let mgr = Manager::new();
+    let mgr = Manager::new("main_service".to_string());
     let mgr_actor_ref = spawn(mgr);
-    
+
     // runtime.repl
     Ok(())
 }

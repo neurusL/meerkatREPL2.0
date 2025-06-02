@@ -1,18 +1,21 @@
-//! Hindley-Milner type inference 
-//! resources: 
+//! Hindley-Milner type inference
+//! resources:
 //! https://course.ccs.neu.edu/cs4410sp19/lec_type-inference_notes.html,
 //! our previous implementation
 //! the union-find algorithm
 
-mod utils;
 mod tc_expr;
-mod tc_stmt;
 mod tc_srvs;
+mod tc_stmt;
+mod utils;
 
-use std::{collections::{HashMap, HashSet}, iter::zip, fmt::Display};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+    iter::zip,
+};
 
 use crate::ast::Prog;
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Type {
@@ -20,10 +23,10 @@ pub enum Type {
     Bool,
     Unit,
     Action,
-    
+
     Fun(Vec<Type>, Box<Type>), // for instantiated type
 
-    TypVar(String), 
+    TypVar(String),
 }
 
 /// Type Scheme represents polymorphic types,
@@ -47,31 +50,30 @@ impl Display for Type {
             Type::Unit => write!(f, "unit"),
             Type::Action => write!(f, "action"),
             Type::Fun(args, ret) => {
-                let joined = args.iter()
-                .map(|t| format!("{}",t))
-                .collect::<Vec<_>>() 
-                .join(",");
+                let joined = args
+                    .iter()
+                    .map(|t| format!("{}", t))
+                    .collect::<Vec<_>>()
+                    .join(",");
                 if args.len() > 1 {
                     write!(f, "({})->{}", joined, ret)
                 } else {
                     write!(f, "{}->{}", joined, ret)
                 }
-            },
-            Type::TypVar(name) => write!(f, "{}",name),
+            }
+            Type::TypVar(name) => write!(f, "{}", name),
         }
     }
 }
 
 pub struct TypecheckEnv {
-    
     pub var_context: HashMap<String, Type>, // Expr::Var to type, todo: change this to more efficient stack of hashmap
     // pub var_to_typ_scheme: HashMap<String, TypeScheme>,
 
     // counter to generate new type var
     pub typevar_id: u64,
     // Type::var to type (canonical form)
-    pub acc_subst: HashMap<String, Type> 
-    
+    pub acc_subst: HashMap<String, Type>,
 }
 
 impl Display for TypecheckEnv {
@@ -91,4 +93,3 @@ pub fn typecheck_prog(prog: &Prog) {
         print!("service: {:?}\n {}", srvs.name, typ_env);
     }
 }
-

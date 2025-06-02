@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::convert::Infallible;
 
-use kameo::Actor;
 use kameo::prelude::*;
+use kameo::Actor;
 
 use crate::ast::Expr;
 
@@ -14,12 +14,13 @@ use super::message::Msg;
 use super::transaction::TxnId;
 use super::var_actor::VarActor;
 
-pub mod handler;
 pub mod alloc_actors;
 pub mod do_action;
+pub mod handler;
 
 #[derive(Clone)]
 pub struct Manager {
+    pub name: String,
     pub address: Option<ActorRef<Manager>>,
 
     pub varname_to_actors: HashMap<String, ActorRef<VarActor>>,
@@ -34,10 +35,7 @@ impl Actor for Manager {
 
     /// customized on_start impl of Actor trait    
     /// to allow manager self reference to its addr
-    async fn on_start(
-        &mut self,
-        actor_ref: ActorRef<Self>,
-    ) -> Result<(), Self::Error> {
+    async fn on_start(&mut self, actor_ref: ActorRef<Self>) -> Result<(), Self::Error> {
         self.address = Some(actor_ref.clone());
         Ok(())
     }
@@ -75,24 +73,28 @@ impl Manager {
     pub fn get_mut_txn_mgr(&mut self, txn_id: &TxnId) -> &mut TxnManager {
         self.txn_mgrs
             .get_mut(txn_id)
-            .expect("txn manager not found")     
+            .expect("txn manager not found")
     }
 
     pub fn get_read_results(&self, txn_id: &TxnId) -> HashMap<String, Expr> {
-        self.txn_mgrs.get(txn_id).expect(&format!("txn manager not found"))
+        self.txn_mgrs
+            .get(txn_id)
+            .expect(&format!("txn manager not found"))
             .reads
             .iter()
             .filter_map(|(name, state)| match state {
                 ReadState::Read(result) => Some((name.clone(), result.clone())),
-                _ => None
+                _ => None,
             })
             .collect()
     }
 
     pub fn get_preds(&self, txn_id: &TxnId) -> HashSet<TxnId> {
-        self.txn_mgrs.get(txn_id)
-        .expect(&format!("txn manager not found"))
-        .preds.clone()
+        self.txn_mgrs
+            .get(txn_id)
+            .expect(&format!("txn manager not found"))
+            .preds
+            .clone()
     }
 
     // invoke the macro to generate one‐line wrappers:
@@ -113,19 +115,20 @@ pub struct TxnManager {
     pub preds: HashSet<TxnId>,
 }
 
-
 #[derive(Clone, PartialEq, Eq)]
 pub enum ReadState {
     Requested,
-    Granted, Aborted,
-    Read(Expr), Failed,
+    Granted,
+    Aborted,
+    Read(Expr),
+    Failed,
 }
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum WriteState {
     Requested,
-    Granted, Aborted,
-
+    Granted,
+    Aborted,
 }
 
 impl TxnManager {
@@ -167,21 +170,23 @@ impl TxnManager {
     pub fn add_finished_read(&mut self, name: String, result: Expr, pred: HashSet<TxnId>) {
         assert!(self.reads.get(&name) == Some(ReadState::Granted).as_ref());
         self.reads.insert(name, ReadState::Read(result));
-        
-        self.preds.extend(pred); 
+
+        self.preds.extend(pred);
     }
 
     pub fn all_lock_granted(&self) -> bool {
         self.reads.iter().all(|(_, v)| *v == ReadState::Granted)
-     && self.writes.iter().all(|(_, v)| *v == WriteState::Granted)
+            && self.writes.iter().all(|(_, v)| *v == WriteState::Granted)
     }
 
     pub fn any_lock_aborted(&self) -> bool {
         self.reads.iter().any(|(_, v)| *v == ReadState::Aborted)
-     || self.writes.iter().any(|(_, v)| *v == WriteState::Aborted)
+            || self.writes.iter().any(|(_, v)| *v == WriteState::Aborted)
     }
 
     pub fn all_read_finished(&self) -> bool {
-        self.reads.iter().all(|(_, v)| matches!(v, ReadState::Read(_)))
+        self.reads
+            .iter()
+            .all(|(_, v)| matches!(v, ReadState::Read(_)))
     }
 }
