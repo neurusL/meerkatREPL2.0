@@ -87,10 +87,6 @@ pub enum Decl {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Assert{
-    condition: Expr
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Service {
@@ -102,8 +98,13 @@ pub struct Service {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Test {       
     pub name: String,
-    pub actions: Vec<Assn>,
-    pub asserts: Vec<Assert>
+    pub steps: Vec<TestStep>
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum TestStep {
+    Do(Vec<Assn>),
+    Assert(Expr)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
