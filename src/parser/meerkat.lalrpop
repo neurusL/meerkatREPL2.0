@@ -1,9 +1,9 @@
-use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp};
+use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test};
 
 grammar;
 
 pub Prog: Prog = {
-    <services: Services> => Prog { services }
+    <services: Services> <tests: Tests> => Prog { services, tests }
 }   
 
 Service: Service = {
@@ -13,6 +13,24 @@ Service: Service = {
 }
 
 Services: Vec<Service> = Service*;
+
+Test: Test = {
+    "@" <i:Ident> "(" <s:Ident> ")" "{" <cms: ReplCmds> "}" => {
+        Test { name: i, service_name: s, commands: cms }
+    },
+}
+Tests: Vec<Test> = Test*;
+
+ReplCmd: ReplCmd = {
+    "do" <e: Expr> ";" => {
+        ReplCmd::Do(e)
+    },
+    "assert" "(" <e:Expr> ")" ";" => {
+        ReplCmd::Assert(e)
+    },
+}
+
+ReplCmds: Vec<ReplCmd> = ReplCmd*;
 
 Decl: Decl = {
     "import" <i:Ident> ";" => {
