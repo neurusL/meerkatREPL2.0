@@ -1,0 +1,25 @@
+
+use crate::ast::*;
+use super::{Type,TypecheckEnv};
+impl TypecheckEnv {
+    pub fn typecheck_test(&mut self, test: &Test) {
+        for command in test.commands.iter() {
+            match command {
+              ReplCmd::Do(expr) => {
+                let typ = self.infer_expr(expr);
+                if typ!= Type::Action {    // does not work right now
+                  panic!("do requires assignment expression");
+                }
+              }
+              ReplCmd::Assert(expr) => {
+                let typ = self.infer_expr(expr);
+                if typ!= Type::Bool {
+                  panic!("Assert statement requires bool expression");
+                }
+              }
+              // TODO:
+              // Have to get decls from service the test refers to in context
+            }
+        }
+    }
+}

@@ -7,6 +7,7 @@
 mod tc_expr;
 mod tc_srvs;
 mod tc_stmt;
+mod tc_test;
 mod utils;
 
 use std::{
@@ -91,5 +92,10 @@ pub fn typecheck_prog(prog: &Prog) {
         let mut typ_env = TypecheckEnv::new();
         typ_env.typecheck_service(srvs);
         print!("service: {:?}\n {}", srvs.name, typ_env);
+    }
+    for test in prog.tests.iter() {
+        let mut typ_env = TypecheckEnv::new();
+        typ_env.typecheck_test(test);
+        print!("test: {:?}\n {}", test.name, typ_env);
     }
 }

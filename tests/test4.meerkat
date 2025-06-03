@@ -27,3 +27,8 @@ service test4 {
 
     
 }
+
+@test(test4) {
+  do x=x+1;
+  assert(false);
+}
