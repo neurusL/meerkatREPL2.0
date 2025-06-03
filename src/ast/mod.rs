@@ -92,31 +92,24 @@ pub enum Decl {
 pub struct Service {
     pub name: String,
     pub decls: Vec<Decl>,
-    pub tests: Vec<Test>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Test {       
     pub name: String,
-    pub steps: Vec<TestStep>
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum TestStep {
-    Do(Vec<Assn>),
-    Assert(Expr)
+    pub commands: Vec<ReplCmd>    // commands here refer to dos and asserts
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Prog {
     pub services: Vec<Service>,
+    pub tests: Vec<Test>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ReplCmd {
-    Do(Vec<Assn>),
-    Decl(Vec<Decl>),
-    Exit,
+    Do(Expr),
+    Assert(Expr),
     // service related commands
     // Service(Service),
     // Open(String),
