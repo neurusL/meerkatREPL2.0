@@ -9,50 +9,49 @@ use crate::{
             LockKind::{Read, Write},
         },
         message::Msg,
-        transaction::TxnId,
+        transaction::{Txn, TxnId},
     },
     static_analysis::var_analysis::read_write::{calc_read_set, calc_write_set},
 };
 
-use super::{Manager, TxnManager};
+use super::Manager;
 
 impl Manager {
     pub async fn do_action(
         &mut self,
-        txn_id: TxnId,
-        assns: &Vec<Assn>,
+        txn: &Txn,
     ) -> Result<(), Box<dyn Error>> {
         // static info of txn, the read and write set
-        let mut read_set = calc_read_set(assns);
-        let write_set = calc_write_set(assns);
+        let mut read_set = calc_read_set(&txn.assns);
+        let write_set = calc_write_set(&txn.assns);
         read_set.retain(|x| !&write_set.contains(x)); // exclude write locks from read locks
 
         // set up txn manager
 
-        self.new_txn_mgr(txn_id.clone());
+        self.new_txn_mgr(&txn.id);
 
         // send lock requests
-        self.request_locks(&txn_id, &read_set, &write_set).await?;
+        self.request_locks(&txn.id, &read_set, &write_set).await?;
 
         // wait for all locks to be granted or any lock to be aborted
-        while !(self.all_lock_granted(&txn_id) && self.any_lock_aborted(&txn_id)) {
+        while !(self.all_lock_granted(&txn.id) && self.any_lock_aborted(&txn.id)) {
             continue;
         }
-        if self.any_lock_aborted(&txn_id) {
+        if self.any_lock_aborted(&txn.id) {
             // abort all locks
-            return self.abort_locks(&txn_id, &read_set, &write_set).await;
+            return self.abort_locks(&txn.id, &read_set, &write_set).await;
         }
-        assert!(self.all_lock_granted(&txn_id));
+        assert!(self.all_lock_granted(&txn.id));
 
         // wait for all reads to finish
-        while !self.all_read_finished(&txn_id) {
+        while !self.all_read_finished(&txn.id) {
             continue;
         }
-        assert!(self.all_read_finished(&txn_id));
+        assert!(self.all_read_finished(&txn.id));
 
         // re-eval all src of assn
-        let mut assns = assns.clone();
-        let env = self.get_read_results(&txn_id);
+        let mut assns = txn.assns.clone();
+        let env = self.get_read_results(&txn.id);
         eval_assns(&mut assns, env);
 
         // send write request
@@ -62,7 +61,7 @@ impl Manager {
             self.ask_to_name(
                 &dest,
                 Msg::UsrWriteVarRequest {
-                    txn: txn_id.clone(),
+                    txn: txn.id.clone(),
                     write_val: src,
                 },
             )
@@ -70,12 +69,12 @@ impl Manager {
         }
 
         // finish up then release
-        let preds = self.get_preds(&txn_id);
+        let preds = self.get_preds(&txn.id);
         for name in read_set.iter().chain(write_set.iter()) {
             self.tell_to_name(
                 &name,
                 Msg::LockRelease {
-                    txn: txn_id.clone(),
+                    txn: txn.clone(),
                     preds: preds.clone(),
                 },
             )

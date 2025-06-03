@@ -7,7 +7,7 @@ use crate::{
     runtime::{lock::Lock, transaction::TxnId},
 };
 
-use super::{def_actor::DefActor, manager::Manager, var_actor::VarActor};
+use super::{def_actor::DefActor, manager::Manager, transaction::Txn, var_actor::VarActor};
 
 #[derive(Debug, Clone, Reply)]
 pub enum Msg {
@@ -18,28 +18,26 @@ pub enum Msg {
         txn: TxnId,
         name: String,
         result: Expr,
-        pred: Option<TxnId>,
-    },
-    UsrWriteVarRequest {
-        txn: TxnId,
-        write_val: Expr,
-        // requires: HashSet<TxnId>,
+        pred: Option<Txn>,
     },
 
     UsrReadDefRequest {
         txn: TxnId,
-        // requires: HashSet<TxnId>, // ?? Why we need this
+        // requires: HashSet<Txn>, // ?? Why we need this
     },
     UsrReadDefResult {
         txn: TxnId,
         name: String,
         result: Expr,
-        preds: HashSet<TxnId>,
+        preds: HashSet<Txn>,
     },
 
-    // Propagate {
-    //     propa_change: PropaChange, // a small change, make batch valid easier
-    // },
+    UsrWriteVarRequest {
+        txn: TxnId,
+        write_val: Expr,
+        // requires: HashSet<Txn>,
+    },
+
     LockRequest {
         // for notifying var/def that a lock is requested
         from_mgr_addr: ActorRef<Manager>,
@@ -47,8 +45,8 @@ pub enum Msg {
     },
     LockRelease {
         // for notifying var/def that a lock should be released
-        txn: TxnId,
-        preds: HashSet<TxnId>,
+        txn: Txn,
+        preds: HashSet<Txn>,
     },
     LockGranted {
         // for notifying manager that a lock request is granted
@@ -69,10 +67,11 @@ pub enum Msg {
 
     SubscribeGranted,
 
-    Change {
+    // propagate change of name's value, with a set of txns (pred) as prereq
+    PropChange {
         from_name: String,
         val: Expr,
-        preds: HashSet<TxnId>,
+        preds: HashSet<Txn>,
     },
 
     // Meerkat 2.0 only support non-distributed CodeUpdate

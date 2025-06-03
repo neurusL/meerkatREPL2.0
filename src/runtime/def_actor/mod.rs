@@ -1,11 +1,17 @@
-use kameo::prelude::*;
+use std::{collections::HashSet, hash::Hash};
+
 use kameo::Actor;
 
 use crate::ast::Expr;
 
 use super::lock::LockState;
-use super::message::Msg;
 use super::pubsub::PubSub;
+use super::transaction::Txn;
+
+pub mod handler;
+pub mod manager;
+pub mod pending;
+pub mod history;
 
 #[derive(Actor)]
 pub struct DefActor {
@@ -16,21 +22,36 @@ pub struct DefActor {
     pub lock_state: LockState,
 }
 
-impl DefActor {
-    pub fn new(name: String, val: Expr) -> DefActor {
-        DefActor {
-            name,
-            value: val,
-            pubsub: PubSub::new(),
-            lock_state: LockState::new(),
-        }
+
+/// internal representation of a prop change received by a def actor
+#[derive(Eq, Clone, Debug)]
+pub struct PropChange {
+    pub id: i64,
+    pub from_name: String,
+    pub new_val: Expr,
+    pub preds: HashSet<Txn>,
+}
+
+impl PartialEq for PropChange {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
     }
 }
 
-impl kameo::prelude::Message<Msg> for DefActor {
-    type Reply = Option<Msg>;
+impl PartialOrd for PropChange {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.id.partial_cmp(&other.id)
+    }
+}
 
-    async fn handle(&mut self, msg: Msg, _ctx: &mut Context<Self, Self::Reply>) -> Self::Reply {
-        todo!("implement me!")
+impl Ord for PropChange {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.id.cmp(&other.id)
+    }
+}
+
+impl Hash for PropChange {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
     }
 }

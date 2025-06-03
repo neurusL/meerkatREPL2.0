@@ -5,7 +5,7 @@ use kameo::Actor;
 
 use super::lock::LockState;
 use super::pubsub::PubSub;
-use super::transaction::TxnId;
+use super::transaction::Txn;
 use crate::ast::Expr;
 
 pub mod handler;
@@ -19,7 +19,7 @@ pub struct VarActor {
     pub pubsub: PubSub,
     pub lock_state: LockState,
 
-    pub latest_write_txn: Option<TxnId>,
+    pub latest_write_txn: Option<Txn>,
 }
 
 impl VarActor {

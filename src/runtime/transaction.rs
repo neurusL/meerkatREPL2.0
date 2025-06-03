@@ -2,7 +2,7 @@ use core::fmt;
 use std::hash::{Hash, Hasher};
 use tokio::time::Instant;
 
-use crate::ast::Expr;
+use crate::ast::{Assn, Expr};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Hash)]
 pub struct TxnId {
@@ -31,7 +31,7 @@ pub struct WriteToName {
 #[derive(Clone)]
 pub struct Txn {
     pub id: TxnId,
-    pub writes: Vec<WriteToName>,
+    pub assns: Vec<Assn>,
 }
 
 impl PartialEq for Txn {

@@ -53,11 +53,11 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 None
             }
 
-            Msg::LockRelease { txn, preds } => {
-                assert!(self.lock_state.has_granted(&txn));
+            Msg::LockRelease { txn, mut preds } => {
+                assert!(self.lock_state.has_granted(&txn.id));
                 let lock = self
                     .lock_state
-                    .remove_granted_or_wait(&txn)
+                    .remove_granted_or_wait(&txn.id)
                     .expect("lock should be granted before release");
 
                 // if lock is read then nothing else to do
@@ -67,11 +67,16 @@ impl kameo::prelude::Message<Msg> for VarActor {
                         .value
                         .confirm_update()
                         .expect("should have unconfirmed value update");
-                    assert!(unconfirmed_txn == txn);
+                    assert!(unconfirmed_txn == txn.id);
 
                     self.latest_write_txn = Some(txn.clone());
 
-                    self.pubsub.publish(Msg::Change {
+                    // except for preds calculated by manager 
+                    // the txn itself should also have been applied when 
+                    // value is updated
+                    preds.insert(txn.clone());
+
+                    self.pubsub.publish(Msg::PropChange {
                         from_name: self.name.clone(),
                         val: new_value,
                         preds: preds.clone(),

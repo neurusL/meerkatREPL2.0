@@ -11,6 +11,7 @@ use super::def_actor::DefActor;
 use super::lock::Lock;
 use super::lock::LockKind;
 use super::message::Msg;
+use super::transaction::Txn;
 use super::transaction::TxnId;
 use super::var_actor::VarActor;
 
@@ -65,9 +66,9 @@ macro_rules! delegate_to_txn {
 }
 
 impl Manager {
-    pub fn new_txn_mgr(&mut self, txn_id: TxnId) {
+    pub fn new_txn_mgr(&mut self, txn_id: &TxnId) {
         let new_mgr = TxnManager::new(txn_id.clone());
-        self.txn_mgrs.insert(txn_id, new_mgr);
+        self.txn_mgrs.insert(txn_id.clone(), new_mgr);
     }
 
     pub fn get_mut_txn_mgr(&mut self, txn_id: &TxnId) -> &mut TxnManager {
@@ -89,7 +90,7 @@ impl Manager {
             .collect()
     }
 
-    pub fn get_preds(&self, txn_id: &TxnId) -> HashSet<TxnId> {
+    pub fn get_preds(&self, txn_id: &TxnId) -> HashSet<Txn> {
         self.txn_mgrs
             .get(txn_id)
             .expect(&format!("txn manager not found"))
@@ -101,7 +102,7 @@ impl Manager {
     delegate_to_txn!(mut add_request_lock(name: String, kind: LockKind));
     delegate_to_txn!(mut add_grant_lock(name: String, kind: LockKind));
     delegate_to_txn!(mut add_abort_lock(name: String, kind: LockKind));
-    delegate_to_txn!(mut add_finished_read(name: String, result: Expr, pred: HashSet<TxnId>));
+    delegate_to_txn!(mut add_finished_read(name: String, result: Expr, pred: HashSet<Txn>));
     delegate_to_txn!(imm all_lock_granted() -> bool);
     delegate_to_txn!(imm any_lock_aborted() -> bool);
     delegate_to_txn!(imm all_read_finished() -> bool);
@@ -112,7 +113,7 @@ pub struct TxnManager {
     pub txn_id: TxnId,
     pub reads: HashMap<String, ReadState>,
     pub writes: HashMap<String, WriteState>,
-    pub preds: HashSet<TxnId>,
+    pub preds: HashSet<Txn>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -167,7 +168,7 @@ impl TxnManager {
         }
     }
 
-    pub fn add_finished_read(&mut self, name: String, result: Expr, pred: HashSet<TxnId>) {
+    pub fn add_finished_read(&mut self, name: String, result: Expr, pred: HashSet<Txn>) {
         assert!(self.reads.get(&name) == Some(ReadState::Granted).as_ref());
         self.reads.insert(name, ReadState::Read(result));
 
