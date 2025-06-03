@@ -24,9 +24,10 @@ pub struct DefActor {
 
 
 /// internal representation of a prop change received by a def actor
+type ChangeId = i64;
 #[derive(Eq, Clone, Debug)]
 pub struct PropChange {
-    pub id: i64,
+    pub id: ChangeId,
     pub from_name: String,
     pub new_val: Expr,
     pub preds: HashSet<Txn>,

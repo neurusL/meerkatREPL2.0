@@ -9,7 +9,7 @@
 use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet};
 
 use crate::runtime::transaction::{Txn, TxnId};
-use super::PropChange;
+use super::{ChangeId, PropChange};
 
 
 /// applied changes 
@@ -18,16 +18,16 @@ pub struct AppliedChanges {
     /// changes that have not been dropped yet, 
     /// key: change 
     /// value: live writes that has not been dominated by writes in other changes
-    pub undropped: HashMap<PropChange, HashSet<String>>,
+    pub undropped: HashMap<ChangeId, HashSet<String>>,
 
     /// changes that have been dropped
     /// as soon as all writes of the a change are dominated by existing writers, 
     /// we don't need to keep it at all
-    pub dropped: HashSet<PropChange>,
+    pub dropped: HashSet<ChangeId>,
 
     /// key: writed var v
     /// value: latest txn writes to v, together with the change it belongs to 
-    pub write_to_changes: HashMap<String, (TxnId, PropChange)>
+    pub write_to_changes: HashMap<String, (TxnId, ChangeId)>
 }
 
 impl AppliedChanges {
@@ -65,33 +65,33 @@ impl AppliedChanges {
                         }
                         change_live_set.insert(write.clone());
                         *max_id = txn.id.clone();
-                        *max_change = change.clone();
+                        *max_change = change.id;
                     }
                 
             } else { 
                 change_live_set.insert(write.clone());
-                self.write_to_changes.insert(write, (txn.id.clone(), change.clone()));
+                self.write_to_changes.insert(write, (txn.id.clone(), change.id));
             }
         }
 
         if change_live_set.len() > 0 {
-            self.undropped.insert(change.clone(), change_live_set);
+            self.undropped.insert(change.id, change_live_set);
         } else {
-            self.dropped.insert(change.clone());
+            self.dropped.insert(change.id);
         }
           
     }
 
     pub fn has_change(&self, change: &PropChange) -> bool {
-        self.undropped.contains_key(change)
-        || self.dropped.contains(change)
+        self.undropped.contains_key(&change.id)
+        || self.dropped.contains(&change.id)
     }
 
-    pub fn get_undropped_changes(&self) -> HashSet<PropChange> {
+    pub fn get_undropped_changes(&self) -> HashSet<ChangeId> {
         self.undropped.keys().cloned().collect()
     }
 
-    pub fn get_all_applied_changes(&self) -> HashSet<PropChange> {
+    pub fn get_all_applied_changes(&self) -> HashSet<ChangeId> {
         self.undropped.keys().cloned()
         .chain(self.dropped.iter().cloned()).collect()
     }
