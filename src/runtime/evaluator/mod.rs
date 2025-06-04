@@ -38,41 +38,8 @@ impl Evaluator {
     }
 
 
-    // function to get declarations from service
-    pub fn get_service_decls<'a>(&self, test: &Test, services: &'a [Service]) -> Result<&'a Vec<Decl>, String> {
-        services.iter().find(|s| s.name == test.name).map(|s| &s.decls)
-        .ok_or_else(|| format!("Service {} not found", test.name))
-    }
-
-    //loading service declarations
-    pub fn load_service_decls(&mut self, decls: &[Decl], services: &[Service]) -> Result<(),String> {
-        for decl in decls {
-            match decl {
-                Decl::VarDecl { name, val } => {
-                    let val_expr = val.clone();
-                    self.reactive_name_to_vals.insert(name.clone(), val_expr);
-                    self.reactive_names.insert(name.clone());
-                }
-                Decl::DefDecl { name, val, is_pub } => {
-                    let val_expr = val.clone();
-                    self.reactive_name_to_vals.insert(name.clone(), val_expr);
-                    self.reactive_names.insert(name.clone());
-                }
-                Decl::Import { srv_name } =>{   // not done yet
-
-                }
-            }
-        }
-        Ok(())
-    }
-
     pub fn eval_test(&mut self, test: &Test, services: &[Service]) -> Result<(), String> {
-        let declarations = self.get_service_decls(test, services)?; 
-
-        self.load_service_decls(declarations, services)?;  //getting and loading declarations from services
-
         
-
         for cmd in &test.commands {
             match cmd {
                 ReplCmd::Do(expr) => {
