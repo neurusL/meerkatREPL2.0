@@ -24,11 +24,13 @@ service test4 {
     pub def update = (fn x => (x+5));
 
     pub def updated_val = update(x);
+    pub def new = updated_val + 4;
 
     
 }
 
-@test(test4) {
-  do x=x+1;
-  assert(false);
+@test (test4) {
+  do act;
+  assert(x==1);
+  
 }
