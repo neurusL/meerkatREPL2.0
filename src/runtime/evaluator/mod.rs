@@ -1,4 +1,4 @@
-use crate::ast::{Assn, Expr, Prog, Service};
+use crate::ast::{Assn, Expr, Prog, Service, Test, ReplCmd, Decl};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
@@ -36,6 +36,70 @@ impl Evaluator {
             reactive_name_to_vals: reactive_names_to_vals,
         }
     }
+
+
+    // function to get declarations from service
+    pub fn get_service_decls<'a>(&self, test: &Test, services: &'a [Service]) -> Result<&'a Vec<Decl>, String> {
+        services.iter().find(|s| s.name == test.name).map(|s| &s.decls)
+        .ok_or_else(|| format!("Service {} not found", test.name))
+    }
+
+    //loading service declarations
+    pub fn load_service_decls(&mut self, decls: &[Decl], services: &[Service]) -> Result<(),String> {
+        for decl in decls {
+            match decl {
+                Decl::VarDecl { name, val } => {
+                    let val_expr = val.clone();
+                    self.reactive_name_to_vals.insert(name.clone(), val_expr);
+                    self.reactive_names.insert(name.clone());
+                }
+                Decl::DefDecl { name, val, is_pub } => {
+                    let val_expr = val.clone();
+                    self.reactive_name_to_vals.insert(name.clone(), val_expr);
+                    self.reactive_names.insert(name.clone());
+                }
+                Decl::Import { srv_name } =>{   // not done yet
+
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn eval_test(&mut self, test: &Test, services: &[Service]) -> Result<(), String> {
+        let declarations = self.get_service_decls(test, services)?; 
+
+        self.load_service_decls(declarations, services)?;  //getting and loading declarations from services
+
+        
+
+        for cmd in &test.commands {
+            match cmd {
+                ReplCmd::Do(expr) => {
+                    let mut expr_clone = expr.clone();
+                    let _ = self.eval_expr(&mut expr_clone);
+                }
+                ReplCmd::Assert(expr) => {
+                    let mut expr_clone = expr.clone();
+                    self.eval_expr(&mut expr_clone)?;
+                    match expr_clone {
+                        Expr::Bool {val} => {
+                            if !val {
+                                println!("Assert failed");
+                                return Err(format!("Assert Failed"));
+                            }
+                            
+                        }
+                        _=> {
+                            return Err(format!("Assert requires a boolean"))
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
 }
 
 pub fn eval_assns(assns: &mut Vec<Assn>, env: HashMap<String, Expr>) {
@@ -56,8 +120,23 @@ pub fn eval_srv(srv: &Service) -> Evaluator {
 }
 
 pub fn eval_prog(prog: &Prog) {
+    let mut global_decls = HashMap::new();  // global declarations from services
     for srv in prog.services.iter() {
-        eval_srv(srv);
+        let srv_evaluator = eval_srv(srv);
+
+        global_decls.extend(srv_evaluator.reactive_name_to_vals);   // adding service's decls to global
+    }
+
+
+    let mut test_eval = Evaluator::new(global_decls);  // using global decls as context
+    for test in prog.tests.iter() {
+        if let Err(e) = test_eval.eval_test(test, &prog.services) {
+            println!("Test failed");
+            println!("{}",e);
+        }
+        else {
+            println!("Test passed");
+        }
     }
 }
 
