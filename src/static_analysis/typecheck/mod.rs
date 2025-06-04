@@ -77,6 +77,7 @@ pub struct TypecheckEnv {
     pub acc_subst: HashMap<String, Type>,
 }
 
+
 impl Display for TypecheckEnv {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "------------------\n")?;
@@ -88,13 +89,17 @@ impl Display for TypecheckEnv {
 }
 
 pub fn typecheck_prog(prog: &Prog) {
+
+    let mut global_type_context = HashMap::new();  // global var context
+
     for srvs in prog.services.iter() {
-        let mut typ_env = TypecheckEnv::new();
+        let mut typ_env = TypecheckEnv::new(HashMap::new());
         typ_env.typecheck_service(srvs);
         print!("service: {:?}\n {}", srvs.name, typ_env);
+        global_type_context.extend(typ_env.var_context);   // adding context to global context
     }
     for test in prog.tests.iter() {
-        let mut typ_env = TypecheckEnv::new();
+        let mut typ_env = TypecheckEnv::new(global_type_context.clone()); // usign context from services for tests
         typ_env.typecheck_test(test);
         print!("test: {:?}\n {}", test.name, typ_env);
     }
