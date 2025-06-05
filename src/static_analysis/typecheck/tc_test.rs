@@ -7,8 +7,8 @@ impl TypecheckEnv {
             match command {
               ReplCmd::Do(expr) => {
                 let typ = self.infer_expr(expr);
-                if typ!= Type::Action {    // does not work right now
-                  panic!("do requires assignment expression");
+                if typ!= Type::Action {    
+                  panic!("do requires action expression");
                 }
               }
               ReplCmd::Assert(expr) => {
@@ -17,8 +17,6 @@ impl TypecheckEnv {
                   panic!("Assert statement requires bool expression");
                 }
               }
-              // TODO:
-              // Have to get decls from service the test refers to in context
             }
         }
     }

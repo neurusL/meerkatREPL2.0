@@ -38,21 +38,32 @@ impl Evaluator {
     }
 
 
-    pub fn eval_test(&mut self, test: &Test, services: &[Service]) -> Result<(), String> {
+    
+
+}
+
+pub fn eval_assns(assns: &mut Vec<Assn>, env: HashMap<String, Expr>) {
+    let mut eval = Evaluator::new(env);
+    for assn in assns.iter_mut() {
+        eval.eval_assn(assn);
+    }
+}
+pub fn eval_test(test: &Test, env: &HashMap<String, Expr>) -> Result<(), String> {
         
+        let mut eval = Evaluator::new(env.clone());
+
         for cmd in &test.commands {
             match cmd {
                 ReplCmd::Do(expr) => {
                     let mut expr_clone = expr.clone();
-                    let _ = self.eval_expr(&mut expr_clone);
+                    let _ = eval.eval_expr(&mut expr_clone);
                 }
                 ReplCmd::Assert(expr) => {
                     let mut expr_clone = expr.clone();
-                    self.eval_expr(&mut expr_clone)?;
+                    eval.eval_assert(&mut expr_clone)?;
                     match expr_clone {
                         Expr::Bool {val} => {
                             if !val {
-                                println!("Assert failed");
                                 return Err(format!("Assert Failed"));
                             }
                             
@@ -67,15 +78,6 @@ impl Evaluator {
         Ok(())
     }
 
-}
-
-pub fn eval_assns(assns: &mut Vec<Assn>, env: HashMap<String, Expr>) {
-    let mut eval = Evaluator::new(env);
-    for assn in assns.iter_mut() {
-        eval.eval_assn(assn);
-    }
-}
-
 pub fn eval_srv(srv: &Service) -> Evaluator {
     let mut srv = srv.clone();
     let mut eval = Evaluator::new(HashMap::new());
@@ -87,22 +89,21 @@ pub fn eval_srv(srv: &Service) -> Evaluator {
 }
 
 pub fn eval_prog(prog: &Prog) {
-    let mut global_decls = HashMap::new();  // global declarations from services
+    let mut global_vals = HashMap::new();  // global vals from services
     for srv in prog.services.iter() {
         let srv_evaluator = eval_srv(srv);
 
-        global_decls.extend(srv_evaluator.reactive_name_to_vals);   // adding service's decls to global
+        global_vals.extend(srv_evaluator.reactive_name_to_vals);   // adding service's vals to global
     }
 
 
-    let mut test_eval = Evaluator::new(global_decls);  // using global decls as context
     for test in prog.tests.iter() {
-        if let Err(e) = test_eval.eval_test(test, &prog.services) {
-            println!("Test failed");
-            println!("{}",e);
+        if let Err(e) = eval_test(test, &global_vals) {
+            println!("Test {} failed because {}", test.name,e);
+            
         }
         else {
-            println!("Test passed");
+            println!("Test {} passed", test.name);
         }
     }
 }

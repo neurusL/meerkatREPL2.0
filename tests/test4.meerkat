@@ -30,8 +30,16 @@ service test4 {
     
 }
 
-@test (test4) {
+service tt {
+  var x = 1;
+  pub def w = x + 1;
+}
+
+@test (test5) {
   do act;
-  assert(result);
-  
+  assert(x==2);
+}
+
+@test (test3) {
+  assert(w==2);
 }
