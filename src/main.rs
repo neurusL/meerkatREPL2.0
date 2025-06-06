@@ -4,6 +4,7 @@ use std::{env, fs};
 use kameo::spawn;
 use parser::meerkat;
 use runtime::manager::Manager;
+use runtime::message::Msg;
 use tokio;
 
 pub mod ast;
@@ -28,9 +29,12 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     let _ = static_analysis::var_analysis::calc_dep_prog(&prog);
     let _ = runtime::evaluator::eval_prog(&prog);
 
-    let mgr = Manager::new("main_service".to_string());
-    let mgr_actor_ref = spawn(mgr);
-
+    for srv in prog.services.iter() {
+        let mgr = Manager::new(srv.name.clone());
+        let mgr_actor_ref = spawn(mgr);
+        mgr_actor_ref.tell(Msg::CodeUpdate{ srv: srv.clone() }).await?;
+    }
+    
     // runtime.repl
     Ok(())
 }
