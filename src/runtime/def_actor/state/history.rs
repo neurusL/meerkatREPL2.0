@@ -1,4 +1,4 @@
-//! how we maintain applied changes of a def actor
+//! a finer grained history of applied changes (under development)
 //! 
 //! This module provides a mechanism to track a collection of `PropChange`'s and 
 //! automatically drop any change that has been fully superseded by newer writes. 
@@ -31,6 +31,13 @@ pub struct AppliedChanges {
 }
 
 impl AppliedChanges {
+    pub fn new() -> Self {
+        AppliedChanges {
+            undropped: HashMap::new(),
+            dropped: HashSet::new(),
+            write_to_changes: HashMap::new(),
+        }
+    }
 
     pub fn add_change(&mut self, change: &PropChange) {
         let mut write_to_max_txn = HashMap::new();
@@ -82,9 +89,9 @@ impl AppliedChanges {
           
     }
 
-    pub fn has_change(&self, change: &PropChange) -> bool {
-        self.undropped.contains_key(&change.id)
-        || self.dropped.contains(&change.id)
+    pub fn has_change(&self, change: &ChangeId) -> bool {
+        self.undropped.contains_key(change)
+        || self.dropped.contains(change)
     }
 
     pub fn get_undropped_changes(&self) -> HashSet<ChangeId> {

@@ -1,58 +1,40 @@
+use std::collections::HashMap;
 use std::{collections::HashSet, hash::Hash};
-
 use kameo::Actor;
 
 use crate::ast::Expr;
-
 use super::lock::LockState;
 use super::pubsub::PubSub;
-use super::transaction::Txn;
+use state::ChangeState;
 
 pub mod handler;
-pub mod manager;
-pub mod pending;
-pub mod history;
+pub mod state;
 
-#[derive(Actor)]
+
 pub struct DefActor {
     pub name: String,
-    pub value: Expr,
+    pub value: Expr,  // expr of def
 
     pub pubsub: PubSub,
     pub lock_state: LockState,
+
+    pub state: ChangeState,
 }
 
-
-/// internal representation of a prop change received by a def actor
-type ChangeId = i64;
-#[derive(Eq, Clone, Debug)]
-pub struct PropChange {
-    pub id: ChangeId,
-    pub from_name: String,
-    pub new_val: Expr,
-    pub preds: HashSet<Txn>,
-}
-
-impl PartialEq for PropChange {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-impl PartialOrd for PropChange {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.id.partial_cmp(&other.id)
-    }
-}
-
-impl Ord for PropChange {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.id.cmp(&other.id)
-    }
-}
-
-impl Hash for PropChange {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
+impl DefActor {
+    pub fn new(
+        name: String, 
+        expr: Expr, // def's expr
+        value: Expr, // def's initialized value 
+        arg_to_values: HashMap<String, Expr>, // def's args to their initialized values
+        arg_to_vars: HashMap<String, HashSet<String>>, // args to their transitively dependent vars
+    ) -> DefActor {
+        DefActor {
+            name,
+            value,
+            pubsub: PubSub::new(),
+            lock_state: LockState::new(),
+            state: ChangeState::new(expr, arg_to_values, arg_to_vars),
+        }
     }
 }

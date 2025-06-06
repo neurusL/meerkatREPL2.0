@@ -50,12 +50,11 @@ impl Manager {
         assert!(self.all_read_finished(&txn.id));
 
         // re-eval all src of assn
-        let mut assns = txn.assns.clone();
         let env = self.get_read_results(&txn.id);
-        eval_assns(&mut assns, env);
+        let evaled_assns = eval_assns(&txn.assns, env);
 
         // send write request
-        for Assn { dest, src } in assns {
+        for Assn { dest, src } in evaled_assns {
             // for right behavior, hand write request synchronously
             // avoiding LockRelease received before UsrWriteVarRequest
             self.ask_to_name(

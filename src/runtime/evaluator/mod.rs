@@ -1,7 +1,6 @@
 use crate::ast::{Assn, Expr, Prog, Service};
 use std::{
-    collections::{HashMap, HashSet},
-    fmt::Display,
+    collections::{HashMap, HashSet}, env, fmt::Display
 };
 
 mod eval_expr;
@@ -20,29 +19,39 @@ pub struct Evaluator {
     var_id_cnt: i32,
     pub reactive_names: HashSet<String>,
 
-    // context are modally separated into, we didn't use lambda expr var
-    // as we subst directly in place when we eval expr
-    // reactive def/var name -> val
+    /// context are modally separated into, we didn't use lambda expr var
+    /// as we subst directly in place when we eval expr
+    /// reactive def/var name -> val
     pub reactive_name_to_vals: HashMap<String, Expr>,
-    // lambda expr var name -> val
-    // pub exprvar_name_to_val: HashMap<String, Expr>,
+    /// lambda expr var name -> val
+    /// exprvar_name_to_val: HashMap<String, Expr>,
+
+    pub def_name_to_exprs: HashMap<String, Expr>,
 }
 
 impl Evaluator {
-    pub fn new(reactive_names_to_vals: HashMap<String, Expr>) -> Evaluator {
+    pub fn new(reactive_name_to_vals: HashMap<String, Expr>) -> Evaluator {
         Evaluator {
             var_id_cnt: 0,
             reactive_names: HashSet::new(),
-            reactive_name_to_vals: reactive_names_to_vals,
+            reactive_name_to_vals,
+            def_name_to_exprs: HashMap::new(),
         }
     }
 }
 
-pub fn eval_assns(assns: &mut Vec<Assn>, env: HashMap<String, Expr>) {
+pub fn eval_def_expr(def_expr: &Expr, env: HashMap<String, Expr>) -> Expr {
+    todo!()
+}
+
+pub fn eval_assns(assns: &Vec<Assn>, env: HashMap<String, Expr>) -> Vec<Assn> {
     let mut eval = Evaluator::new(env);
-    for assn in assns.iter_mut() {
+    let mut evaled_assns = assns.clone();
+    for assn in evaled_assns.iter_mut() {
         eval.eval_assn(assn);
     }
+
+    evaled_assns
 }
 
 pub fn eval_srv(srv: &Service) -> Evaluator {

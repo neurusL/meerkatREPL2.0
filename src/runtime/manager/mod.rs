@@ -26,7 +26,11 @@ pub struct Manager {
 
     pub varname_to_actors: HashMap<String, ActorRef<VarActor>>,
     pub defname_to_actors: HashMap<String, ActorRef<DefActor>>,
+
+    pub reactive_name_to_vals: HashMap<String, Expr>,
+    
     pub dep_graph: HashMap<String, HashSet<String>>,
+    pub dep_transtive: HashMap<String, HashSet<String>>,
 
     pub txn_mgrs: HashMap<TxnId, TxnManager>,
 }

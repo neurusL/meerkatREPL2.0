@@ -1,12 +1,16 @@
 //! Logic for Var Actor
 //!
 
-use std::collections::HashSet;
 
-use tokio::runtime::Handle;
+use std::time::Duration;
+
+use kameo::{error::Infallible, prelude::*};
+use kameo::mailbox::Signal;
 
 use super::VarActor;
 use crate::runtime::{lock::Lock, message::Msg};
+
+pub const TICK_INTERVAL: Duration = Duration::from_millis(100);
 
 impl kameo::prelude::Message<Msg> for VarActor {
     type Reply = Option<Msg>;
@@ -22,7 +26,6 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 from_addr,
             } => {
                 self.pubsub.subscribe(from_addr);
-
                 Some(Msg::SubscribeGranted)
             }
 
@@ -40,23 +43,19 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 None
             }
 
-            Msg::LockAbort {
-                from_name: _,
-                lock: Lock { txn_id, .. },
-            } => {
-                self.lock_state.remove_granted_or_wait(&txn_id);
+            Msg::LockAbort { lock, ..} => {
+                self.lock_state.remove_granted_or_wait(&lock.txn_id);
 
                 // roll back to previous stable state of value
                 // unconfirmed write has same txn as aborted
-                self.value.roll_back_if_relevant(&txn_id);
+                self.value.roll_back_if_relevant(&lock.txn_id);
 
                 None
             }
 
             Msg::LockRelease { txn, mut preds } => {
                 assert!(self.lock_state.has_granted(&txn.id));
-                let lock = self
-                    .lock_state
+                let lock = self.lock_state
                     .remove_granted_or_wait(&txn.id)
                     .expect("lock should be granted before release");
 
@@ -80,7 +79,7 @@ impl kameo::prelude::Message<Msg> for VarActor {
                         from_name: self.name.clone(),
                         val: new_value,
                         preds: preds.clone(),
-                    })
+                    }).await;
                 }
 
                 None
@@ -110,6 +109,34 @@ impl kameo::prelude::Message<Msg> for VarActor {
 
             #[allow(unreachable_patterns)]
             _ => panic!("VarActor should not receive message {:?}", msg),
+        }
+    }
+}
+
+impl Actor for VarActor {
+    type Error = Infallible;
+
+    async fn next(
+            &mut self,
+            _actor_ref: WeakActorRef<Self>,
+            mailbox_rx: &mut MailboxReceiver<Self>,
+        ) -> Option<Signal<Self>> {
+        let mut interval = tokio::time::interval(TICK_INTERVAL);
+
+        loop {
+            tokio::select! {
+                // if a real message waiting, return immediately:
+                maybe_signal = mailbox_rx.recv() => {
+                    return maybe_signal;
+                }
+
+                // else, every 100 ms ticks
+                _ = interval.tick() => {
+                    if let Err(e) = self.tick().await {
+                        eprintln!("[{}] tick() failed: {:?}", self.name, e);
+                    }
+                }
+            }
         }
     }
 }

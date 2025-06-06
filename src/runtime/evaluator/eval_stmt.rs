@@ -19,6 +19,11 @@ impl Evaluator {
             }
             Decl::DefDecl { name, val, is_pub } => {
                 self.reactive_names.insert(name.clone());
+
+                // unevaled expr of def should be stored
+                self.def_name_to_exprs.insert(name.clone(), val.clone());
+
+                // then eval def
                 self.eval_expr(val)?;
                 self.reactive_name_to_vals.insert(name.clone(), val.clone());
             }
