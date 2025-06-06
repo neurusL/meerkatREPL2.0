@@ -87,6 +87,7 @@ pub enum Decl {
     },
 }
 
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Service {
     pub name: String,
@@ -94,15 +95,22 @@ pub struct Service {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Test {       
+    pub name: String,
+    pub service_name : String,
+    pub commands: Vec<ReplCmd>    // commands here refer to dos and asserts
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Prog {
     pub services: Vec<Service>,
+    pub tests: Vec<Test>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ReplCmd {
-    Do(Vec<Assn>),
-    Decl(Vec<Decl>),
-    Exit,
+    Do(Expr),
+    Assert(Expr),
     // service related commands
     // Service(Service),
     // Open(String),
