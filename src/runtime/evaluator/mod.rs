@@ -1,4 +1,4 @@
-use crate::ast::{Assn, Expr, Prog, Service};
+use crate::ast::{Assn, Expr, Prog, Service, Test, ReplCmd, Decl};
 use std::{
     collections::{HashMap, HashSet}, env, fmt::Display
 };
@@ -38,6 +38,10 @@ impl Evaluator {
             def_name_to_exprs: HashMap::new(),
         }
     }
+
+
+    
+
 }
 
 pub fn eval_def_expr(def_expr: &Expr, env: HashMap<String, Expr>) -> Expr {
@@ -53,6 +57,35 @@ pub fn eval_assns(assns: &Vec<Assn>, env: HashMap<String, Expr>) -> Vec<Assn> {
 
     evaled_assns
 }
+pub fn eval_test(test: &Test, env: &HashMap<String, Expr>) -> Result<(), String> {
+        
+        let mut eval = Evaluator::new(env.clone());
+
+        for cmd in &test.commands {
+            match cmd {
+                ReplCmd::Do(expr) => {
+                    let mut expr_clone = expr.clone();
+                    let _ = eval.eval_expr(&mut expr_clone);
+                }
+                ReplCmd::Assert(expr) => {
+                    let mut expr_clone = expr.clone();
+                    eval.eval_assert(&mut expr_clone)?;
+                    match expr_clone {
+                        Expr::Bool {val} => {
+                            if !val {
+                                return Err(format!("Assert Failed"));
+                            }
+                            
+                        }
+                        _=> {
+                            return Err(format!("Assert requires a boolean"))
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
 
 pub fn eval_srv(srv: &Service) -> Evaluator {
     let mut srv = srv.clone();
@@ -65,8 +98,22 @@ pub fn eval_srv(srv: &Service) -> Evaluator {
 }
 
 pub fn eval_prog(prog: &Prog) {
+    let mut global_vals = HashMap::new();  // global vals from services
     for srv in prog.services.iter() {
-        eval_srv(srv);
+        let srv_evaluator = eval_srv(srv);
+
+        global_vals.extend(srv_evaluator.reactive_name_to_vals);   // adding service's vals to global
+    }
+
+
+    for test in prog.tests.iter() {
+        if let Err(e) = eval_test(test, &global_vals) {
+            println!("Test {} failed because {}", test.name,e);
+            
+        }
+        else {
+            println!("Test {} passed", test.name);
+        }
     }
 }
 

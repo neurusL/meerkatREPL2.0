@@ -15,8 +15,8 @@ Service: Service = {
 Services: Vec<Service> = Service*;
 
 Test: Test = {
-    "@" <i:Ident> "(" <s:Ident> ")" "{" <cms: ReplCmds> "}" => {
-        Test { name: i, service_name: s, commands: cms }
+    "@test" "(" <i:Ident> ")" "{" <cms: ReplCmds> "}" => {
+        Test { name: i, commands: cms }
     },
 }
 Tests: Vec<Test> = Test*;

@@ -97,7 +97,6 @@ pub struct Service {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Test {       
     pub name: String,
-    pub service_name : String,
     pub commands: Vec<ReplCmd>    // commands here refer to dos and asserts
 }
 

@@ -34,10 +34,16 @@ impl Evaluator {
 
     pub fn eval_assn(&mut self, assn: &mut Assn) -> Result<(), String> {
         self.eval_expr(&mut assn.src)?;
-
+        
         // since assn only appears in action,
         // their effect should not protrude to the expression level language's env
         // self.env.insert(assn.dest.clone(), assn.src.clone());
+        Ok(())
+    }
+
+    pub fn eval_assert(&mut self, expr: &mut Expr) ->  Result<(), String> {
+        self.eval_expr(expr)?;
+
         Ok(())
     }
 }

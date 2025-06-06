@@ -4,7 +4,7 @@ service test4 {
       if a then a else b
     )); 
 
-    pub def result = f(true,false);
+    pub def result = f(false,false);
 
     pub def div = (fn a,b => (
       a/b
@@ -14,6 +14,7 @@ service test4 {
     var x = 1;
     var y = 2;
     
+    pub def z = x + 2;
     pub def func_on_action = fn x => fn y => action { x = y; };
 
     pub def func_on_action_x = func_on_action(x);
@@ -24,6 +25,21 @@ service test4 {
     pub def update = (fn x => (x+5));
 
     pub def updated_val = update(x);
+    pub def new = updated_val + 4;
 
     
+}
+
+service tt {
+  var x = 1;
+  pub def w = x + 1;
+}
+
+@test (test5) {
+  do act;
+  assert(x==2);
+}
+
+@test (test3) {
+  assert(w==2);
 }
