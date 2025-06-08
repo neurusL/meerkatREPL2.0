@@ -40,7 +40,7 @@ impl kameo::prelude::Message<Msg> for VarActor {
                     });
                 }
 
-                None
+                Some(Msg::LockGranted { from_name: self.name.clone(), lock })
             }
 
             Msg::LockAbort { lock, ..} => {
@@ -132,11 +132,10 @@ impl Actor for VarActor {
 
                 // else, every 100 ms ticks
                 _ = interval.tick() => {
-                    if let Err(e) = self.tick().await {
-                        eprintln!("[{}] tick() failed: {:?}", self.name, e);
-                    }
+                    let _ = self.tick().await;
                 }
             }
+            // println!("[{}] ticked, now value is {:?}", self.name, self.value);
         }
     }
 }
@@ -145,12 +144,14 @@ impl VarActor {
     async fn tick(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // if can grant new waiting lock
         if let Some((lock, mgr)) = self.lock_state.grant_oldest_wait() {
+            println!("grant lock: {:?} to {:?}", lock, mgr);
             let msg = Msg::LockGranted {
                 from_name: self.name.clone(),
                 lock,
             };
 
             mgr.tell(msg).await?;
+            println!("message is sent");
         }
         Ok(())
     }

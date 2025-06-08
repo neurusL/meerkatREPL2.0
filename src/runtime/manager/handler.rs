@@ -1,8 +1,8 @@
 use core::panic;
-use std::{collections::HashSet, error::Error};
+use std::{collections::HashSet, error::Error, sync::Condvar};
 
 use crate::runtime::message::Msg;
-use kameo::{error, prelude::*};
+use kameo::prelude::*;
 
 use super::{Manager, TxnManager};
 
@@ -10,16 +10,27 @@ impl kameo::prelude::Message<Msg> for Manager {
     type Reply = Option<Msg>;
 
     async fn handle(&mut self, msg: Msg, _ctx: &mut Context<Self, Self::Reply>) -> Self::Reply {
+        println!(">>>>>>>>>>> receive >>>>>>>>>> {:?}", msg);
         match msg {
+            Msg::TryTest { test } =>  {
+                let _ = self.try_test(test).await;
+                Some(Msg::TryTestPass)
+            }
+
             Msg::CodeUpdate { srv } => {
                 self.alloc_service(&srv).await;
-                None
+                Some(Msg::CodeUpdateGranted)
             }
+
             Msg::LockGranted { from_name, lock } => {
+                println!("receive lock granted from {}", from_name);
+
                 self.get_mut_txn_mgr(&lock.txn_id)
                     .add_grant_lock(from_name, lock.lock_kind);
+                
                 None
             }
+
             Msg::UsrReadVarResult {
                 txn,
                 name,

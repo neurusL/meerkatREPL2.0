@@ -76,6 +76,7 @@ impl LockState {
     /// only allow lock older than all granted locks to wait
     /// return true if lock added to waiting list
     pub fn add_wait(&mut self, lock: Lock, who_request: ActorRef<Manager>) -> bool {
+        println!("add wait");
         if let Some(oldest) = &self.oldest_granted_lock_txnid {
             // if receive lock younger than oldest granted lock, ignore
             if lock.txn_id > *oldest {
@@ -84,6 +85,9 @@ impl LockState {
         }
         self.waiting_locks
             .insert(lock.txn_id.clone(), (lock, who_request));
+
+        println!("add wait finish");
+        println!("{:?}", self.waiting_locks);
         return true;
     }
 
@@ -93,6 +97,7 @@ impl LockState {
 
     pub fn grant_oldest_wait(&mut self) -> Option<(Lock, ActorRef<Manager>)> {
         if let Some((lock, mgr)) = self.pop_oldest_wait() {
+            
             self.granted_locks.insert(lock.txn_id.clone(), lock.clone());
 
             if let Some(prev_oldest) = &self.oldest_granted_lock_txnid {

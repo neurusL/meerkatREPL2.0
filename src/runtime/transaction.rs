@@ -28,7 +28,7 @@ pub struct WriteToName {
 // (txid, writes)
 // writes := a list of updates to state vars
 // Clone, PartialEq, Eq, Hash, Debug
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Txn {
     pub id: TxnId,
     pub assns: Vec<Assn>,
@@ -39,7 +39,6 @@ impl PartialEq for Txn {
         self.id == other.id
     }
 }
-
 impl Eq for Txn {}
 
 impl Hash for Txn {
@@ -48,8 +47,11 @@ impl Hash for Txn {
     }
 }
 
-impl fmt::Debug for Txn {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Txn").finish()
+impl Txn {
+    pub fn new(assns: Vec<Assn>) -> Txn {
+        Txn {
+            id: TxnId::new(),
+            assns,
+        }
     }
 }

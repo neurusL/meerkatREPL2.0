@@ -70,6 +70,10 @@ impl kameo::prelude::Message<Msg> for DefActor {
                 None
             },
 
+            Msg::UnsafeRead => {
+                Some(Msg::UnsafeReadResult { result: self.value.clone() })
+            }
+
             _ => panic!("DefActor: unexpected message: {:?}", msg),
         }
     }
@@ -99,6 +103,9 @@ impl Actor for DefActor {
                     }
                 }
             }
+            // println!("[{}] tick() \n now value is {:?} \n now expr is {:?} \n 
+            // now input args are {:?}", 
+            // self.name, self.value, self.state.expr, self.state.arg_to_values);
         }
     }
 }

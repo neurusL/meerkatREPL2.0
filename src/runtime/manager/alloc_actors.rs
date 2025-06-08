@@ -4,6 +4,7 @@ use std::error::Error;
 
 use kameo::{prelude::*, spawn, Actor};
 
+use crate::runtime::evaluator::Evaluator;
 use crate::{
     ast::{Expr, Prog, Service},
     runtime::{def_actor::DefActor, evaluator::eval_srv, message::Msg, var_actor::VarActor},
@@ -23,7 +24,7 @@ impl Manager {
             varname_to_actors: HashMap::new(),
             defname_to_actors: HashMap::new(),
 
-            reactive_name_to_vals: HashMap::new(),
+            evaluator: Evaluator::new(HashMap::new()),
             dep_graph: HashMap::new(),
             dep_transtive: HashMap::new(),
 
@@ -33,15 +34,19 @@ impl Manager {
 
     pub async fn alloc_service(&mut self, srv: &Service) {
         // intial evaluation of srv
-        self.reactive_name_to_vals = eval_srv(srv).reactive_name_to_vals;
+        self.evaluator = eval_srv(srv);
+        // print!("service: {:?}\n {:?}", srv.name, self.evaluator.reactive_name_to_vals);
+
         let def_to_exprs = eval_srv(srv).def_name_to_exprs;
 
         let srv_info = calc_dep_srv(srv);
+        print!("service: {:?}\n {}", srv.name, srv_info);
+
         self.dep_graph = srv_info.dep_graph;
         self.dep_transtive = srv_info.dep_transtive;
 
         for name in srv_info.topo_order.iter() {
-            let val = self.reactive_name_to_vals.get(name).expect(&format!(
+            let val = self.evaluator.reactive_name_to_vals.get(name).expect(&format!(
                 "Service alloc: var/def is not initialized: {}",
                 name
             ));
@@ -53,9 +58,12 @@ impl Manager {
                 .expect(&format!("Service alloc: def expr is not 
                     initialized: {}", name));
 
-                self.alloc_def_actor(name, val.clone(), def_expr.clone()).await.unwrap();
+                self.alloc_def_actor(name, def_expr.clone()).await.unwrap();
             }
         }
+
+        print!("service: {:?}\n {}", srv.name, self);
+        
     }
 
     pub fn alloc_var_actor(
@@ -67,18 +75,24 @@ impl Manager {
         self.varname_to_actors.insert(name.clone(), actor_ref);
     }
 
+    /// current impl of alloc_def_actor rely on a centralized manager 
+    /// preprocess all information 
+    /// 
+    /// should change to distributed and incrementally allocate def actor 
+    /// to accommodate for code update
     pub async fn alloc_def_actor(
         &mut self,
         name: &String,
-        val: Expr,
         expr: Expr,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<ActorRef<DefActor>, Box<dyn Error>> {
         // calculate all information for def actor
         let def_args = self.dep_graph.get(name)
-            .expect(&format!("Service alloc: no such def with name: 
-                {} in dependency graph", name));
+        .map_or_else(
+            || expr.free_var(&HashSet::new()), // incrementally calculated
+            |def_args| def_args.clone()       // precalculated by centralized manager
+        );
 
-        let def_arg_to_vals = self.reactive_name_to_vals.iter()
+        let def_arg_to_vals = self.evaluator.reactive_name_to_vals.iter()
         .filter(|(k, _)| def_args.contains(*k))
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect::<HashMap<String, Expr>>();
@@ -88,6 +102,8 @@ impl Manager {
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect::<HashMap<String, HashSet<String>>>();
 
+        let mut val = expr.clone();
+        let _ = self.evaluator.eval_expr(&mut val);
 
         let actor_ref = spawn(DefActor::new(
             name.clone(), expr, val,
@@ -115,7 +131,7 @@ impl Manager {
             }
         }
 
-        Ok(())
+        Ok(actor_ref)
     }
 }
 

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::convert::Infallible;
+use std::fmt::Display;
 
 use kameo::prelude::*;
 use kameo::Actor;
@@ -8,6 +9,7 @@ use kameo::Actor;
 use crate::ast::Expr;
 
 use super::def_actor::DefActor;
+use super::evaluator::Evaluator;
 use super::lock::Lock;
 use super::lock::LockKind;
 use super::message::Msg;
@@ -17,9 +19,10 @@ use super::var_actor::VarActor;
 
 pub mod alloc_actors;
 pub mod do_action;
+pub mod try_test;
 pub mod handler;
 
-#[derive(Clone)]
+#[derive(Debug)]
 pub struct Manager {
     pub name: String,
     pub address: Option<ActorRef<Manager>>,
@@ -27,7 +30,7 @@ pub struct Manager {
     pub varname_to_actors: HashMap<String, ActorRef<VarActor>>,
     pub defname_to_actors: HashMap<String, ActorRef<DefActor>>,
 
-    pub reactive_name_to_vals: HashMap<String, Expr>,
+    pub evaluator: Evaluator,
     
     pub dep_graph: HashMap<String, HashSet<String>>,
     pub dep_transtive: HashMap<String, HashSet<String>>,
@@ -112,7 +115,18 @@ impl Manager {
     delegate_to_txn!(imm all_read_finished() -> bool);
 }
 
-#[derive(Clone)]
+impl Display for Manager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)?;
+        write!(f, "varname_to_actors: {:?}\n defname_to_actors: {:?}\n", 
+            self.varname_to_actors, 
+            self.defname_to_actors)?;
+        write!(f, "txn_mgrs: {:?}\n", self.txn_mgrs)?;
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct TxnManager {
     pub txn_id: TxnId,
     pub reads: HashMap<String, ReadState>,
@@ -120,7 +134,7 @@ pub struct TxnManager {
     pub preds: HashSet<Txn>,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ReadState {
     Requested,
     Granted,
@@ -129,7 +143,7 @@ pub enum ReadState {
     Failed,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum WriteState {
     Requested,
     Granted,

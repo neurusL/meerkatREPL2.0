@@ -1,0 +1,13 @@
+service foo_service {
+    var x = 1;
+    var y = 2;
+    def f = x + y;
+    
+    pub def inc_x = action { x = y + 1; };
+}
+
+@test(foo_service) {
+    assert(y == 2);
+    do inc_x;
+    assert(x == 3);
+}

@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use kameo::{actor::ActorRef, Reply};
 
 use crate::{
-    ast::{Expr, Prog, Service},
+    ast::{Expr, Prog, Service, Test},
     runtime::{lock::Lock, transaction::TxnId},
 };
 
@@ -36,6 +36,11 @@ pub enum Msg {
         txn: TxnId,
         write_val: Expr,
         // requires: HashSet<Txn>,
+    },
+
+    UnsafeRead, // for test only
+    UnsafeReadResult {
+        result: Expr,
     },
 
     LockRequest {
@@ -78,6 +83,12 @@ pub enum Msg {
     CodeUpdate {
         srv: Service,
     },
+    CodeUpdateGranted,
+
+    TryTest {
+        test: Test,
+    },
+    TryTestPass,
 }
 
 // #[derive(PartialEq, Eq, Clone, Debug)]

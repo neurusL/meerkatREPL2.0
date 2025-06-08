@@ -35,8 +35,11 @@ impl Manager {
 
         // wait for all locks to be granted or any lock to be aborted
         while !(self.all_lock_granted(&txn.id) && self.any_lock_aborted(&txn.id)) {
+            // println!("{:?}", self.txn_mgrs.get(&txn.id));
             continue;
-        }
+        }  
+        println!("--- DO ACTION REACH HERE --- ");
+
         if self.any_lock_aborted(&txn.id) {
             // abort all locks
             return self.abort_locks(&txn.id, &read_set, &write_set).await;
@@ -93,6 +96,8 @@ impl Manager {
             .address
             .clone()
             .expect("manager addr should not be None");
+        
+        println!("manager addr: {:?}", mgr_addr);
 
         for name in read_set.iter() {
             self.tell_to_name(
@@ -101,8 +106,7 @@ impl Manager {
                     from_mgr_addr: mgr_addr.clone(),
                     lock: Lock::new_read(txn_id.clone()),
                 },
-            )
-            .await?;
+            ).await?;
             self.add_request_lock(&txn_id, name.clone(), Read);
         }
         for name in write_set.iter() {
@@ -112,8 +116,7 @@ impl Manager {
                     from_mgr_addr: mgr_addr.clone(),
                     lock: Lock::new_write(txn_id.clone()),
                 },
-            )
-            .await?;
+            ).await?;
             self.add_request_lock(&txn_id, name.clone(), Write);
         }
 

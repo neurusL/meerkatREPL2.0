@@ -11,9 +11,8 @@ mod tc_test;
 mod utils;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt::Display,
-    iter::zip,
 };
 
 use crate::ast::Prog;
@@ -89,18 +88,20 @@ impl Display for TypecheckEnv {
 }
 
 pub fn typecheck_prog(prog: &Prog) {
-
-    let mut global_type_context = HashMap::new();  // global var context
+    // each service has its own type environment
+    let mut srv_to_type_env = HashMap::new();
 
     for srvs in prog.services.iter() {
         let mut typ_env = TypecheckEnv::new(HashMap::new());
         typ_env.typecheck_service(srvs);
         print!("service: {:?}\n {}", srvs.name, typ_env);
-        global_type_context.extend(typ_env.var_context);   // adding context to global context
+        
+        srv_to_type_env.insert(srvs.name.clone(), typ_env);
     }
+
     for test in prog.tests.iter() {
-        let mut typ_env = TypecheckEnv::new(global_type_context.clone()); // usign context from services for tests
-        typ_env.typecheck_test(test);
-        print!("test: {:?}\n {}", test.name, typ_env);
+        srv_to_type_env.get_mut(&test.name)
+        .expect(&format!("Test: test instantiate a non-existing service {:?}", test.name))
+        .typecheck_test(test);
     }
 }

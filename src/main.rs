@@ -1,10 +1,8 @@
 use std::error::Error;
 use std::{env, fs};
 
-use kameo::spawn;
 use parser::meerkat;
-use runtime::manager::Manager;
-use runtime::message::Msg;
+
 use tokio;
 
 pub mod ast;
@@ -25,15 +23,10 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
         Err(e) => panic!("Parse Error: {:?}", e),
     };
 
-    let _ = static_analysis::typecheck::typecheck_prog(&prog);
-    let _ = static_analysis::var_analysis::calc_dep_prog(&prog);
-    let _ = runtime::evaluator::eval_prog(&prog);
+    println!("{:?}", prog);
 
-    for srv in prog.services.iter() {
-        let mgr = Manager::new(srv.name.clone());
-        let mgr_actor_ref = spawn(mgr);
-        mgr_actor_ref.tell(Msg::CodeUpdate{ srv: srv.clone() }).await?;
-    }
+    let _ = static_analysis::typecheck::typecheck_prog(&prog);
+    runtime::RuntimeManager::run(&prog).await?;
     
     // runtime.repl
     Ok(())

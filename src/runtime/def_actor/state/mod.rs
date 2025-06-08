@@ -74,7 +74,7 @@ impl ChangeState {
             self.applied_changes.add_change(change);
         }
         
-        eval_def_expr(&self.expr, self.arg_to_values.clone())
+        eval_def_expr(&self.expr, &self.arg_to_values)
     }
 
     pub fn get_preds_of_changes(&self, changes: &HashSet<ChangeId>) -> HashSet<Txn> {

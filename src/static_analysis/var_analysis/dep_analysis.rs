@@ -27,9 +27,7 @@ impl DependAnalysis {
         }
 
         DependAnalysis {
-            vars,
-            defs,
-            dep_graph,
+            vars, defs, dep_graph,
             topo_order: Vec::new(),
             dep_transtive: HashMap::new(),
             dep_vars: HashMap::new(),
@@ -90,14 +88,13 @@ impl DependAnalysis {
 
     pub fn calc_dep_vars(&mut self) {
         let mut visited = HashSet::new();
-        let mut topo_order = Vec::new();
 
-        for name in self.defs.iter() {
+        for name in self.vars.iter().chain(self.defs.iter()) {
             Self::dfs_helper(
                 &self.dep_graph,
                 &self.vars,
                 &mut visited,
-                &mut topo_order,
+                &mut self.topo_order,
                 &mut self.dep_transtive,
                 name,
             );

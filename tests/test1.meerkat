@@ -1,4 +1,4 @@
-service test1 {
+service foo_service {
     var x = 1;
     var y = 2;
     def f = x + y;
@@ -12,7 +12,7 @@ service test1 {
 
     pub def h = mult(f,g);
 
-    pub def inc_x = action { x = x + x; y = y; };
+    pub def inc_x = action { x = x + 1; };
     
     pub def id = (fn x => x);
     pub def unit = (fn => 1);
@@ -30,7 +30,7 @@ service test1 {
     
 }
 
-@test(test1) {
+@test(foo_service) {
     do inc_x;
-    assert(x == 1);
+    assert(x == 2);
 }

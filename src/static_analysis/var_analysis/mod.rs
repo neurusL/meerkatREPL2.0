@@ -25,24 +25,26 @@ impl Display for DependAnalysis {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Dependency Graph \n")?;
         for (name, deps) in self.dep_graph.iter() {
-            if deps.len() > 0 {
-                write!(f, "{} -> ", name)?;
-                for dep in deps.iter() {
-                    write!(f, "{},", dep)?;
-                }
-                write!(f, "\n")?;
+            write!(f, "{} -> ", name)?;
+            for dep in deps.iter() {
+                write!(f, "{},", dep)?;
             }
+            write!(f, "\n")?;
         }
         write!(f, "Transitive Dependency (Var only) \n")?;
         for (name, deps) in self.dep_vars.iter() {
-            if deps.len() > 0 {
-                write!(f, "{} -> ", name)?;
-                for dep in deps.iter() {
-                    write!(f, "{},", dep)?;
-                }
-                write!(f, "\n")?;
+            write!(f, "{} -> ", name)?;
+            for dep in deps.iter() {
+                write!(f, "{},", dep)?;
             }
+            write!(f, "\n")?;
         }
+
+        write!(f, "Topological Order \n")?;
+        for name in self.topo_order.iter() {
+            write!(f, "{} ", name)?;
+        }
+        write!(f, "\n")?;
         Ok(())
     }
 }
