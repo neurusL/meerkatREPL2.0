@@ -64,7 +64,7 @@ pub fn eval_test(test: &Test, env: &HashMap<String, Expr>) -> Result<(), String>
                     match expr_clone {
                         Expr::Bool {val} => {
                             if !val {
-                                return Err(format!("Assert Failed"));
+                                return Err(format!("{} returned false", expr));
                             }
                             
                         }
@@ -99,11 +99,11 @@ pub fn eval_prog(prog: &Prog) {
 
     for test in prog.tests.iter() {
         if let Err(e) = eval_test(test, &global_vals) {
-            println!("Test {} failed because {}", test.name,e);
+            println!("{} failed because {}", test.name,e);
             
         }
         else {
-            println!("Test {} passed", test.name);
+            println!("{} passed", test.name);
         }
     }
 }
