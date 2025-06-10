@@ -17,7 +17,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
 
     let file_name = &args[1]; // the second argument be test.meerkat
 
-    let prog = parser::parser::parse(file_name.clone())  // using iterator instead of string for updated parse
+    let prog = parser::parser::parse(file_name.clone())  // using helper function which reads from file name and parses
         .map_err(|e| format!("Parse error: {e}"))?;
 
     let _ = static_analysis::typecheck::typecheck_prog(&prog);
