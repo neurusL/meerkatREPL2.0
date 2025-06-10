@@ -6,9 +6,10 @@
 // Lalrpop generates a LR(1) paraser the grammar can be found in c0.lalrpop
 // and the generated code in c0.rs
 
-//lalrpop_mod!(pub meerkat, "/parser/meerkat.rs");
+use lalrpop_util::lalrpop_mod;
 
-pub mod meerkat;
+lalrpop_mod!(pub meerkat, "/parser/meerkat.rs");
+
 pub mod lex;
 
 pub mod parser {
