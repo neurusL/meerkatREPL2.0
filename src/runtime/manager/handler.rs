@@ -1,5 +1,6 @@
 use core::panic;
-use std::{collections::HashSet, error::Error, sync::Condvar};
+use log::info;
+use std::{collections::HashSet, error::Error};
 
 use crate::runtime::message::Msg;
 use kameo::prelude::*;
@@ -10,21 +11,19 @@ impl kameo::prelude::Message<Msg> for Manager {
     type Reply = Option<Msg>;
 
     async fn handle(&mut self, msg: Msg, _ctx: &mut Context<Self, Self::Reply>) -> Self::Reply {
-        println!(">>>>>>>>>>> receive >>>>>>>>>> {:?}", msg);
+        info!("MANAGER {} RECEIVE: ", self.name);
         match msg {
-            Msg::TryTest { test } =>  {
+            Msg::TryTest { test } =>  { info!("Try Test");
                 let _ = self.try_test(test).await;
                 Some(Msg::TryTestPass)
             }
 
-            Msg::CodeUpdate { srv } => {
+            Msg::CodeUpdate { srv } => { info!("Code Update");
                 self.alloc_service(&srv).await;
                 Some(Msg::CodeUpdateGranted)
             }
 
-            Msg::LockGranted { from_name, lock } => {
-                println!("receive lock granted from {}", from_name);
-
+            Msg::LockGranted { from_name, lock } => { info!("Lock Granted");
                 self.get_mut_txn_mgr(&lock.txn_id)
                     .add_grant_lock(from_name, lock.lock_kind);
                 
@@ -36,7 +35,7 @@ impl kameo::prelude::Message<Msg> for Manager {
                 name,
                 result,
                 pred,
-            } => {
+            } => { info!("UsrReadVarResult");
                 let pred = if let Some(p) = pred {
                     HashSet::from([p])
                 } else {
@@ -51,11 +50,11 @@ impl kameo::prelude::Message<Msg> for Manager {
                 name,
                 result,
                 preds,
-            } => {
+            } => { info!("UsrReadDefResult");
                 self.add_finished_read(&txn, name, result, preds);
                 None
             }
-            Msg::LockAbort { from_name, lock } => {
+            Msg::LockAbort { from_name, lock } => { info!("Lock Abort");
                 self.add_abort_lock(&lock.txn_id, from_name, lock.lock_kind);
 
                 None

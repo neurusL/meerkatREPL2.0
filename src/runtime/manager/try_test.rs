@@ -27,16 +27,11 @@ use crate::{
 
 impl Manager {
     pub async fn try_test(&mut self, test: Test) -> Result<(), Box<dyn std::error::Error>> {
-        println!("--- TRY TEST REACH HERE --- ");
-        print!("{:?}", test);
-
         let mut assert_cnt = 0; // for name of assert actors
 
         for cmd in test.commands {
-            print!("cmd: {:?}\n", cmd);
             match cmd {
                 ReplCmd::Do(mut action) => {
-                    println!("handle do");
                     self.evaluator.eval_expr(&mut action)?;
                     if let Expr::Action { assns } = action {
                         let txn = Txn::new(assns);

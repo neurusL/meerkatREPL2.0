@@ -35,10 +35,8 @@ impl Manager {
 
         // wait for all locks to be granted or any lock to be aborted
         while !(self.all_lock_granted(&txn.id) && self.any_lock_aborted(&txn.id)) {
-            // println!("{:?}", self.txn_mgrs.get(&txn.id));
             continue;
         }  
-        println!("--- DO ACTION REACH HERE --- ");
 
         if self.any_lock_aborted(&txn.id) {
             // abort all locks
@@ -97,8 +95,6 @@ impl Manager {
             .clone()
             .expect("manager addr should not be None");
         
-        println!("manager addr: {:?}", mgr_addr);
-
         for name in read_set.iter() {
             self.tell_to_name(
                 &name,

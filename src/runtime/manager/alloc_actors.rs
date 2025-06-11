@@ -35,12 +35,10 @@ impl Manager {
     pub async fn alloc_service(&mut self, srv: &Service) {
         // intial evaluation of srv
         self.evaluator = eval_srv(srv);
-        // print!("service: {:?}\n {:?}", srv.name, self.evaluator.reactive_name_to_vals);
 
         let def_to_exprs = eval_srv(srv).def_name_to_exprs;
 
         let srv_info = calc_dep_srv(srv);
-        print!("service: {:?}\n {}", srv.name, srv_info);
 
         self.dep_graph = srv_info.dep_graph;
         self.dep_transtive = srv_info.dep_transtive;
@@ -60,10 +58,7 @@ impl Manager {
 
                 self.alloc_def_actor(name, def_expr.clone()).await.unwrap();
             }
-        }
-
-        print!("service: {:?}\n {}", srv.name, self);
-        
+        }        
     }
 
     pub fn alloc_var_actor(

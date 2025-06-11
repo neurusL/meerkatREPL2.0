@@ -46,13 +46,13 @@ impl RuntimeManager {
             }
         }
 
-        // println!("{:?}", prog.tests);
         for test in prog.tests.iter() {
+            println!("testing {} ...... ", test.name);
             let srv_actor_ref = srv_to_mgr.get_mut(&test.name)
             .expect(&format!("Test: manager for service {:?} not found", test.name));
             
             if let Some(Msg::TryTestPass) = srv_actor_ref.ask(Msg::TryTest { test: test.clone() }).await? {
-                println!("Test for {} passed", test.name);
+                println!("passed");
             } else {
                 panic!("Test for {} failed", test.name);
             }
