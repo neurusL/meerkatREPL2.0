@@ -6,6 +6,7 @@ use std::{collections::HashSet, error::Error};
 use crate::ast::Expr;
 use crate::runtime::def_actor::{DefActor, TickFunc};
 use crate::runtime::message::{CmdMsg, Msg};
+use crate::runtime::transaction::Txn;
 use kameo::{error::Infallible, prelude::*};
 
 pub const TICK_INTERVAL: Duration = Duration::from_millis(100);
@@ -54,13 +55,15 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                 None
             }
 
-            DoTransaction {
+            DoAction {
                 from_client_addr, 
-                txn 
+                txn_id,
+                action,
             } => {
                 info!("Do Action");
-                let txn_id = txn.id.clone();
-                let txn_mgr = self.new_txn(txn, from_client_addr);
+                let assns = self.eval_action(action).unwrap();
+
+                let txn_mgr = self.new_txn(txn_id.clone(), assns, from_client_addr);
                 self.txn_mgrs.insert(txn_id.clone(), txn_mgr);
 
                 // request locks

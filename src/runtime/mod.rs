@@ -23,7 +23,7 @@ use std::{collections::HashMap};
 
 use crate::{
     ast::{Expr, Prog, ReplCmd, Service, Test},
-    runtime::message::CmdMsg,
+    runtime::{message::CmdMsg, transaction::TxnId},
 };
 use tokio::sync::mpsc::{self, Sender, Receiver};
 use kameo::{actor::ActorRef, prelude::{Context, Message}, spawn, Actor};
@@ -82,7 +82,7 @@ pub async fn run_srv(srv: &Service, dev_tx: Sender<CmdMsg>) -> Result<ActorRef<M
     Ok(srv_actor_ref)
 }
 
-pub async fn run_test(test: &Test, 
+pub async fn run_test(test: &Test,
     srv_actor_ref: ActorRef<Manager>,
     cli_tx: Sender<CmdMsg>,
     mut cli_rx: Receiver<CmdMsg>,
@@ -101,15 +101,12 @@ pub async fn run_test(test: &Test,
         let cmd = &test.commands[process_cmd_idx];
         match cmd {
             ReplCmd::Do(action) => {
-                if let Expr::Action { assns } = action {
-                    let txn = transaction::Txn::new(assns.clone());
-                    txn_to_cmd_idx.insert(txn.id.clone(), process_cmd_idx);
-                    srv_actor_ref.tell(CmdMsg::DoTransaction { txn, from_client_addr: cli_tx.clone() }).await?;
-
-                } else {
-                    panic!("do requires action expression")
-                }
-                
+                let txn_id = TxnId::new();
+                txn_to_cmd_idx.insert(txn_id.clone(), process_cmd_idx);
+                srv_actor_ref.tell(CmdMsg::DoAction { 
+                    txn_id, 
+                    action: action.clone(),
+                    from_client_addr: cli_tx.clone() }).await?;
             }
             ReplCmd::Assert(expr) => {
                 srv_actor_ref.tell(CmdMsg::TryAssert { 
@@ -121,6 +118,7 @@ pub async fn run_test(test: &Test,
 
         'listen: loop {
             if let Some(CmdMsg::AssertSucceeded) = dev_rx.recv().await {
+                process_cmd_idx += 1;
                 break 'listen;
             }
             if let Some(CmdMsg::TransactionAborted { txn_id }) = cli_rx.recv().await {
@@ -130,5 +128,6 @@ pub async fn run_test(test: &Test,
             print!(".");
         }
     }
+    println!("pass");
     Ok(())
 }

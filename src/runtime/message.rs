@@ -89,9 +89,10 @@ pub enum CmdMsg {
     CodeUpdate { srv: Service },
     CodeUpdateGranted { srv_name: String },
 
-    DoTransaction { 
+    DoAction { 
         from_client_addr: Sender<CmdMsg>,
-        txn: Txn 
+        txn_id: TxnId,
+        action: Expr, 
     },
 
     TransactionAborted { txn_id: TxnId },

@@ -48,7 +48,14 @@ impl Hash for Txn {
 }
 
 impl Txn {
-    pub fn new(assns: Vec<Assn>) -> Txn {
+    pub fn new(id: TxnId, assns: Vec<Assn>) -> Txn {
+        Txn {
+            id, 
+            assns,
+        }
+    }
+
+    pub fn new_without_id(assns: Vec<Assn>) -> Txn {
         Txn {
             id: TxnId::new(),
             assns,

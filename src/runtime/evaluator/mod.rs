@@ -19,7 +19,7 @@ pub enum Val {
     Func(Vec<String>, Box<Expr>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Evaluator {
     var_id_cnt: i32,
     pub reactive_names: HashSet<String>,

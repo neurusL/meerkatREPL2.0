@@ -41,14 +41,20 @@ use super::Manager;
 
 impl Manager {
     /// 1. initialize a new transaction manager
-    pub fn new_txn(&mut self, txn: Txn, from_client: Sender<CmdMsg>) -> TxnManager {
+    pub fn new_txn(&mut self, 
+        txn_id: TxnId, 
+        assns: Vec<Assn>,
+        from_client: Sender<CmdMsg>
+    ) -> TxnManager {
         // static info of txn, the read and write set, which may overlap
-        let read_set = calc_read_set(&txn.assns);
-        let write_set = calc_write_set(&txn.assns);
+        let read_set = calc_read_set(&assns);
+        let write_set = calc_write_set(&assns);
+
+        let txn = Txn::new(txn_id, assns);
 
         // set up txn manager
         let txn_mgr = TxnManager::new(
-            txn.clone(), from_client,read_set, write_set);
+            txn, from_client,read_set, write_set);
 
         txn_mgr
     }
@@ -202,5 +208,15 @@ impl Manager {
         self.evaluator.eval_assert(&mut expr)?;
 
         Ok(expr == Expr::Bool { val: true })
+    }
+
+    pub fn eval_action(&mut self, mut expr: Expr) -> Result<Vec<Assn>, String> {
+        self.evaluator.eval_expr(&mut expr)?;
+
+        if let Expr::Action { assns } = expr {
+            Ok(assns.clone())
+        } else {
+            Err(format!("do requires action expression"))
+        }
     }
 }
