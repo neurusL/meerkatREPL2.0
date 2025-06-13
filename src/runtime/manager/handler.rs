@@ -28,35 +28,41 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                 info!("Try Test");
                 let mgr_ref = self.address.clone().unwrap();
 
-                let customized_tick: Option<TickFunc> = Some(Box::new(
-                move |actor: &mut DefActor| {
-                    let mgr_ref = mgr_ref.clone();
+                let customized_tick: Option<TickFunc> =
+                    Some(Box::new(move |actor: &mut DefActor| {
+                        let mgr_ref = mgr_ref.clone();
 
-                    Box::pin(async move {
-                        if (actor.value == Expr::Bool { val: true }) {
-                            let _ =mgr_ref.tell(CmdMsg::AssertSucceeded).await;
-                        }
-                        Ok(())
-                    })
-                }));
+                        Box::pin(async move {
+                            if (actor.value == Expr::Bool { val: true }) {
+                                let _ = mgr_ref.tell(CmdMsg::AssertSucceeded).await;
+                            }
+                            Ok(())
+                        })
+                    }));
 
-                let _ = self.alloc_def_actor(&format!("{}_assert_{}", name, bool_expr), 
-                    bool_expr.clone(),
-                    customized_tick
-                ).await;
+                let _ = self
+                    .alloc_def_actor(
+                        &format!("{}_assert_{}", name, bool_expr),
+                        bool_expr.clone(),
+                        customized_tick,
+                    )
+                    .await;
 
                 None
-            },
+            }
 
             AssertSucceeded => {
                 info!("Assert Succeeded");
-                self.from_developer.send(CmdMsg::AssertSucceeded).await.unwrap();
+                self.from_developer
+                    .send(CmdMsg::AssertSucceeded)
+                    .await
+                    .unwrap();
 
                 None
             }
 
             DoAction {
-                from_client_addr, 
+                from_client_addr,
                 txn_id,
                 action,
             } => {
@@ -75,19 +81,22 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
             TransactionAborted { txn_id } => {
                 info!("Transaction Aborted");
                 let client_sender = self.get_client_sender(&txn_id);
-                client_sender.send(CmdMsg::TransactionAborted { txn_id }).await.unwrap();
-                
+                client_sender
+                    .send(CmdMsg::TransactionAborted { txn_id })
+                    .await
+                    .unwrap();
+
                 None
             }
 
             CodeUpdate { srv } => {
                 info!("Code Update");
-                self.alloc_service(&srv).await; 
-                // todo(): handle alloc_service asynchronously 
-                // to do so, exploit the developer sender 
+                self.alloc_service(&srv).await;
+                // todo(): handle alloc_service asynchronously
+                // to do so, exploit the developer sender
                 // for delayed response
                 // and change logic in runtime.mod
-                Some(CodeUpdateGranted{ srv_name: srv.name })
+                Some(CodeUpdateGranted { srv_name: srv.name })
             }
             _ => {
                 panic!("Manager should not receive message from REPL");
@@ -159,11 +168,12 @@ impl kameo::prelude::Message<Msg> for Manager {
 
             Msg::LockAbort { from_name: _, lock } => {
                 info!("Lock Abort");
-                let _ =self.request_abort_locks(&lock.txn_id).await;
+                let _ = self.request_abort_locks(&lock.txn_id).await;
                 self.abort_lock(&lock.txn_id); // turn all txn's lock state to aborted
 
                 // notify another mailbox of manager myself
-                let  _ = ctx.actor_ref()
+                let _ = ctx
+                    .actor_ref()
                     .tell(CmdMsg::TransactionAborted {
                         txn_id: lock.txn_id,
                     })

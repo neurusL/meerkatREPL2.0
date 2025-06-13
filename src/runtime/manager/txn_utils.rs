@@ -41,10 +41,11 @@ use super::Manager;
 
 impl Manager {
     /// 1. initialize a new transaction manager
-    pub fn new_txn(&mut self, 
-        txn_id: TxnId, 
+    pub fn new_txn(
+        &mut self,
+        txn_id: TxnId,
         assns: Vec<Assn>,
-        from_client: Sender<CmdMsg>
+        from_client: Sender<CmdMsg>,
     ) -> TxnManager {
         // static info of txn, the read and write set, which may overlap
         let read_set = calc_read_set(&assns);
@@ -53,8 +54,7 @@ impl Manager {
         let txn = Txn::new(txn_id, assns);
 
         // set up txn manager
-        let txn_mgr = TxnManager::new(
-            txn, from_client,read_set, write_set);
+        let txn_mgr = TxnManager::new(txn, from_client, read_set, write_set);
 
         txn_mgr
     }

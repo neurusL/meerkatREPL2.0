@@ -19,15 +19,19 @@
 //!  4. test_manager will wait for bool_expr to be true before processing next
 //!     action, on the other hand, timeout means assertion failed
 use core::panic;
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 use crate::{
     ast::{Expr, Prog, ReplCmd, Service, Test},
     runtime::{message::CmdMsg, transaction::TxnId},
 };
-use tokio::sync::mpsc::{self, Sender, Receiver};
-use kameo::{actor::ActorRef, prelude::{Context, Message}, spawn, Actor};
+use kameo::{
+    actor::ActorRef,
+    prelude::{Context, Message},
+    spawn, Actor,
+};
 use manager::Manager;
+use tokio::sync::mpsc::{self, Receiver, Sender};
 
 // pub mod instr;
 pub mod lock;
@@ -47,30 +51,34 @@ pub mod var_actor;
 
 const MPSC_CHANNEL_SIZE: usize = 100;
 
-
 pub async fn run(prog: &Prog) -> Result<(), Box<dyn std::error::Error>> {
     let (dev_tx, dev_rx) = mpsc::channel::<CmdMsg>(MPSC_CHANNEL_SIZE);
     let (cli_tx, cli_rx) = mpsc::channel::<CmdMsg>(MPSC_CHANNEL_SIZE);
-    
-    assert!(prog.services.len() == 1 && prog.tests.len() == 1, 
-    "Only support one service and one test for now");
+
+    assert!(
+        prog.services.len() == 1 && prog.tests.len() == 1,
+        "Only support one service and one test for now"
+    );
 
     let srv = &prog.services[0];
     let test = &prog.tests[0];
-    
+
     let srv_actor_ref = run_srv(srv, dev_tx.clone()).await?;
     run_test(test, srv_actor_ref, cli_tx.clone(), cli_rx, dev_rx).await?;
-    
+
     Ok(())
 }
 
-pub async fn run_srv(srv: &Service, dev_tx: Sender<CmdMsg>) -> Result<ActorRef<Manager>, Box<dyn std::error::Error>> {
+pub async fn run_srv(
+    srv: &Service,
+    dev_tx: Sender<CmdMsg>,
+) -> Result<ActorRef<Manager>, Box<dyn std::error::Error>> {
     // initialize the service's manager
     let srv_manager = Manager::new(srv.name.clone(), dev_tx);
     let srv_actor_ref = spawn(srv_manager);
 
     // synchronously wait for manager to be initialized
-    if let Some(CmdMsg::CodeUpdateGranted{..}) = srv_actor_ref
+    if let Some(CmdMsg::CodeUpdateGranted { .. }) = srv_actor_ref
         .ask(CmdMsg::CodeUpdate { srv: srv.clone() })
         .await?
     {
@@ -82,11 +90,12 @@ pub async fn run_srv(srv: &Service, dev_tx: Sender<CmdMsg>) -> Result<ActorRef<M
     Ok(srv_actor_ref)
 }
 
-pub async fn run_test(test: &Test,
+pub async fn run_test(
+    test: &Test,
     srv_actor_ref: ActorRef<Manager>,
     cli_tx: Sender<CmdMsg>,
     mut cli_rx: Receiver<CmdMsg>,
-    mut dev_rx: Receiver<CmdMsg>
+    mut dev_rx: Receiver<CmdMsg>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // start testing on the service
     println!("testing {}", test.name);
@@ -96,23 +105,28 @@ pub async fn run_test(test: &Test,
     // if handler loop hear all assert true, roll forward to next action
     let mut txn_to_cmd_idx = HashMap::new();
     let mut process_cmd_idx = 0;
-    
+
     while process_cmd_idx < test.commands.len() {
         let cmd = &test.commands[process_cmd_idx];
         match cmd {
             ReplCmd::Do(action) => {
                 let txn_id = TxnId::new();
                 txn_to_cmd_idx.insert(txn_id.clone(), process_cmd_idx);
-                srv_actor_ref.tell(CmdMsg::DoAction { 
-                    txn_id, 
-                    action: action.clone(),
-                    from_client_addr: cli_tx.clone() }).await?;
+                srv_actor_ref
+                    .tell(CmdMsg::DoAction {
+                        txn_id,
+                        action: action.clone(),
+                        from_client_addr: cli_tx.clone(),
+                    })
+                    .await?;
             }
             ReplCmd::Assert(expr) => {
-                srv_actor_ref.tell(CmdMsg::TryAssert { 
-                    name: test.name.clone(), 
-                    test: expr.clone()
-                }).await?;
+                srv_actor_ref
+                    .tell(CmdMsg::TryAssert {
+                        name: test.name.clone(),
+                        test: expr.clone(),
+                    })
+                    .await?;
             }
         }
 

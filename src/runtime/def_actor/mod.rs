@@ -15,10 +15,11 @@ pub mod state;
 
 pub type TickFunc = Box<
     dyn for<'a> FnMut(
-            &'a mut DefActor
-        ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error + Send>>> + Send + 'a>>
-    + Send
-    + 'static
+            &'a mut DefActor,
+        ) -> Pin<
+            Box<dyn Future<Output = Result<(), Box<dyn Error + Send>>> + Send + 'a>,
+        > + Send
+        + 'static,
 >;
 
 pub struct DefActor {

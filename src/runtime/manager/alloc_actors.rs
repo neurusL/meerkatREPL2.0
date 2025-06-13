@@ -48,7 +48,9 @@ impl Manager {
                     name
                 ));
 
-                self.alloc_def_actor(name, def_expr.clone(), None).await.unwrap();
+                self.alloc_def_actor(name, def_expr.clone(), None)
+                    .await
+                    .unwrap();
             }
         }
 
@@ -101,7 +103,7 @@ impl Manager {
             val,
             def_arg_to_vals,
             def_arg_to_vars,
-            customized_tick
+            customized_tick,
         ));
         self.defname_to_actors
             .insert(name.clone(), actor_ref.clone());

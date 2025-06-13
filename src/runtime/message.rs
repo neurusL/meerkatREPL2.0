@@ -86,17 +86,26 @@ pub enum Msg {
 #[derive(Debug, Clone, Reply)]
 pub enum CmdMsg {
     // Meerkat 2.0 only support non-distributed CodeUpdate
-    CodeUpdate { srv: Service },
-    CodeUpdateGranted { srv_name: String },
-
-    DoAction { 
-        from_client_addr: Sender<CmdMsg>,
-        txn_id: TxnId,
-        action: Expr, 
+    CodeUpdate {
+        srv: Service,
+    },
+    CodeUpdateGranted {
+        srv_name: String,
     },
 
-    TransactionAborted { txn_id: TxnId },
+    DoAction {
+        from_client_addr: Sender<CmdMsg>,
+        txn_id: TxnId,
+        action: Expr,
+    },
 
-    TryAssert { name: String, test: Expr },
+    TransactionAborted {
+        txn_id: TxnId,
+    },
+
+    TryAssert {
+        name: String,
+        test: Expr,
+    },
     AssertSucceeded,
 }

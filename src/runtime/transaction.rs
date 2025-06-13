@@ -49,10 +49,7 @@ impl Hash for Txn {
 
 impl Txn {
     pub fn new(id: TxnId, assns: Vec<Assn>) -> Txn {
-        Txn {
-            id, 
-            assns,
-        }
+        Txn { id, assns }
     }
 
     pub fn new_without_id(assns: Vec<Assn>) -> Txn {

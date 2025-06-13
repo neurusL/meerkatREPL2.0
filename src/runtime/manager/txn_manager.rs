@@ -6,7 +6,10 @@ use tokio::sync::mpsc::Sender;
 use crate::{
     ast::Expr,
     runtime::{
-        lock::LockKind, manager::Manager, message::CmdMsg, transaction::{Txn, TxnId},
+        lock::LockKind,
+        manager::Manager,
+        message::CmdMsg,
+        transaction::{Txn, TxnId},
     },
 };
 
@@ -37,12 +40,14 @@ pub enum WriteState {
 
 impl TxnManager {
     pub fn new(
-        txn: Txn, 
+        txn: Txn,
         from_client: Sender<CmdMsg>,
-        reads: HashSet<String>, 
-        writes: HashSet<String>) -> Self {
+        reads: HashSet<String>,
+        writes: HashSet<String>,
+    ) -> Self {
         TxnManager {
-            txn, from_client,
+            txn,
+            from_client,
             reads: HashMap::from_iter(
                 reads
                     .iter()
@@ -151,12 +156,7 @@ impl Manager {
         read_set: HashSet<String>,
         write_set: HashSet<String>,
     ) {
-        let new_mgr = TxnManager::new(
-            txn.clone(), 
-            from_client,
-            read_set, 
-            write_set
-        );
+        let new_mgr = TxnManager::new(txn.clone(), from_client, read_set, write_set);
         self.txn_mgrs.insert(txn.id.clone(), new_mgr);
     }
 
