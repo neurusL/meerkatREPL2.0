@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use kameo::{actor::ActorRef, Reply};
 
 use crate::{
-    ast::{Expr, Prog, Service, Test},
+    ast::{Assn, Expr, Prog, Service, Test},
     runtime::{lock::Lock, transaction::TxnId},
 };
 
@@ -11,6 +11,8 @@ use super::{def_actor::DefActor, manager::Manager, transaction::Txn, var_actor::
 
 #[derive(Debug, Clone, Reply)]
 pub enum Msg {
+    Unit,
+    
     UsrReadVarRequest {
         txn: TxnId,
     },
@@ -78,42 +80,29 @@ pub enum Msg {
         val: Expr,
         preds: HashSet<Txn>,
     },
+}
 
+#[derive(Debug, Clone, Reply)]
+pub enum CmdMsg {
     // Meerkat 2.0 only support non-distributed CodeUpdate
     CodeUpdate {
         srv: Service,
     },
     CodeUpdateGranted,
 
-    TryTest {
-        test: Test,
+    DoTransaction {
+        txn: Txn,
     },
-    TryTestPass,
+
+    TransactionAborted {
+        txn_id: TxnId,
+    },
+
+    TryAssert {
+        name: String,
+        test: Expr,
+    },
+    ListenToAssert {
+        actor: ActorRef<DefActor>,
+    },
 }
-
-// #[derive(PartialEq, Eq, Clone, Debug)]
-// pub struct PropaChange {
-//     pub from_name: String,
-//     pub new_val: Val,
-//     pub provides: HashSet<Txn>,
-//     pub requires: HashSet<Txn>,
-// }
-
-// #[derive(PartialEq, Eq, Hash, Clone, Debug)]
-// pub struct TxnAndName {
-//     pub txn: Txn,
-//     pub name: String,
-// }
-
-// #[derive(PartialEq, Eq, Clone, Debug)]
-// pub struct _PropaChange {
-//     pub propa_id: i32,
-//     pub propa_change: PropaChange,
-//     pub deps: HashSet<TxnAndName>,
-// }
-
-// impl Hash for _PropaChange {
-//     fn hash<H: Hasher>(&self, state: &mut H) {
-//         self.propa_id.hash(state);
-//     }
-// }

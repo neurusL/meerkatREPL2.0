@@ -1,10 +1,12 @@
 use core::panic;
-use std::collections::{HashMap, HashSet};
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::error::Error;
+use std::rc::Rc;
 
 use kameo::{prelude::*, spawn, Actor};
+use log::info;
 
-use crate::runtime::evaluator::Evaluator;
 use crate::{
     ast::{Expr, Prog, Service},
     runtime::{def_actor::DefActor, evaluator::eval_srv, message::Msg, var_actor::VarActor},
@@ -14,24 +16,6 @@ use crate::{
 use super::Manager;
 
 impl Manager {
-    /// to spawn a manager:
-    /// let mgr = Manager::new(); spawn(mgr);
-    pub fn new(name: String) -> Self {
-        Manager {
-            name,
-            address: None,
-
-            varname_to_actors: HashMap::new(),
-            defname_to_actors: HashMap::new(),
-
-            evaluator: Evaluator::new(HashMap::new()),
-            dep_graph: HashMap::new(),
-            dep_transtive: HashMap::new(),
-
-            txn_mgrs: HashMap::new(),
-        }
-    }
-
     pub async fn alloc_service(&mut self, srv: &Service) {
         // intial evaluation of srv
         self.evaluator = eval_srv(srv);
@@ -50,7 +34,7 @@ impl Manager {
             ));
 
             if srv_info.vars.contains(name) {
-                self.alloc_var_actor(name, val.clone());
+                self.alloc_var_actor(name, val.clone()).await;
             } else if srv_info.defs.contains(name) {
                 let def_expr = def_to_exprs.get(name)
                 .expect(&format!("Service alloc: def expr is not 
@@ -58,10 +42,12 @@ impl Manager {
 
                 self.alloc_def_actor(name, def_expr.clone()).await.unwrap();
             }
-        }        
+        }    
+
+        info!("Service allocated: {}", self);    
     }
 
-    pub fn alloc_var_actor(
+    pub async fn alloc_var_actor(
         &mut self, 
         name: &String, 
         val: Expr
@@ -118,8 +104,7 @@ impl Manager {
                         from_addr: actor_ref.clone(),
                     },
                 )
-                .await?
-                .expect("msg should not be None");
+                .await?;
 
             if !matches!(back_msg, Msg::SubscribeGranted) {
                 panic!("Service alloc: receive wrong message type during subscription");

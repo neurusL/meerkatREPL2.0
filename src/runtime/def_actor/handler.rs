@@ -12,27 +12,27 @@ pub const TICK_INTERVAL: Duration = Duration::from_millis(100);
 
 
 impl kameo::prelude::Message<Msg> for DefActor {
-    type Reply = Option<Msg>;
+    type Reply = Msg;
 
     async fn handle(&mut self, msg: Msg, _ctx: &mut Context<Self, Self::Reply>) -> Self::Reply {
         match msg {
             Msg::Subscribe { from_addr, .. } => {
                 self.pubsub.subscribe(from_addr);
-                Some(Msg::SubscribeGranted)
+                Msg::SubscribeGranted
             },
-            Msg::SubscribeGranted => { None },
+            Msg::SubscribeGranted => { Msg::Unit },
 
             Msg::LockRequest { 
                 lock,
                 from_mgr_addr 
             } => {
                 if !self.lock_state.add_wait(lock.clone(), from_mgr_addr) {
-                    return Some(Msg::LockAbort {
+                    return Msg::LockAbort {
                         from_name: self.name.clone(),
                         lock,
-                    });
+                    };
                 }
-                None
+                Msg::Unit
             },
 
             Msg::LockRelease { txn, .. } => {
@@ -43,12 +43,12 @@ impl kameo::prelude::Message<Msg> for DefActor {
                     .expect("lock should be granted before release");
 
                 assert!(lock.is_read());
-                None
+                Msg::Unit
             },
 
             Msg::LockAbort { lock, .. } => {
                 self.lock_state.remove_granted_or_wait(&lock.txn_id);
-                None
+                Msg::Unit
             },
 
             Msg::UsrReadDefRequest { txn } => {
@@ -57,22 +57,22 @@ impl kameo::prelude::Message<Msg> for DefActor {
                 // remove read lock immediately
                 self.lock_state.remove_granted_if_read(&txn);
                 
-                Some(Msg::UsrReadDefResult {
+                Msg::UsrReadDefResult {
                     txn,
                     name: self.name.clone(),
                     result: self.value.clone().into(),
                     preds: self.state.get_all_applied_txns(), // todo!("switch to undropped txns later")
-                })
+                }
             },
 
             Msg::PropChange { from_name, val, preds } => {
                 self.state.receive_change(from_name, val, preds);
-                None
+                Msg::Unit
             },
 
             Msg::UnsafeRead => {
-                Some(Msg::UnsafeReadResult { result: self.value.clone() })
-            }
+                Msg::UnsafeReadResult { result: self.value.clone() }
+            },
 
             _ => panic!("DefActor: unexpected message: {:?}", msg),
         }
@@ -103,9 +103,6 @@ impl Actor for DefActor {
                     }
                 }
             }
-            // println!("[{}] tick() \n now value is {:?} \n now expr is {:?} \n 
-            // now input args are {:?}", 
-            // self.name, self.value, self.state.expr, self.state.arg_to_values);
         }
     }
 }

@@ -14,7 +14,7 @@ use crate::runtime::{lock::Lock, message::Msg};
 pub const TICK_INTERVAL: Duration = Duration::from_millis(100);
 
 impl kameo::prelude::Message<Msg> for VarActor {
-    type Reply = Option<Msg>;
+    type Reply = Msg;
 
     async fn handle(
         &mut self,
@@ -28,7 +28,7 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 from_addr,
             } => { info!("Subscribe from {:?}", from_addr);
                 self.pubsub.subscribe(from_addr);
-                Some(Msg::SubscribeGranted)
+                Msg::SubscribeGranted
             }
 
             Msg::LockRequest {
@@ -36,13 +36,13 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 from_mgr_addr: from_name,
             } => { info!("Lock Request from {:?}", from_name);
                 if !self.lock_state.add_wait(lock.clone(), from_name) {
-                    return Some(Msg::LockAbort {
+                    return Msg::LockAbort {
                         from_name: self.name.clone(),
                         lock,
-                    });
+                    };
                 }
 
-                None
+                Msg::Unit
             }
 
             Msg::LockAbort { lock, ..} => { info!("Lock Aborted for {:?}", lock.txn_id);
@@ -52,7 +52,7 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 // unconfirmed write has same txn as aborted
                 self.value.roll_back_if_relevant(&lock.txn_id);
 
-                None
+                Msg::Unit
             }
 
             Msg::LockRelease { txn, mut preds } => { info!("Lock Release for txn {:?}", txn.id);
@@ -84,7 +84,7 @@ impl kameo::prelude::Message<Msg> for VarActor {
                     }).await;
                 }
 
-                None
+                Msg::Unit
             }
 
             Msg::UsrReadVarRequest { txn } => { info!("UsrReadVarRequest");
@@ -93,12 +93,12 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 // remove read lock immediately
                 self.lock_state.remove_granted_if_read(&txn);
 
-                Some(Msg::UsrReadVarResult {
+                Msg::UsrReadVarResult {
                     txn,
                     name: self.name.clone(),
                     result: self.value.clone().into(),
                     pred: self.latest_write_txn.clone(),
-                })
+                }
             }
 
             Msg::UsrWriteVarRequest { txn, write_val } => { info!("UsrWriteVarRequest");
@@ -106,7 +106,7 @@ impl kameo::prelude::Message<Msg> for VarActor {
 
                 self.value.update(write_val, txn);
 
-                None
+                Msg::Unit
             }
 
             #[allow(unreachable_patterns)]
@@ -146,13 +146,17 @@ impl VarActor {
     async fn tick(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // if can grant new waiting lock
         if let Some((lock, mgr)) = self.lock_state.grant_oldest_wait() {
+            info!("grant lock {:?} to manager {}", lock, mgr.id());
+
             let msg = Msg::LockGranted {
                 from_name: self.name.clone(),
                 lock,
             };
 
-            mgr.tell(msg).await?; 
-            info!("tell manager {:?} lock granted", mgr);
+            info!("VAR {} → MANAGER[{}]: about to tell LockGranted", self.name, mgr.id());
+            let res = mgr.ask(msg).await?; 
+            info!("VAR {} → MANAGER[{}]: tell result = {:?}", self.name, mgr.id(), res);
+
         }
         Ok(())
     }

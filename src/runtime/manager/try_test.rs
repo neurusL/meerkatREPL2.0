@@ -19,15 +19,18 @@
 //!  4. test_manager will wait for bool_expr to be true before processing next 
 //!     action, on the other hand, timeout means assertion failed
 
+use kameo::actor::ActorRef;
+use log::info;
+
 use crate::{
-    ast::{ReplCmd, Test, Expr}, 
-    runtime::{manager::Manager, transaction::Txn},
-    runtime::message::Msg,
+    ast::{Expr, ReplCmd, Test}, 
+    runtime::{def_actor::DefActor, manager::Manager, message::Msg, transaction::Txn},
 };
 
 impl Manager {
-    pub async fn try_test(&mut self, test: Test) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn try_test(&mut self, test: Test) -> Result<Vec<ActorRef<DefActor>>, Box<dyn std::error::Error>> {
         let mut assert_cnt = 0; // for name of assert actors
+        let mut assert_actors = Vec::new(); // all assert actors have to be true
 
         for cmd in test.commands {
             match cmd {
@@ -35,7 +38,11 @@ impl Manager {
                     self.evaluator.eval_expr(&mut action)?;
                     if let Expr::Action { assns } = action {
                         let txn = Txn::new(assns);
-                        self.do_action(&txn).await?;
+                        info!("do action: {:?}", txn);
+                        tokio::spawn(
+                         self.do_action(&txn)   
+                        );
+                        info!("do action done");
                     } else {
                         return Err(format!("do requires action expression").into());
                     }
@@ -49,15 +56,10 @@ impl Manager {
                         expr.clone()
                     ).await?;
 
-                    while let Some(back_msg) = actor_ref.ask(Msg::UnsafeRead).await? {
-                        if let Msg::UnsafeReadResult { 
-                            result: Expr::Bool { val: true } } = back_msg {
-                            break;
-                        }
-                    }
+                    assert_actors.push(actor_ref);
                 }
             }
         }
-        Ok(())
+        Ok(assert_actors)
     }
 }
