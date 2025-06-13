@@ -3,10 +3,12 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::error::Error;
 use std::rc::Rc;
+use std::thread::current;
 
 use kameo::{prelude::*, spawn, Actor};
 use log::info;
 
+use crate::runtime::def_actor::TickFunc;
 use crate::{
     ast::{Expr, Prog, Service},
     runtime::{def_actor::DefActor, evaluator::eval_srv, message::Msg, var_actor::VarActor},
@@ -46,7 +48,7 @@ impl Manager {
                     name
                 ));
 
-                self.alloc_def_actor(name, def_expr.clone()).await.unwrap();
+                self.alloc_def_actor(name, def_expr.clone(), None).await.unwrap();
             }
         }
 
@@ -67,6 +69,7 @@ impl Manager {
         &mut self,
         name: &String,
         expr: Expr,
+        customized_tick: Option<TickFunc>,
     ) -> Result<ActorRef<DefActor>, Box<dyn Error>> {
         // calculate all information for def actor
         let def_args = self.dep_graph.get(name).map_or_else(
@@ -98,6 +101,7 @@ impl Manager {
             val,
             def_arg_to_vals,
             def_arg_to_vars,
+            customized_tick
         ));
         self.defname_to_actors
             .insert(name.clone(), actor_ref.clone());

@@ -49,7 +49,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let _ = static_analysis::typecheck::typecheck_prog(&prog);
-    let _ = runtime::RuntimeManager::run(&prog).await?;
+    let _ = runtime::run(&prog).await;
 
     // runtime.repl
     Ok(())

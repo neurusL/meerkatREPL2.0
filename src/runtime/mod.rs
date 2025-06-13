@@ -19,15 +19,15 @@
 //!  4. test_manager will wait for bool_expr to be true before processing next
 //!     action, on the other hand, timeout means assertion failed
 use core::panic;
-use std::collections::{HashMap, HashSet};
+use std::{collections::HashMap};
 
 use crate::{
-    ast::{Expr, Prog, Test},
+    ast::{Expr, Prog, ReplCmd, Service, Test},
     runtime::message::CmdMsg,
 };
-use kameo::{actor::ActorRef, spawn};
+use tokio::sync::mpsc::{self, Sender, Receiver};
+use kameo::{actor::ActorRef, prelude::{Context, Message}, spawn, Actor};
 use manager::Manager;
-use message::Msg;
 
 // pub mod instr;
 pub mod lock;
@@ -45,62 +45,90 @@ pub mod manager;
 pub mod pubsub;
 pub mod var_actor;
 
-pub struct RuntimeManager {
-    pub srv_to_mgr: HashMap<String, ActorRef<Manager>>,
+const MPSC_CHANNEL_SIZE: usize = 100;
+
+
+pub async fn run(prog: &Prog) -> Result<(), Box<dyn std::error::Error>> {
+    let (dev_tx, dev_rx) = mpsc::channel::<CmdMsg>(MPSC_CHANNEL_SIZE);
+    let (cli_tx, cli_rx) = mpsc::channel::<CmdMsg>(MPSC_CHANNEL_SIZE);
+    
+    assert!(prog.services.len() == 1 && prog.tests.len() == 1, 
+    "Only support one service and one test for now");
+
+    let srv = &prog.services[0];
+    let test = &prog.tests[0];
+    
+    let srv_actor_ref = run_srv(srv, dev_tx.clone()).await?;
+    run_test(test, srv_actor_ref, cli_tx.clone(), cli_rx, dev_rx).await?;
+    
+    Ok(())
 }
 
-impl RuntimeManager {
-    pub async fn run(prog: &Prog) -> Result<(), Box<dyn std::error::Error>> {
-        // initialize all services' managers
-        let mut srv_to_mgr = HashMap::new();
+pub async fn run_srv(srv: &Service, dev_tx: Sender<CmdMsg>) -> Result<ActorRef<Manager>, Box<dyn std::error::Error>> {
+    // initialize the service's manager
+    let srv_manager = Manager::new(srv.name.clone(), dev_tx);
+    let srv_actor_ref = spawn(srv_manager);
 
-        for srv in prog.services.iter() {
-            let srv_manager = Manager::new(srv.name.clone());
-            let srv_actor_ref = spawn(srv_manager);
-            srv_to_mgr.insert(srv.name.clone(), srv_actor_ref.clone());
+    // synchronously wait for manager to be initialized
+    if let Some(CmdMsg::CodeUpdateGranted{..}) = srv_actor_ref
+        .ask(CmdMsg::CodeUpdate { srv: srv.clone() })
+        .await?
+    {
+        println!("Service {} initialized", srv.name);
+    } else {
+        panic!("Service {} initialization failed", srv.name);
+    }
 
-            // synchronously wait for manager to be initialized
-            if let Some(CmdMsg::CodeUpdateGranted) = srv_actor_ref
-                .ask(CmdMsg::CodeUpdate { srv: srv.clone() })
-                .await?
-            {
-                println!("Service {} initialized", srv.name);
-            } else {
-                panic!("Service {} initialization failed", srv.name);
+    Ok(srv_actor_ref)
+}
+
+pub async fn run_test(test: &Test, 
+    srv_actor_ref: ActorRef<Manager>,
+    cli_tx: Sender<CmdMsg>,
+    mut cli_rx: Receiver<CmdMsg>,
+    mut dev_rx: Receiver<CmdMsg>
+) -> Result<(), Box<dyn std::error::Error>> {
+    // start testing on the service
+    println!("testing {}", test.name);
+    // one handler loop keep listening to incoming messages from manager
+    // the main thread keep processing actions and asserts
+    // if handler loop hear TransactionAbort, roll back to that transaction
+    // if handler loop hear all assert true, roll forward to next action
+    let mut txn_to_cmd_idx = HashMap::new();
+    let mut process_cmd_idx = 0;
+    
+    while process_cmd_idx < test.commands.len() {
+        let cmd = &test.commands[process_cmd_idx];
+        match cmd {
+            ReplCmd::Do(action) => {
+                if let Expr::Action { assns } = action {
+                    let txn = transaction::Txn::new(assns.clone());
+                    txn_to_cmd_idx.insert(txn.id.clone(), process_cmd_idx);
+                    srv_actor_ref.tell(CmdMsg::DoTransaction { txn, from_client_addr: cli_tx.clone() }).await?;
+
+                } else {
+                    panic!("do requires action expression")
+                }
+                
+            }
+            ReplCmd::Assert(expr) => {
+                srv_actor_ref.tell(CmdMsg::TryAssert { 
+                    name: test.name.clone(), 
+                    test: expr.clone()
+                }).await?;
             }
         }
 
-        for test in prog.tests.iter() {
-            println!("testing {} ...... ", test.name);
-            let srv_actor_ref = srv_to_mgr.get_mut(&test.name).expect(&format!(
-                "Test: manager for service {:?} not found",
-                test.name
-            ));
-
-            // if let Msg::TryTestResult { assert_actors } = srv_actor_ref.ask(Msg::TryTest { test: test.clone() }).await? {
-            //     let mut assert_to_pass: HashSet<kameo::prelude::ActorID> = HashSet::from_iter(
-            //         assert_actors.iter().map(|actor_ref| actor_ref.id())
-            //     );
-            //     loop {
-            //         for actor_ref in assert_actors.iter() {
-            //             if let Msg::UnsafeReadResult {
-            //                 result: Expr::Bool { val: true },
-            //             } = actor_ref.ask(Msg::UnsafeRead).await? {
-            //                 assert_to_pass.remove(&actor_ref.id());
-            //                 if assert_to_pass.is_empty() {
-            //                     println!("Test for {} passed", test.name);
-            //                     break;
-            //                 }
-            //             }
-            //         }
-            //     }
-            // } else {
-            //     panic!("Test for {} failed", test.name);
-            // }
-
-            todo!()
+        'listen: loop {
+            if let Some(CmdMsg::AssertSucceeded) = dev_rx.recv().await {
+                break 'listen;
+            }
+            if let Some(CmdMsg::TransactionAborted { txn_id }) = cli_rx.recv().await {
+                process_cmd_idx = *txn_to_cmd_idx.get(&txn_id).unwrap();
+                break 'listen;
+            }
+            print!(".");
         }
-
-        Ok(())
     }
+    Ok(())
 }

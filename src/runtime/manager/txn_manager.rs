@@ -1,19 +1,19 @@
 use std::collections::{HashMap, HashSet};
 
+use kameo::actor::ActorRef;
+use tokio::sync::mpsc::Sender;
+
 use crate::{
     ast::Expr,
     runtime::{
-        lock::LockKind,
-        manager::Manager,
-        transaction::{Txn, TxnId},
+        lock::LockKind, manager::Manager, message::CmdMsg, transaction::{Txn, TxnId},
     },
 };
-
-use super::txn_utils::*;
 
 #[derive(Clone, Debug)]
 pub struct TxnManager {
     pub txn: Txn,
+    pub from_client: Sender<CmdMsg>,
     pub reads: HashMap<String, ReadState>,
     pub writes: HashMap<String, WriteState>,
     pub preds: HashSet<Txn>,
@@ -36,9 +36,13 @@ pub enum WriteState {
 }
 
 impl TxnManager {
-    pub fn new(txn: Txn, reads: HashSet<String>, writes: HashSet<String>) -> Self {
+    pub fn new(
+        txn: Txn, 
+        from_client: Sender<CmdMsg>,
+        reads: HashSet<String>, 
+        writes: HashSet<String>) -> Self {
         TxnManager {
-            txn,
+            txn, from_client,
             reads: HashMap::from_iter(
                 reads
                     .iter()
@@ -109,6 +113,10 @@ impl TxnManager {
         self.reads.iter().any(|(_, v)| *v == ReadState::Aborted)
             || self.writes.iter().any(|(_, v)| *v == WriteState::Aborted)
     }
+
+    pub fn get_client_sender(&self) -> Sender<CmdMsg> {
+        self.from_client.clone()
+    }
 }
 
 /// derived methods on service manager
@@ -139,10 +147,16 @@ impl Manager {
     pub fn new_txn_mgr(
         &mut self,
         txn: &Txn,
+        from_client: Sender<CmdMsg>,
         read_set: HashSet<String>,
         write_set: HashSet<String>,
     ) {
-        let new_mgr = TxnManager::new(txn.clone(), read_set, write_set);
+        let new_mgr = TxnManager::new(
+            txn.clone(), 
+            from_client,
+            read_set, 
+            write_set
+        );
         self.txn_mgrs.insert(txn.id.clone(), new_mgr);
     }
 
@@ -180,4 +194,5 @@ impl Manager {
     delegate_to_txn!(imm all_lock_granted() -> bool);
     delegate_to_txn!(imm all_read_finished() -> bool);
     delegate_to_txn!(imm is_aborted() -> bool);
+    delegate_to_txn!(imm get_client_sender() -> Sender<CmdMsg>);
 }

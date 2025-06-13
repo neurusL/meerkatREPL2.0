@@ -19,8 +19,11 @@
 //!   to lock the shared state of each transaction.
 use std::{collections::HashSet, error::Error};
 
+use kameo::actor::ActorRef;
+use tokio::sync::mpsc::Sender;
+
 use crate::{
-    ast::Assn,
+    ast::{Assn, Expr},
     runtime::{
         evaluator::eval_assns,
         lock::{
@@ -28,7 +31,7 @@ use crate::{
             LockKind::{Read, Write},
         },
         manager::txn_manager::{ReadState, TxnManager, WriteState},
-        message::Msg,
+        message::{CmdMsg, Msg},
         transaction::{Txn, TxnId},
     },
     static_analysis::var_analysis::read_write::{calc_read_set, calc_write_set},
@@ -38,13 +41,14 @@ use super::Manager;
 
 impl Manager {
     /// 1. initialize a new transaction manager
-    pub fn new_txn(&mut self, txn: Txn) -> TxnManager {
+    pub fn new_txn(&mut self, txn: Txn, from_client: Sender<CmdMsg>) -> TxnManager {
         // static info of txn, the read and write set, which may overlap
         let read_set = calc_read_set(&txn.assns);
         let write_set = calc_write_set(&txn.assns);
 
         // set up txn manager
-        let txn_mgr = TxnManager::new(txn.clone(), read_set, write_set);
+        let txn_mgr = TxnManager::new(
+            txn.clone(), from_client,read_set, write_set);
 
         txn_mgr
     }
@@ -189,5 +193,14 @@ impl Manager {
             .await?;
         }
         Ok(())
+    }
+}
+
+impl Manager {
+    pub fn eval_assert(&mut self, expr: &Expr) -> Result<bool, String> {
+        let mut expr = expr.clone();
+        self.evaluator.eval_assert(&mut expr)?;
+
+        Ok(expr == Expr::Bool { val: true })
     }
 }

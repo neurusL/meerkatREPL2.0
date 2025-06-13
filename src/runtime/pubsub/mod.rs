@@ -12,7 +12,7 @@ use super::{def_actor::DefActor, message::Msg};
 /// - (layer 2: pub/subscribers) maintain network topology between nodes
 ///    similar to kameo/actors/src/pubsub.rs
 pub struct PubSub {
-    subscribers: Vec<ActorRef<DefActor>>,
+    subscribers: Vec<ActorRef<DefActor>>, // todo: generalize to all actors
 }
 
 impl PubSub {

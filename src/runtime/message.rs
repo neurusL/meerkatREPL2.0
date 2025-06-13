@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use kameo::{actor::ActorRef, Reply};
+use tokio::sync::mpsc::Sender;
 
 use crate::{
     ast::{Assn, Expr, Prog, Service, Test},
@@ -86,12 +87,15 @@ pub enum Msg {
 pub enum CmdMsg {
     // Meerkat 2.0 only support non-distributed CodeUpdate
     CodeUpdate { srv: Service },
-    CodeUpdateGranted,
+    CodeUpdateGranted { srv_name: String },
 
-    DoTransaction { txn: Txn },
+    DoTransaction { 
+        from_client_addr: Sender<CmdMsg>,
+        txn: Txn 
+    },
 
     TransactionAborted { txn_id: TxnId },
 
     TryAssert { name: String, test: Expr },
-    ListenToAssert { actor: ActorRef<DefActor> },
+    AssertSucceeded,
 }

@@ -137,6 +137,12 @@ impl DefActor {
             self.pubsub.publish(msg).await;
         }
 
+        let maybe_tick = self.customized_tick.take();
+        if let Some(mut f) = maybe_tick {
+            f(self).await;
+            self.customized_tick = Some(f);
+        }
+
         Ok(())
     }
 }

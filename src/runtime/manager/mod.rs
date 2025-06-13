@@ -3,8 +3,10 @@ use std::collections::HashSet;
 use std::fmt::Display;
 
 use kameo::prelude::*;
+use tokio::sync::mpsc::Sender;
 
 use crate::runtime::manager::txn_manager::TxnManager;
+use crate::runtime::message::CmdMsg;
 
 use super::def_actor::DefActor;
 use super::evaluator::Evaluator;
@@ -22,11 +24,15 @@ pub struct Manager {
     /// basic info of the manager
     pub name: String,
     pub address: Option<ActorRef<Manager>>,
+    pub from_developer: Sender<CmdMsg>, // sender to developer side
 
     pub varname_to_actors: HashMap<String, ActorRef<VarActor>>,
     pub defname_to_actors: HashMap<String, ActorRef<DefActor>>,
 
-    /// analysis and evaluation of program stored at manager
+    /// analysis and initial evaluation of program stored at manager
+    /// todo!("probably can use for later eval of program")
+    /// then manager need regularly fetch values from var/def actors
+    /// might be benefitial
     pub evaluator: Evaluator,
 
     pub dep_graph: HashMap<String, HashSet<String>>,
@@ -39,10 +45,11 @@ pub struct Manager {
 impl Manager {
     /// to spawn a manager:
     /// let mgr = Manager::new(); spawn(mgr);
-    pub fn new(name: String) -> Self {
+    pub fn new(name: String, from_developer: Sender<CmdMsg>) -> Self {
         Manager {
             name,
             address: None,
+            from_developer,
 
             varname_to_actors: HashMap::new(),
             defname_to_actors: HashMap::new(),
