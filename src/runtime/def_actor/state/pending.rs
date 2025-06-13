@@ -1,5 +1,5 @@
 //! how we key the pending changes of a def actor F
-//! 
+//!
 //! we maintain a dependency graph of pending changes, where applying a change
 //! requires for all transactions t in change, if t writes t ancestor of F,
 //! then we want to see all relevant args(F) has t in hand to be applied
@@ -7,7 +7,10 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::{ast::Assn, runtime::transaction::{Txn, TxnId}};
+use crate::{
+    ast::Assn,
+    runtime::transaction::{Txn, TxnId},
+};
 
 use super::{ChangeId, PropChange};
 
@@ -17,22 +20,20 @@ pub struct PendingChanges {
     /// then all var_to_inputs[f] should see transaction t
     pub var_to_args: HashMap<String, HashSet<String>>,
 
-    /// dependency graph (a hypergraph): 
-    /// 
+    /// dependency graph (a hypergraph):
+    ///
     /// in a way that a change depends on (arg_name, txn_id)'s
     /// # req_to_changes, include pending and applied changes
     /// key: (arg_name, txn_id)
     /// value: a set of changes whose from_name is arg_name, and preds contains txn_id
     pub req_to_changes: HashMap<(String, TxnId), HashSet<ChangeId>>,
-    /// # changes_to_req: 
-    /// key: change 
+    /// # changes_to_req:
+    /// key: change
     /// value: (arg_name, txn_id) that the change depends on
     pub change_to_reqs: HashMap<ChangeId, HashSet<(String, TxnId)>>,
-
     // todo: there are rooms for optimization here!
     // - incrementally update some data structures to avoid full scan each time
     // - ... ?
-
 }
 
 impl PendingChanges {
@@ -47,25 +48,28 @@ impl PendingChanges {
     pub fn add_change(&mut self, change: &PropChange) {
         // change depends on (arg, t)
         //
-        // if a write (var, ...) appears in txn t in change 
-        // then for all arg in var_to_inputs[var] should see t, 
-        // namely change depends a change on arg, whose preds contains t 
+        // if a write (var, ...) appears in txn t in change
+        // then for all arg in var_to_inputs[var] should see t,
+        // namely change depends a change on arg, whose preds contains t
         // recorded as (arg, t)
-        for Txn {id: txn_id, assns} in change.preds.iter() {
-            for Assn {dest, ..} in assns.iter() {
-                for arg in self.var_to_args.get(dest)
+        for Txn { id: txn_id, assns } in change.preds.iter() {
+            for Assn { dest, .. } in assns.iter() {
+                for arg in self
+                    .var_to_args
+                    .get(dest)
                     .expect(&format!("var {} not found in var_to_inputs", dest))
-                    .iter() 
+                    .iter()
                 {
-                    self.change_to_reqs.entry(change.id)
-                    .or_insert(HashSet::new())
-                    .insert((arg.clone(), txn_id.clone()));
+                    self.change_to_reqs
+                        .entry(change.id)
+                        .or_insert(HashSet::new())
+                        .insert((arg.clone(), txn_id.clone()));
                 }
             }
         }
 
         // change provides (arg, t)
-        for Txn {id: txn_id, ..} in change.preds.iter() {
+        for Txn { id: txn_id, .. } in change.preds.iter() {
             self.req_to_changes
                 .entry((change.from_name.clone(), txn_id.clone()))
                 .or_insert(HashSet::new())
@@ -74,12 +78,12 @@ impl PendingChanges {
     }
 
     /// todo(): try different search strategies
-    /// - search for minimal batch of changes (find SCC's): 
+    /// - search for minimal batch of changes (find SCC's):
     ///   - generated change will have the least number of preds
     ///   - better liveness of the distributed system
     /// - search for maximal batch of changes (worklist algorithm):
     ///   - minimal number of messages to communicate
-    /// 
+    ///
     pub fn search_smallest_batches(&self) -> Vec<HashSet<ChangeId>> {
         todo!()
     }
@@ -87,9 +91,9 @@ impl PendingChanges {
     /// worklist algorithm
     /// self.req_to_changes serve as history of applied changes
     pub fn search_largest_batch(&self) -> HashSet<ChangeId> {
-        let mut req_to_changes= self.req_to_changes.clone();
+        let mut req_to_changes = self.req_to_changes.clone();
 
-        // worklist keep track of changes whose preds are missing 
+        // worklist keep track of changes whose preds are missing
         let mut worklist = VecDeque::new();
         let mut kept_changes = HashSet::new();
 
@@ -105,7 +109,7 @@ impl PendingChanges {
                 kept_changes.insert(*change);
             }
         }
-        
+
         while let Some(change) = worklist.pop_front() {
             for (req, changes) in req_to_changes.iter_mut() {
                 changes.remove(&change);
@@ -115,14 +119,20 @@ impl PendingChanges {
             }
             for (new_change, reqs) in self.change_to_reqs.iter() {
                 if !kept_changes.contains(new_change)
-                && reqs.iter().any(|req| empty_reqs.contains(req)) {
+                    && reqs.iter().any(|req| empty_reqs.contains(req))
+                {
                     worklist.push_back(*new_change);
                     kept_changes.insert(*new_change);
                 }
             }
         }
-        
-        self.change_to_reqs.keys().cloned().collect::<HashSet<_>>()
-        .difference(&kept_changes).cloned().collect::<HashSet<_>>()
+
+        self.change_to_reqs
+            .keys()
+            .cloned()
+            .collect::<HashSet<_>>()
+            .difference(&kept_changes)
+            .cloned()
+            .collect::<HashSet<_>>()
     }
 }

@@ -1,9 +1,15 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{ast::Expr, runtime::{lock::LockKind, manager::Manager, transaction::{Txn, TxnId}}};
+use crate::{
+    ast::Expr,
+    runtime::{
+        lock::LockKind,
+        manager::Manager,
+        transaction::{Txn, TxnId},
+    },
+};
 
 use super::txn_utils::*;
-
 
 #[derive(Clone, Debug)]
 pub struct TxnManager {
@@ -30,17 +36,19 @@ pub enum WriteState {
 }
 
 impl TxnManager {
-    pub fn new(
-        txn: Txn, 
-        reads: HashSet<String>, 
-        writes: HashSet<String>
-    ) -> Self {
+    pub fn new(txn: Txn, reads: HashSet<String>, writes: HashSet<String>) -> Self {
         TxnManager {
             txn,
-            reads: HashMap::from_iter(reads.iter()
-                .map(|name| (name.clone(), ReadState::Requested))),
-            writes: HashMap::from_iter(writes.iter()
-                .map(|name| (name.clone(), WriteState::Requested))),
+            reads: HashMap::from_iter(
+                reads
+                    .iter()
+                    .map(|name| (name.clone(), ReadState::Requested)),
+            ),
+            writes: HashMap::from_iter(
+                writes
+                    .iter()
+                    .map(|name| (name.clone(), WriteState::Requested)),
+            ),
             preds: HashSet::new(),
         }
     }
@@ -104,7 +112,7 @@ impl TxnManager {
 }
 
 /// derived methods on service manager
-/// 
+///
 macro_rules! delegate_to_txn {
     // Mutable delegates take (&mut self, &TxnId, ...) ->  call &mut TxnManager
     (mut $fn_name:ident ( $($arg:ident : $arg_ty:ty),* ) ) => {
@@ -129,17 +137,12 @@ macro_rules! delegate_to_txn {
 
 impl Manager {
     pub fn new_txn_mgr(
-        &mut self, 
+        &mut self,
         txn: &Txn,
         read_set: HashSet<String>,
         write_set: HashSet<String>,
-
     ) {
-        let new_mgr = TxnManager::new(
-            txn.clone(),
-            read_set,
-            write_set
-        );
+        let new_mgr = TxnManager::new(txn.clone(), read_set, write_set);
         self.txn_mgrs.insert(txn.id.clone(), new_mgr);
     }
 

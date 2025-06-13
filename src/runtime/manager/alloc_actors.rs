@@ -28,38 +28,40 @@ impl Manager {
         self.dep_transtive = srv_info.dep_transtive;
 
         for name in srv_info.topo_order.iter() {
-            let val = self.evaluator.reactive_name_to_vals.get(name).expect(&format!(
-                "Service alloc: var/def is not initialized: {}",
-                name
-            ));
+            let val = self
+                .evaluator
+                .reactive_name_to_vals
+                .get(name)
+                .expect(&format!(
+                    "Service alloc: var/def is not initialized: {}",
+                    name
+                ));
 
             if srv_info.vars.contains(name) {
                 self.alloc_var_actor(name, val.clone()).await;
             } else if srv_info.defs.contains(name) {
-                let def_expr = def_to_exprs.get(name)
-                .expect(&format!("Service alloc: def expr is not 
-                    initialized: {}", name));
+                let def_expr = def_to_exprs.get(name).expect(&format!(
+                    "Service alloc: def expr is not 
+                    initialized: {}",
+                    name
+                ));
 
                 self.alloc_def_actor(name, def_expr.clone()).await.unwrap();
             }
-        }    
+        }
 
-        info!("Service allocated: {}", self);    
+        info!("Service allocated: {}", self);
     }
 
-    pub async fn alloc_var_actor(
-        &mut self, 
-        name: &String, 
-        val: Expr
-    ) {
+    pub async fn alloc_var_actor(&mut self, name: &String, val: Expr) {
         let actor_ref = spawn(VarActor::new(name.clone(), val));
         self.varname_to_actors.insert(name.clone(), actor_ref);
     }
 
-    /// current impl of alloc_def_actor rely on a centralized manager 
-    /// preprocess all information 
-    /// 
-    /// should change to distributed and incrementally allocate def actor 
+    /// current impl of alloc_def_actor rely on a centralized manager
+    /// preprocess all information
+    ///
+    /// should change to distributed and incrementally allocate def actor
     /// to accommodate for code update
     pub async fn alloc_def_actor(
         &mut self,
@@ -67,28 +69,35 @@ impl Manager {
         expr: Expr,
     ) -> Result<ActorRef<DefActor>, Box<dyn Error>> {
         // calculate all information for def actor
-        let def_args = self.dep_graph.get(name)
-        .map_or_else(
+        let def_args = self.dep_graph.get(name).map_or_else(
             || expr.free_var(&HashSet::new()), // incrementally calculated
-            |def_args| def_args.clone()       // precalculated by centralized manager
+            |def_args| def_args.clone(),       // precalculated by centralized manager
         );
 
-        let def_arg_to_vals = self.evaluator.reactive_name_to_vals.iter()
-        .filter(|(k, _)| def_args.contains(*k))
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect::<HashMap<String, Expr>>();
+        let def_arg_to_vals = self
+            .evaluator
+            .reactive_name_to_vals
+            .iter()
+            .filter(|(k, _)| def_args.contains(*k))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect::<HashMap<String, Expr>>();
 
-        let def_arg_to_vars = self.dep_transtive.iter()
-        .filter(|(k, _)| def_args.contains(*k))
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect::<HashMap<String, HashSet<String>>>();
+        let def_arg_to_vars = self
+            .dep_transtive
+            .iter()
+            .filter(|(k, _)| def_args.contains(*k))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect::<HashMap<String, HashSet<String>>>();
 
         let mut val = expr.clone();
         let _ = self.evaluator.eval_expr(&mut val);
 
         let actor_ref = spawn(DefActor::new(
-            name.clone(), expr, val,
-            def_arg_to_vals, def_arg_to_vars
+            name.clone(),
+            expr,
+            val,
+            def_arg_to_vals,
+            def_arg_to_vars,
         ));
         self.defname_to_actors
             .insert(name.clone(), actor_ref.clone());

@@ -1,6 +1,12 @@
-use std::{collections::{HashMap, HashSet}, hash::Hash};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+};
 
-use crate::{ast::Expr, runtime::{evaluator::eval_def_expr, transaction::Txn}};
+use crate::{
+    ast::Expr,
+    runtime::{evaluator::eval_def_expr, transaction::Txn},
+};
 
 use history::AppliedChanges;
 use pending::PendingChanges;
@@ -12,9 +18,9 @@ pub struct ChangeState {
     pub id_cnt: ChangeId,
     pub id_to_change: HashMap<ChangeId, PropChange>,
 
-    pub expr: Expr, // current value of def 
+    pub expr: Expr,                           // current value of def
     pub arg_to_values: HashMap<String, Expr>, // args of expr
-    
+
     pub pending_changes: PendingChanges,
     pub applied_changes: AppliedChanges,
 }
@@ -29,29 +35,29 @@ impl ChangeState {
 
         for (arg, vars) in arg_to_vars {
             for var in vars {
-                var_to_args.entry(var)
+                var_to_args
+                    .entry(var)
                     .or_insert(HashSet::new())
                     .insert(arg.clone());
             }
         }
 
         ChangeState {
-            id_cnt: 0, 
+            id_cnt: 0,
             id_to_change: HashMap::new(),
-            expr, arg_to_values,
+            expr,
+            arg_to_values,
             pending_changes: PendingChanges::new(var_to_args),
             applied_changes: AppliedChanges::new(),
         }
     }
 
-    pub fn receive_change(&mut self, 
-        from_name: String, 
-        new_val: Expr,
-        preds: HashSet<Txn>
-    ) {
-        let change = PropChange { 
-            id: self.id_cnt, 
-            from_name, new_val, preds 
+    pub fn receive_change(&mut self, from_name: String, new_val: Expr, preds: HashSet<Txn>) {
+        let change = PropChange {
+            id: self.id_cnt,
+            from_name,
+            new_val,
+            preds,
         };
 
         self.pending_changes.add_change(&change);
@@ -67,13 +73,11 @@ impl ChangeState {
     pub fn apply_batch(&mut self, changes: &HashSet<ChangeId>) -> Expr {
         for change_id in changes.iter() {
             let change = &self.id_to_change[change_id];
-            self.arg_to_values.insert(
-                change.from_name.clone(), 
-                change.new_val.clone()
-            );
+            self.arg_to_values
+                .insert(change.from_name.clone(), change.new_val.clone());
             self.applied_changes.add_change(change);
         }
-        
+
         eval_def_expr(&self.expr, &self.arg_to_values)
     }
 

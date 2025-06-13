@@ -12,8 +12,8 @@ use super::transaction::TxnId;
 use super::var_actor::VarActor;
 
 pub mod alloc_actors;
-pub mod txn_utils;
 pub mod txn_manager;
+pub mod txn_utils;
 // pub mod try_test;
 pub mod handler;
 
@@ -28,7 +28,7 @@ pub struct Manager {
 
     /// analysis and evaluation of program stored at manager
     pub evaluator: Evaluator,
-    
+
     pub dep_graph: HashMap<String, HashSet<String>>,
     pub dep_transtive: HashMap<String, HashSet<String>>,
 
@@ -59,9 +59,11 @@ impl Manager {
 impl Display for Manager {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} and actor ref: {:?}\n", self.name, self.address)?;
-        write!(f, "varname_to_actors: {:?}\n defname_to_actors: {:?}\n", 
-            self.varname_to_actors, 
-            self.defname_to_actors)?;
+        write!(
+            f,
+            "varname_to_actors: {:?}\n defname_to_actors: {:?}\n",
+            self.varname_to_actors, self.defname_to_actors
+        )?;
         // write!(f, "txn_mgrs: {:?}\n", self.txn_mgrs)?;
         Ok(())
     }

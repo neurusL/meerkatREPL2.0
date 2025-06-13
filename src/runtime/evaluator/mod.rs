@@ -1,6 +1,8 @@
-use crate::ast::{Assn, Expr, Prog, Service, Test, ReplCmd, Decl};
+use crate::ast::{Assn, Decl, Expr, Prog, ReplCmd, Service, Test};
 use std::{
-    collections::{HashMap, HashSet}, env, fmt::Display
+    collections::{HashMap, HashSet},
+    env,
+    fmt::Display,
 };
 
 use super::{manager::Manager, message::Msg};
@@ -28,7 +30,6 @@ pub struct Evaluator {
     pub reactive_name_to_vals: HashMap<String, Expr>,
     /// lambda expr var name -> val
     /// exprvar_name_to_val: HashMap<String, Expr>,
-
     pub def_name_to_exprs: HashMap<String, Expr>,
 }
 
@@ -72,8 +73,6 @@ pub fn eval_srv(srv: &Service) -> Evaluator {
     }
     eval
 }
-
-
 
 impl From<Val> for Expr {
     fn from(val: Val) -> Self {

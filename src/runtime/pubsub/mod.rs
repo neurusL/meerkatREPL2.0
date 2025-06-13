@@ -26,8 +26,8 @@ impl PubSub {
         self.subscribers.push(subscriber);
     }
 
-    /// developer note: don't use future.join_all() overhead there 
-    /// https://github.com/tqwewe/kameo/issues/157 
+    /// developer note: don't use future.join_all() overhead there
+    /// https://github.com/tqwewe/kameo/issues/157
     pub async fn publish(&self, msg: Msg) {
         for subscriber in &self.subscribers {
             if let Err(e) = subscriber.tell(msg.clone()).await {

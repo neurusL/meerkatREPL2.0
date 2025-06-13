@@ -1,11 +1,10 @@
 //! Logic for Var Actor
 //!
 
-
 use std::time::Duration;
 
-use kameo::{error::Infallible, prelude::*};
 use kameo::mailbox::Signal;
+use kameo::{error::Infallible, prelude::*};
 use log::info;
 
 use super::VarActor;
@@ -26,7 +25,8 @@ impl kameo::prelude::Message<Msg> for VarActor {
             Msg::Subscribe {
                 from_name: _,
                 from_addr,
-            } => { info!("Subscribe from {:?}", from_addr);
+            } => {
+                info!("Subscribe from {:?}", from_addr);
                 self.pubsub.subscribe(from_addr);
                 Msg::SubscribeGranted
             }
@@ -34,7 +34,8 @@ impl kameo::prelude::Message<Msg> for VarActor {
             Msg::LockRequest {
                 lock,
                 from_mgr_addr: from_name,
-            } => { info!("Lock Request from {:?}", from_name);
+            } => {
+                info!("Lock Request from {:?}", from_name);
                 if !self.lock_state.add_wait(lock.clone(), from_name) {
                     return Msg::LockAbort {
                         from_name: self.name.clone(),
@@ -45,7 +46,8 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 Msg::Unit
             }
 
-            Msg::LockAbort { lock, ..} => { info!("Lock Aborted for {:?}", lock.txn_id);
+            Msg::LockAbort { lock, .. } => {
+                info!("Lock Aborted for {:?}", lock.txn_id);
                 self.lock_state.remove_granted_or_wait(&lock.txn_id);
 
                 // roll back to previous stable state of value
@@ -55,9 +57,11 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 Msg::Unit
             }
 
-            Msg::LockRelease { txn, mut preds } => { info!("Lock Release for txn {:?}", txn.id);
+            Msg::LockRelease { txn, mut preds } => {
+                info!("Lock Release for txn {:?}", txn.id);
                 assert!(self.lock_state.has_granted(&txn.id));
-                let lock = self.lock_state
+                let lock = self
+                    .lock_state
                     .remove_granted_or_wait(&txn.id)
                     .expect("lock should be granted before release");
 
@@ -72,22 +76,25 @@ impl kameo::prelude::Message<Msg> for VarActor {
 
                     self.latest_write_txn = Some(txn.clone());
 
-                    // except for preds calculated by manager 
-                    // the txn itself should also have been applied when 
+                    // except for preds calculated by manager
+                    // the txn itself should also have been applied when
                     // value is updated
                     preds.insert(txn.clone());
 
-                    self.pubsub.publish(Msg::PropChange {
-                        from_name: self.name.clone(),
-                        val: new_value,
-                        preds: preds.clone(),
-                    }).await;
+                    self.pubsub
+                        .publish(Msg::PropChange {
+                            from_name: self.name.clone(),
+                            val: new_value,
+                            preds: preds.clone(),
+                        })
+                        .await;
                 }
 
                 Msg::Unit
             }
 
-            Msg::UsrReadVarRequest { txn } => { info!("UsrReadVarRequest");
+            Msg::UsrReadVarRequest { txn } => {
+                info!("UsrReadVarRequest");
                 assert!(self.lock_state.has_granted(&txn));
 
                 // remove read lock immediately
@@ -101,7 +108,8 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 }
             }
 
-            Msg::UsrWriteVarRequest { txn, write_val } => { info!("UsrWriteVarRequest");
+            Msg::UsrWriteVarRequest { txn, write_val } => {
+                info!("UsrWriteVarRequest");
                 assert!(self.lock_state.has_granted_write(&txn));
 
                 self.value.update(write_val, txn);
@@ -119,10 +127,10 @@ impl Actor for VarActor {
     type Error = Infallible;
 
     async fn next(
-            &mut self,
-            _actor_ref: WeakActorRef<Self>,
-            mailbox_rx: &mut MailboxReceiver<Self>,
-        ) -> Option<Signal<Self>> {
+        &mut self,
+        _actor_ref: WeakActorRef<Self>,
+        mailbox_rx: &mut MailboxReceiver<Self>,
+    ) -> Option<Signal<Self>> {
         let mut interval = tokio::time::interval(TICK_INTERVAL);
 
         loop {
@@ -153,10 +161,18 @@ impl VarActor {
                 lock,
             };
 
-            info!("VAR {} → MANAGER[{}]: about to tell LockGranted", self.name, mgr.id());
-            let res = mgr.ask(msg).await?; 
-            info!("VAR {} → MANAGER[{}]: tell result = {:?}", self.name, mgr.id(), res);
-
+            info!(
+                "VAR {} → MANAGER[{}]: about to tell LockGranted",
+                self.name,
+                mgr.id()
+            );
+            let res = mgr.ask(msg).await?;
+            info!(
+                "VAR {} → MANAGER[{}]: tell result = {:?}",
+                self.name,
+                mgr.id(),
+                res
+            );
         }
         Ok(())
     }

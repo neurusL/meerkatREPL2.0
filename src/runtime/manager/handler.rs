@@ -1,15 +1,15 @@
 use core::panic;
-use std::time::Duration;
 use log::info;
+use std::time::Duration;
 use std::{collections::HashSet, error::Error};
 
-use crate::runtime::message::{Msg, CmdMsg};
+use crate::runtime::message::{CmdMsg, Msg};
 use kameo::{error::Infallible, prelude::*};
 
 pub const TICK_INTERVAL: Duration = Duration::from_millis(100);
 
-use super::Manager;
 use super::txn_utils::*;
+use super::Manager;
 
 /// message between manager and REPL
 impl kameo::prelude::Message<CmdMsg> for Manager {
@@ -19,16 +19,21 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
         use CmdMsg::*;
         info!("MANAGER {} RECEIVE form Command Line: ", self.name);
         match msg {
-            TryAssert { name, test: bool_expr } =>  { info!("Try Test");
-                let actor_ref = self.alloc_def_actor(
-                        &format!("{}_assert_{}", name, bool_expr),
-                        bool_expr.clone()
-                ).await.unwrap();
-                
+            TryAssert {
+                name,
+                test: bool_expr,
+            } => {
+                info!("Try Test");
+                let actor_ref = self
+                    .alloc_def_actor(&format!("{}_assert_{}", name, bool_expr), bool_expr.clone())
+                    .await
+                    .unwrap();
+
                 Some(ListenToAssert { actor: actor_ref })
             }
 
-            DoTransaction { txn } => { info!("Do Action");
+            DoTransaction { txn } => {
+                info!("Do Action");
                 let txn_id = txn.id.clone();
                 let txn_mgr = self.new_txn(txn);
                 self.txn_mgrs.insert(txn_id.clone(), txn_mgr);
@@ -39,11 +44,13 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                 None
             }
 
-            TransactionAborted { txn_id } => { info!("Transaction Aborted");
+            TransactionAborted { txn_id } => {
+                info!("Transaction Aborted");
                 Some(TransactionAborted { txn_id })
             }
 
-            CodeUpdate { srv } => { info!("Code Update");
+            CodeUpdate { srv } => {
+                info!("Code Update");
                 self.alloc_service(&srv).await;
                 Some(CodeUpdateGranted)
             }
@@ -61,12 +68,13 @@ impl kameo::prelude::Message<Msg> for Manager {
     async fn handle(&mut self, msg: Msg, _ctx: &mut Context<Self, Self::Reply>) -> Self::Reply {
         info!("MANAGER {} RECEIVE: ", self.name);
         match msg {
-            Msg::LockGranted { from_name, lock } => { info!("Lock Granted");
+            Msg::LockGranted { from_name, lock } => {
+                info!("Lock Granted");
                 self.add_grant_lock(&lock.txn_id, from_name, lock.lock_kind);
                 if self.all_lock_granted(&lock.txn_id) {
                     self.request_reads(&lock.txn_id).await;
                 }
-                
+
                 Msg::Unit
             }
 
@@ -75,25 +83,22 @@ impl kameo::prelude::Message<Msg> for Manager {
                 name,
                 result,
                 pred,
-            } => { info!("UsrReadVarResult");
+            } => {
+                info!("UsrReadVarResult");
                 if self.is_aborted(&txn_id) {
-                    return Msg::Unit
+                    return Msg::Unit;
                 }
 
-                let pred = pred.map_or_else(
-                    || HashSet::new(), 
-                    |p| HashSet::from([p])
-                );
+                let pred = pred.map_or_else(|| HashSet::new(), |p| HashSet::from([p]));
 
                 self.add_finished_read(&txn_id, name, result, pred);
 
                 if self.all_read_finished(&txn_id) {
                     self.reeval_and_request_writes(&txn_id).await;
                     // todo!() current impl isn't optimized for best concurrency
-                    // if re-eval block for too long 
-                    // feel free to spawn a new thread 
+                    // if re-eval block for too long
+                    // feel free to spawn a new thread
                     // or put it in tick()
-
                 }
                 Msg::Unit
             }
@@ -102,9 +107,10 @@ impl kameo::prelude::Message<Msg> for Manager {
                 name,
                 result,
                 preds,
-            } => { info!("UsrReadDefResult");
+            } => {
+                info!("UsrReadDefResult");
                 if self.is_aborted(&txn_id) {
-                    return Msg::Unit
+                    return Msg::Unit;
                 }
 
                 self.add_finished_read(&txn_id, name, result, preds);
@@ -116,14 +122,17 @@ impl kameo::prelude::Message<Msg> for Manager {
                 Msg::Unit
             }
 
-            Msg::LockAbort { from_name: _, lock } => { info!("Lock Abort");
+            Msg::LockAbort { from_name: _, lock } => {
+                info!("Lock Abort");
                 self.request_abort_locks(&lock.txn_id).await;
-                self.abort_lock(&lock.txn_id); // turn all txn's lock state to aborted 
+                self.abort_lock(&lock.txn_id); // turn all txn's lock state to aborted
 
                 // notify another mailbox of manager myself
-                _ctx.actor_ref().tell(
-                    CmdMsg::TransactionAborted { txn_id: lock.txn_id }
-                ).await;
+                _ctx.actor_ref()
+                    .tell(CmdMsg::TransactionAborted {
+                        txn_id: lock.txn_id,
+                    })
+                    .await;
 
                 Msg::Unit
             }
@@ -157,11 +166,7 @@ impl Manager {
         Ok(())
     }
 
-    pub async fn ask_to_name(
-        &self,
-        name: &String,
-        msg: Msg,
-    ) -> Result<Msg, Box<dyn Error>> {
+    pub async fn ask_to_name(&self, name: &String, msg: Msg) -> Result<Msg, Box<dyn Error>> {
         let back_msg = if let Some(actor) = self.varname_to_actors.get(name) {
             actor.ask(msg).await?
         } else if let Some(actor) = self.defname_to_actors.get(name) {

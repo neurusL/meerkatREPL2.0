@@ -12,7 +12,7 @@ use super::{def_actor::DefActor, manager::Manager, transaction::Txn, var_actor::
 #[derive(Debug, Clone, Reply)]
 pub enum Msg {
     Unit,
-    
+
     UsrReadVarRequest {
         txn: TxnId,
     },
@@ -85,24 +85,13 @@ pub enum Msg {
 #[derive(Debug, Clone, Reply)]
 pub enum CmdMsg {
     // Meerkat 2.0 only support non-distributed CodeUpdate
-    CodeUpdate {
-        srv: Service,
-    },
+    CodeUpdate { srv: Service },
     CodeUpdateGranted,
 
-    DoTransaction {
-        txn: Txn,
-    },
+    DoTransaction { txn: Txn },
 
-    TransactionAborted {
-        txn_id: TxnId,
-    },
+    TransactionAborted { txn_id: TxnId },
 
-    TryAssert {
-        name: String,
-        test: Expr,
-    },
-    ListenToAssert {
-        actor: ActorRef<DefActor>,
-    },
+    TryAssert { name: String, test: Expr },
+    ListenToAssert { actor: ActorRef<DefActor> },
 }

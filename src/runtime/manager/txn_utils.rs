@@ -1,31 +1,35 @@
 //! utils for managing a transaction (do action)
-//! 
+//!
 //! a transactions is processed in the following step:
 //! 1. new txn manager of the transaction
-//! 2. request read and write lock, if both required for a reactive name 
+//! 2. request read and write lock, if both required for a reactive name
 //!    we send only write lock request
 //! 3. if all locks granted, send all read requests, wait for all reads to finish
 //! 4. if any lock aborted, abort all locks
 //! 5. if all read finished, evaluate the transaction and send write requests
-//! 6. upon finished, release all locks 
-//! 
+//! 6. upon finished, release all locks
+//!
 //! notes:
-//! * abort all locks is different from releasing all locks and distinguished 
-//!   by two message types, while AbortLock enforce reactive names abort the 
-//!   granted/waiting locks and roll back to previous state, ReleaseLock commit 
+//! * abort all locks is different from releasing all locks and distinguished
+//!   by two message types, while AbortLock enforce reactive names abort the
+//!   granted/waiting locks and roll back to previous state, ReleaseLock commit
 //!   the change brought by the transaction
-//! * alternatively, we can spawn new thread for each transaction, combined with 
-//!   channel to communicate between threads OR with Arc<Mutex or DashMap> 
+//! * alternatively, we can spawn new thread for each transaction, combined with
+//!   channel to communicate between threads OR with Arc<Mutex or DashMap>
 //!   to lock the shared state of each transaction.
 use std::{collections::HashSet, error::Error};
 
 use crate::{
     ast::Assn,
     runtime::{
-        evaluator::eval_assns, 
-        lock::{Lock, LockKind::{Read, Write},}, 
-        manager::txn_manager::{ReadState, TxnManager, WriteState}, 
-        message::Msg, transaction::{Txn, TxnId}
+        evaluator::eval_assns,
+        lock::{
+            Lock,
+            LockKind::{Read, Write},
+        },
+        manager::txn_manager::{ReadState, TxnManager, WriteState},
+        message::Msg,
+        transaction::{Txn, TxnId},
     },
     static_analysis::var_analysis::read_write::{calc_read_set, calc_write_set},
 };
@@ -34,34 +38,24 @@ use super::Manager;
 
 impl Manager {
     /// 1. initialize a new transaction manager
-    pub fn new_txn(
-        &mut self,
-        txn: Txn,
-    ) -> TxnManager {
+    pub fn new_txn(&mut self, txn: Txn) -> TxnManager {
         // static info of txn, the read and write set, which may overlap
         let read_set = calc_read_set(&txn.assns);
         let write_set = calc_write_set(&txn.assns);
 
         // set up txn manager
-        let txn_mgr = TxnManager::new(
-            txn.clone(),
-            read_set,
-            write_set
-        );
+        let txn_mgr = TxnManager::new(txn.clone(), read_set, write_set);
 
         txn_mgr
     }
 
     /// 2. request read and write lock
-    pub async fn request_locks(
-        &self,
-        txn_id: &TxnId,
-    ) -> Result<(), Box<dyn Error>> {
+    pub async fn request_locks(&self, txn_id: &TxnId) -> Result<(), Box<dyn Error>> {
         let mgr_addr = self
             .address
             .clone()
             .expect("manager addr should not be None");
-        
+
         let txn_mgr = self.txn_mgrs.get(txn_id).unwrap();
 
         // send lock requests
@@ -78,7 +72,8 @@ impl Manager {
                     from_mgr_addr: mgr_addr.clone(),
                     lock: Lock::new_read(txn_id.clone()),
                 },
-            ).await?;
+            )
+            .await?;
             assert!(*state == ReadState::Requested);
         }
 
@@ -89,7 +84,8 @@ impl Manager {
                     from_mgr_addr: mgr_addr.clone(),
                     lock: Lock::new_write(txn_id.clone()),
                 },
-            ).await?;
+            )
+            .await?;
             assert!(*state == WriteState::Requested);
         }
 
@@ -97,12 +93,9 @@ impl Manager {
     }
 
     /// 3. send all read requests
-    /// (if all locks granted, which is handled by Manager::handler when 
+    /// (if all locks granted, which is handled by Manager::handler when
     /// receive new LockGranted message)
-    pub async fn request_reads(
-        &mut self,
-        txn_id: &TxnId
-    ) -> Result<(), Box<dyn Error>> {
+    pub async fn request_reads(&mut self, txn_id: &TxnId) -> Result<(), Box<dyn Error>> {
         let txn_mgr = self.txn_mgrs.get(txn_id).unwrap();
         assert!(txn_mgr.all_lock_granted());
 
@@ -110,9 +103,10 @@ impl Manager {
             self.tell_to_name(
                 &name,
                 Msg::UsrReadVarRequest {
-                    txn: txn_mgr.txn.id.clone(),   
-                }
-            ).await?;
+                    txn: txn_mgr.txn.id.clone(),
+                },
+            )
+            .await?;
         }
 
         Ok(())
@@ -121,16 +115,13 @@ impl Manager {
     /// 5. evaluate the transaction and send write requests
     /// (if all reads finished, which is handled by Manager::handler when
     /// receive new ReadVarResult message)
-    pub async fn reeval_and_request_writes(
-        &self,
-        txn_id: &TxnId
-    ) -> Result<(), Box<dyn Error>> {
+    pub async fn reeval_and_request_writes(&self, txn_id: &TxnId) -> Result<(), Box<dyn Error>> {
         let txn_mgr = self.txn_mgrs.get(txn_id).unwrap();
         assert!(txn_mgr.all_read_finished());
 
         let env = txn_mgr.get_read_results();
         let assns = eval_assns(&txn_mgr.txn.assns, env);
-        
+
         for Assn { dest, src } in assns {
             self.ask_to_name(
                 &dest,
@@ -138,18 +129,16 @@ impl Manager {
                     txn: txn_mgr.txn.id.clone(),
                     write_val: src,
                 },
-            ).await?;
+            )
+            .await?;
         }
         Ok(())
     }
 
-    /// 4. abort all locks 
+    /// 4. abort all locks
     /// (if any lock aborted, which is handled by Manager::handler when
     /// receive new LockAbort message)
-    pub async fn request_abort_locks(
-        &self,
-        txn_id: &TxnId,
-    ) -> Result<(), Box<dyn Error>> {
+    pub async fn request_abort_locks(&self, txn_id: &TxnId) -> Result<(), Box<dyn Error>> {
         let txn_mgr = self.txn_mgrs.get(txn_id).unwrap();
 
         for name in txn_mgr.reads.keys() {
@@ -186,10 +175,7 @@ impl Manager {
     }
 
     /// 6. release all locks
-    pub async fn release_locks(
-        &self,
-        txn_id: &TxnId
-    ) -> Result<(), Box<dyn Error>> {
+    pub async fn release_locks(&self, txn_id: &TxnId) -> Result<(), Box<dyn Error>> {
         let txn_mgr = self.txn_mgrs.get(txn_id).unwrap();
 
         for name in txn_mgr.reads.keys().chain(txn_mgr.writes.keys()) {

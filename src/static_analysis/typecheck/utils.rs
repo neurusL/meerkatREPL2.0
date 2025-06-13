@@ -39,9 +39,10 @@ impl Type {
 }
 
 impl TypecheckEnv {
-    pub fn new(initial_context: HashMap<String, Type>) -> TypecheckEnv {  // passing initial context as parameter (useful when tests need service's context)
+    pub fn new(initial_context: HashMap<String, Type>) -> TypecheckEnv {
+        // passing initial context as parameter (useful when tests need service's context)
         TypecheckEnv {
-            var_context: initial_context,  // using it as var context
+            var_context: initial_context, // using it as var context
             typevar_id: 0,
             acc_subst: HashMap::new(),
         }
@@ -126,6 +127,6 @@ impl TypecheckEnv {
 
 impl Default for TypecheckEnv {
     fn default() -> Self {
-        Self::new(HashMap::new())  // initializing with empty hashmap
+        Self::new(HashMap::new()) // initializing with empty hashmap
     }
 }

@@ -94,7 +94,6 @@ impl LockState {
 
     pub fn grant_oldest_wait(&mut self) -> Option<(Lock, ActorRef<Manager>)> {
         if let Some((lock, mgr)) = self.pop_oldest_wait() {
-            
             self.granted_locks.insert(lock.txn_id.clone(), lock.clone());
 
             if let Some(prev_oldest) = &self.oldest_granted_lock_txnid {

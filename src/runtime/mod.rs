@@ -1,4 +1,4 @@
-//！ runtime and test infrastructure 
+//！ runtime and test infrastructure
 //!
 //!  # How to use
 //!  triggered when developer run @test(service_name) {
@@ -10,21 +10,24 @@
 //!     do(action);
 //!     ...
 //! }
-//! 
-//!  # implementation Idea 
-//!  1. each service initialize its own manager when declared 
-//!  2. test instantiated by service_name, do actions on service_name's manager 
-//!  3. test treat assert(boolean_expr) by internally allocate a def actor 
-//!     of boolean_expr 
-//!  4. test_manager will wait for bool_expr to be true before processing next 
+//!
+//!  # implementation Idea
+//!  1. each service initialize its own manager when declared
+//!  2. test instantiated by service_name, do actions on service_name's manager
+//!  3. test treat assert(boolean_expr) by internally allocate a def actor
+//!     of boolean_expr
+//!  4. test_manager will wait for bool_expr to be true before processing next
 //!     action, on the other hand, timeout means assertion failed
 use core::panic;
 use std::collections::{HashMap, HashSet};
 
+use crate::{
+    ast::{Expr, Prog, Test},
+    runtime::message::CmdMsg,
+};
 use kameo::{actor::ActorRef, spawn};
 use manager::Manager;
 use message::Msg;
-use crate::{ast::{Expr, Prog, Test}, runtime::message::CmdMsg};
 
 // pub mod instr;
 pub mod lock;
@@ -42,7 +45,6 @@ pub mod manager;
 pub mod pubsub;
 pub mod var_actor;
 
-
 pub struct RuntimeManager {
     pub srv_to_mgr: HashMap<String, ActorRef<Manager>>,
 }
@@ -56,10 +58,12 @@ impl RuntimeManager {
             let srv_manager = Manager::new(srv.name.clone());
             let srv_actor_ref = spawn(srv_manager);
             srv_to_mgr.insert(srv.name.clone(), srv_actor_ref.clone());
-            
+
             // synchronously wait for manager to be initialized
             if let Some(CmdMsg::CodeUpdateGranted) = srv_actor_ref
-            .ask(CmdMsg::CodeUpdate{ srv: srv.clone() }).await? {
+                .ask(CmdMsg::CodeUpdate { srv: srv.clone() })
+                .await?
+            {
                 println!("Service {} initialized", srv.name);
             } else {
                 panic!("Service {} initialization failed", srv.name);
@@ -68,16 +72,18 @@ impl RuntimeManager {
 
         for test in prog.tests.iter() {
             println!("testing {} ...... ", test.name);
-            let srv_actor_ref = srv_to_mgr.get_mut(&test.name)
-            .expect(&format!("Test: manager for service {:?} not found", test.name));
-            
+            let srv_actor_ref = srv_to_mgr.get_mut(&test.name).expect(&format!(
+                "Test: manager for service {:?} not found",
+                test.name
+            ));
+
             // if let Msg::TryTestResult { assert_actors } = srv_actor_ref.ask(Msg::TryTest { test: test.clone() }).await? {
             //     let mut assert_to_pass: HashSet<kameo::prelude::ActorID> = HashSet::from_iter(
             //         assert_actors.iter().map(|actor_ref| actor_ref.id())
             //     );
             //     loop {
             //         for actor_ref in assert_actors.iter() {
-            //             if let Msg::UnsafeReadResult { 
+            //             if let Msg::UnsafeReadResult {
             //                 result: Expr::Bool { val: true },
             //             } = actor_ref.ask(Msg::UnsafeRead).await? {
             //                 assert_to_pass.remove(&actor_ref.id());

@@ -10,10 +10,7 @@ mod tc_stmt;
 mod tc_test;
 mod utils;
 
-use std::{
-    collections::HashMap,
-    fmt::Display,
-};
+use std::{collections::HashMap, fmt::Display};
 
 use crate::ast::Prog;
 
@@ -76,7 +73,6 @@ pub struct TypecheckEnv {
     pub acc_subst: HashMap<String, Type>,
 }
 
-
 impl Display for TypecheckEnv {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "------------------\n")?;
@@ -95,13 +91,17 @@ pub fn typecheck_prog(prog: &Prog) {
         let mut typ_env = TypecheckEnv::new(HashMap::new());
         typ_env.typecheck_service(srvs);
         print!("service: {:?}\n {}", srvs.name, typ_env);
-        
+
         srv_to_type_env.insert(srvs.name.clone(), typ_env);
     }
 
     for test in prog.tests.iter() {
-        srv_to_type_env.get_mut(&test.name)
-        .expect(&format!("Test: test instantiate a non-existing service {:?}", test.name))
-        .typecheck_test(test);
+        srv_to_type_env
+            .get_mut(&test.name)
+            .expect(&format!(
+                "Test: test instantiate a non-existing service {:?}",
+                test.name
+            ))
+            .typecheck_test(test);
     }
 }

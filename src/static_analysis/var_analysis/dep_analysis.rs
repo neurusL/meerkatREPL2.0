@@ -27,7 +27,9 @@ impl DependAnalysis {
         }
 
         DependAnalysis {
-            vars, defs, dep_graph,
+            vars,
+            defs,
+            dep_graph,
             topo_order: Vec::new(),
             dep_transtive: HashMap::new(),
             dep_vars: HashMap::new(),
