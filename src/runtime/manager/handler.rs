@@ -1,10 +1,12 @@
 use core::panic;
+
+use std::sync::{Arc, Mutex};
 use log::info;
 use std::time::Duration;
 use std::{collections::HashSet, error::Error};
 
 use crate::ast::Expr;
-use crate::runtime::def_actor::{DefActor, TickFunc};
+use crate::runtime::def_actor::DefActor;
 use crate::runtime::message::{CmdMsg, Msg};
 use crate::runtime::transaction::Txn;
 use kameo::{error::Infallible, prelude::*};
@@ -18,7 +20,7 @@ use super::Manager;
 impl kameo::prelude::Message<CmdMsg> for Manager {
     type Reply = Option<CmdMsg>;
 
-    async fn handle(&mut self, msg: CmdMsg, ctx: &mut Context<Self, Self::Reply>) -> Self::Reply {
+    async fn handle(&mut self, msg: CmdMsg, _ctx: &mut Context<Self, Self::Reply>) -> Self::Reply {
         use CmdMsg::*;
         info!("MANAGER {} RECEIVE form Command Line: ", self.name);
         match msg {
@@ -28,27 +30,11 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
             } => {
                 info!("Try Test");
                 let mgr_ref = self.address.clone().unwrap();
-
-                let customized_tick: Option<TickFunc> =
-                    Some(Box::new(move |actor: &mut DefActor| {
-                        let mgr_ref = mgr_ref.clone();
-
-                        Box::pin(async move {
-                            if (actor.value == Expr::Bool { val: true }) {
-                                let _ = mgr_ref.tell(CmdMsg::AssertSucceeded).await;
-
-                                // todo!() unrigorous logic!
-                                actor.value = Expr::Bool { val: false };
-                            }
-                            Ok(())
-                        })
-                    }));
-
                 let _ = self
                     .alloc_def_actor(
                         &format!("{}_assert_{}", name, bool_expr),
                         bool_expr.clone(),
-                        customized_tick,
+                        Some(mgr_ref),
                     )
                     .await;
 

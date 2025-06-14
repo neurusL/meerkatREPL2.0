@@ -19,7 +19,7 @@
 //!  4. test_manager will wait for bool_expr to be true before processing next
 //!     action, on the other hand, timeout means assertion failed
 use core::panic;
-use std::collections::HashMap;
+use std::{collections::HashMap, thread::sleep};
 
 use crate::{
     ast::{Expr, Prog, ReplCmd, Service, Test},
@@ -131,25 +131,30 @@ pub async fn run_test(
             }
         }
 
-        loop {
+        'listen: loop {
+            // sleep 5 s for debugging
+            // sleep(std::time::Duration::from_secs(5));
+            println!("process_cmd_idx: {}", process_cmd_idx);
             tokio::select! {
                 maybe_msg = dev_rx.recv() => {
                     if let Some(CmdMsg::AssertSucceeded) = maybe_msg {
+                        println!("assert succeeded");
                         process_cmd_idx += 1;
-                        break;
+                        break 'listen;
                     }
                 }
                 maybe_msg = cli_rx.recv() => {
                     if let Some(msg) = maybe_msg {
                         match msg {
                             CmdMsg::TransactionAborted { txn_id } => {
-                                process_cmd_idx = *txn_to_cmd_idx.get(&txn_id).expect("txn_id not found");
-                                break;
+                                process_cmd_idx = *txn_to_cmd_idx.get(&txn_id)
+                                .expect("txn_id not found");
+                                break 'listen;
                             }
                             CmdMsg::TransactionCommitted { txn_id } => {
                                 info!("Transaction {:?} committed", txn_id);
                                 process_cmd_idx += 1;
-                                break;
+                                break 'listen;
                             }
                             _ => panic!("unexpected message")
                         }

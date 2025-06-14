@@ -41,7 +41,7 @@ impl ChangeState {
                     .insert(arg.clone());
             }
         }
-        
+
         ChangeState {
             id_cnt: 0,
             id_to_change: HashMap::new(),
@@ -53,6 +53,7 @@ impl ChangeState {
     }
 
     pub fn receive_change(&mut self, from_name: String, new_val: Expr, preds: HashSet<Txn>) {
+        // println!("received change: ({}, {:?}, {:#?})", from_name, new_val, preds);
         let change = PropChange {
             id: self.id_cnt,
             from_name,
@@ -71,6 +72,9 @@ impl ChangeState {
     }
 
     pub fn apply_batch(&mut self, changes: &HashSet<ChangeId>) -> Expr {
+        // println!("applying changes: {:#?}", changes);
+        self.pending_changes.remove_batch_from_pending(changes);
+
         for change_id in changes.iter() {
             let change = &self.id_to_change[change_id];
             self.arg_to_values

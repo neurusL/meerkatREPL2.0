@@ -2,12 +2,19 @@ service foo_service {
     var x = 1;
     var y = 2;
     def f = x + y;
+    def g = x * y;
+    def h = g - f;
+
+    
     
     pub def inc_x = action { x = x + 1; };
 }
 
 @test(foo_service) {
-    assert(f == 3);
+    
     do inc_x;
-    assert(f == 4);
+    assert(g == 4);
+    do inc_x;
+    assert(g == 5);
+    assert(f == 3);
 }

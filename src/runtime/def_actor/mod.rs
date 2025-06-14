@@ -1,3 +1,4 @@
+use kameo::actor::ActorRef;
 use kameo::Actor;
 use std::collections::HashMap;
 use std::error::Error;
@@ -8,24 +9,25 @@ use std::{collections::HashSet, hash::Hash};
 use super::lock::LockState;
 use super::pubsub::PubSub;
 use crate::ast::Expr;
+use crate::runtime::manager::Manager;
 use state::ChangeState;
 
 pub mod handler;
 pub mod state;
 
-pub type TickFunc = Box<
-    dyn for<'a> FnMut(
-            &'a mut DefActor,
-        ) -> Pin<
-            Box<dyn Future<Output = Result<(), Box<dyn Error + Send>>> + Send + 'a>,
-        > + Send
-        + 'static,
->;
+// pub type TickFunc = Box<
+//     dyn for<'a> FnMut(
+//             &'a mut DefActor,
+//         ) -> Pin<Box 
+//                 <dyn Future<Output = Result<(), Box<dyn Error + Send>>> + Send + 'a>
+//             > 
+//             + Send + 'static,
+// >;
 
 pub struct DefActor {
     pub name: String,
     pub value: Expr, // expr of def
-    pub customized_tick: Option<TickFunc>,
+    pub is_assert_actor_of: Option<ActorRef<Manager>>,
 
     pub pubsub: PubSub,
     pub lock_state: LockState,
@@ -39,17 +41,19 @@ impl DefActor {
         expr: Expr,                                    // def's expr
         value: Expr,                                   // def's initialized value
         arg_to_values: HashMap<String, Expr>,          // def's args to their initialized values
-        arg_to_vars: HashMap<String, HashSet<String>>, // args to their transitively dependent vars
+        arg_to_vars: HashMap<String, HashSet<String>>, // args to their transitively dependent vars   
                                                        // if arg itself is var, then arg_to_vars[arg] = {arg}
-        customized_tick: Option<TickFunc>,
+        manager: Option<ActorRef<Manager>>
     ) -> DefActor {
         DefActor {
             name,
             value,
-            customized_tick,
+            is_assert_actor_of: manager,
             pubsub: PubSub::new(),
             lock_state: LockState::new(),
             state: ChangeState::new(expr, arg_to_values, arg_to_vars),
         }
     }
+
+
 }

@@ -31,7 +31,7 @@ impl PubSub {
     pub async fn publish(&self, msg: Msg) {
         for subscriber in &self.subscribers {
             if let Err(e) = subscriber.tell(msg.clone()).await {
-                eprintln!("Failed to send message to subscriber: {:?}", e);
+                eprintln!("Failed to send message to subscriber {:?}: {:?}", subscriber, e);
             }
         }
     }

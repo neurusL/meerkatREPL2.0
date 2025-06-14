@@ -135,4 +135,10 @@ impl PendingChanges {
             .cloned()
             .collect::<HashSet<_>>()
     }
+
+    pub fn remove_batch_from_pending(&mut self, changes: &HashSet<ChangeId>) {
+        for change in changes.iter() {
+            self.change_to_reqs.remove(change);
+        }
+    }
 }

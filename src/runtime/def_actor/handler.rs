@@ -5,6 +5,8 @@ use kameo::mailbox::Signal;
 use kameo::{error::Infallible, prelude::*};
 use log::info;
 
+use crate::ast::Expr;
+use crate::runtime::message::CmdMsg;
 use crate::runtime::{lock, message::Msg};
 
 use super::DefActor;
@@ -138,10 +140,14 @@ impl DefActor {
             self.pubsub.publish(msg).await;
         }
 
-        let maybe_tick = self.customized_tick.take();
-        if let Some(mut f) = maybe_tick {
-            let _ =f(self).await;
-            self.customized_tick = Some(f);
+        if let Some(manager) = &self.is_assert_actor_of {
+            if let Expr::Bool { val: true } = self.value {
+                manager.tell(CmdMsg::AssertSucceeded).await?;
+
+                // todo!("this is a hack, we should use a better way to get the actor ref
+                // and kill/stop_gracefully the actor") 
+                self.is_assert_actor_of = None;
+            }
         }
 
         Ok(())
