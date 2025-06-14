@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use kameo::mailbox::Signal;
 use kameo::{error::Infallible, prelude::*};
+use log::info;
 
 use crate::runtime::{lock, message::Msg};
 
@@ -101,6 +102,7 @@ impl Actor for DefActor {
 
                 // else, every 100 ms ticks
                 _ = interval.tick() => {
+                    info!("{} has value {:?}", self.name, self.value);
                     if let Err(e) = self.tick().await {
                         eprintln!("[{}] tick() failed: {:?}", self.name, e);
                     }

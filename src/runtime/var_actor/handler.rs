@@ -59,7 +59,10 @@ impl kameo::prelude::Message<Msg> for VarActor {
 
             Msg::LockRelease { txn, mut preds } => {
                 info!("Lock Release for txn {:?}", txn.id);
-                assert!(self.lock_state.has_granted(&txn.id));
+                assert!(self.lock_state.has_granted(&txn.id),
+                    "lock for txn {:?} should be granted before release",
+                    txn.id
+                );
                 let lock = self
                     .lock_state
                     .remove_granted_or_wait(&txn.id)

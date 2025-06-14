@@ -3,11 +3,10 @@ service foo_service {
     var y = 2;
     def f = x + y;
     
-    pub def inc_x = action { x = y + 1; };
+    pub def inc_x = action { x = x + 1; };
 }
 
 @test(foo_service) {
 
     do inc_x;
-
 }
