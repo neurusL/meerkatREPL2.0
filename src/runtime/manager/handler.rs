@@ -183,6 +183,13 @@ impl kameo::prelude::Message<Msg> for Manager {
 
                 if self.all_write_finished(&txn_id) {
                     let _ = self.release_locks(&txn_id).await;
+
+                    info!("release all locks, send commit transaction");
+                    let client_sender = self.get_client_sender(&txn_id);
+                    client_sender
+                    .send(CmdMsg::TransactionCommitted { txn_id })
+                    .await
+                    .unwrap();
                 }
                 Msg::Unit
             },

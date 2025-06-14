@@ -17,7 +17,7 @@
 //! * alternatively, we can spawn new thread for each transaction, combined with
 //!   channel to communicate between threads OR with Arc<Mutex or DashMap>
 //!   to lock the shared state of each transaction.
-use std::{collections::HashSet, error::Error};
+use std::{collections::HashSet, error::Error, hash::Hash};
 
 use kameo::actor::ActorRef;
 use tokio::sync::mpsc::Sender;
@@ -190,7 +190,11 @@ impl Manager {
     pub async fn release_locks(&self, txn_id: &TxnId) -> Result<(), Box<dyn Error>> {
         let txn_mgr = self.txn_mgrs.get(txn_id).unwrap();
 
-        for name in txn_mgr.reads.keys().chain(txn_mgr.writes.keys()) {
+        // release all locks while avoid duplicated release
+        let mut names = txn_mgr.reads.keys().collect::<HashSet<&String>>();
+        names.extend(txn_mgr.writes.keys());
+
+        for name in names {
             self.tell_to_name(
                 &name,
                 Msg::LockRelease {

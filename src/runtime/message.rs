@@ -109,6 +109,9 @@ pub enum CmdMsg {
     TransactionAborted {
         txn_id: TxnId,
     },
+    TransactionCommitted {
+        txn_id: TxnId,
+    },
 
     TryAssert {
         name: String,

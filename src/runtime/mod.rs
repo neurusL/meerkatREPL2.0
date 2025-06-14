@@ -30,6 +30,7 @@ use kameo::{
     prelude::{Context, Message},
     spawn, Actor,
 };
+use log::info;
 use manager::Manager;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 
@@ -130,16 +131,33 @@ pub async fn run_test(
             }
         }
 
-        'listen: loop {
-            if let Some(CmdMsg::AssertSucceeded) = dev_rx.recv().await {
-                process_cmd_idx += 1;
-                break 'listen;
+        loop {
+            tokio::select! {
+                maybe_msg = dev_rx.recv() => {
+                    if let Some(CmdMsg::AssertSucceeded) = maybe_msg {
+                        process_cmd_idx += 1;
+                        break;
+                    }
+                }
+                maybe_msg = cli_rx.recv() => {
+                    if let Some(msg) = maybe_msg {
+                        match msg {
+                            CmdMsg::TransactionAborted { txn_id } => {
+                                process_cmd_idx = *txn_to_cmd_idx.get(&txn_id).expect("txn_id not found");
+                                break;
+                            }
+                            CmdMsg::TransactionCommitted { txn_id } => {
+                                info!("Transaction {:?} committed", txn_id);
+                                process_cmd_idx += 1;
+                                break;
+                            }
+                            _ => panic!("unexpected message")
+                        }
+                    }
+                }
             }
-            if let Some(CmdMsg::TransactionAborted { txn_id }) = cli_rx.recv().await {
-                process_cmd_idx = *txn_to_cmd_idx.get(&txn_id).unwrap();
-                break 'listen;
-            }
-            print!(".");
+
+            println!(".");
         }
     }
     println!("pass");
