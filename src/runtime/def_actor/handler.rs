@@ -51,18 +51,21 @@ impl kameo::prelude::Message<Msg> for DefActor {
                 Msg::Unit
             }
 
-            Msg::UsrReadDefRequest { txn } => {
+            Msg::UsrReadDefRequest { from_mgr_addr, txn } => {
                 assert!(self.lock_state.has_granted(&txn));
 
                 // remove read lock immediately
                 self.lock_state.remove_granted_if_read(&txn);
 
-                Msg::UsrReadDefResult {
-                    txn,
-                    name: self.name.clone(),
-                    result: self.value.clone().into(),
-                    preds: self.state.get_all_applied_txns(), // todo!("switch to undropped txns later")
-                }
+                let _ = from_mgr_addr.tell(
+                    Msg::UsrReadDefResult {
+                        txn,
+                        name: self.name.clone(),
+                        result: self.value.clone().into(),
+                        preds: self.state.get_all_applied_txns(), // todo!("switch to undropped txns later")
+                }).await;
+
+                Msg::Unit
             }
 
             Msg::PropChange {
@@ -73,10 +76,6 @@ impl kameo::prelude::Message<Msg> for DefActor {
                 self.state.receive_change(from_name, val, preds);
                 Msg::Unit
             }
-
-            Msg::UnsafeRead => Msg::UnsafeReadResult {
-                result: self.value.clone(),
-            },
 
             _ => panic!("DefActor: unexpected message: {:?}", msg),
         }
@@ -139,7 +138,7 @@ impl DefActor {
 
         let maybe_tick = self.customized_tick.take();
         if let Some(mut f) = maybe_tick {
-            f(self).await;
+            let _ =f(self).await;
             self.customized_tick = Some(f);
         }
 

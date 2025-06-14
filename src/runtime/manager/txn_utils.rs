@@ -114,6 +114,7 @@ impl Manager {
                 &name,
                 Msg::UsrReadVarRequest {
                     txn: txn_mgr.txn.id.clone(),
+                    from_mgr_addr: self.address.clone().unwrap(),
                 },
             )
             .await?;
@@ -133,9 +134,10 @@ impl Manager {
         let assns = eval_assns(&txn_mgr.txn.assns, env);
 
         for Assn { dest, src } in assns {
-            self.ask_to_name(
+            self.tell_to_name(
                 &dest,
                 Msg::UsrWriteVarRequest {
+                    from_mgr_addr: self.address.clone().unwrap(),
                     txn: txn_mgr.txn.id.clone(),
                     write_val: src,
                 },

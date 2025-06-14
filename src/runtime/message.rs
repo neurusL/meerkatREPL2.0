@@ -15,6 +15,7 @@ pub enum Msg {
     Unit,
 
     UsrReadVarRequest {
+        from_mgr_addr: ActorRef<Manager>,
         txn: TxnId,
     },
     UsrReadVarResult {
@@ -25,6 +26,7 @@ pub enum Msg {
     },
 
     UsrReadDefRequest {
+        from_mgr_addr: ActorRef<Manager>,
         txn: TxnId,
         // requires: HashSet<Txn>, // ?? Why we need this
     },
@@ -36,15 +38,20 @@ pub enum Msg {
     },
 
     UsrWriteVarRequest {
+        from_mgr_addr: ActorRef<Manager>,
         txn: TxnId,
         write_val: Expr,
         // requires: HashSet<Txn>,
     },
-
-    UnsafeRead, // for test only
-    UnsafeReadResult {
-        result: Expr,
+    UsrWriteVarFinish {
+        txn: TxnId,
+        name: String,
     },
+
+    // UnsafeRead, // for test only
+    // UnsafeReadResult {
+    //     result: Expr,
+    // },
 
     LockRequest {
         // for notifying var/def that a lock is requested

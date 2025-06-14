@@ -93,26 +93,36 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 Msg::Unit
             }
 
-            Msg::UsrReadVarRequest { txn } => {
+            Msg::UsrReadVarRequest { txn, from_mgr_addr } => {
                 info!("UsrReadVarRequest");
                 assert!(self.lock_state.has_granted(&txn));
 
-                // remove read lock immediately
-                self.lock_state.remove_granted_if_read(&txn);
+                // // remove read lock immediately
+                // self.lock_state.remove_granted_if_read(&txn);
 
-                Msg::UsrReadVarResult {
+                info!("sending UsrReadVarResult to {:?}", from_mgr_addr);
+                let _ = from_mgr_addr.tell(Msg::UsrReadVarResult {
                     txn,
                     name: self.name.clone(),
                     result: self.value.clone().into(),
                     pred: self.latest_write_txn.clone(),
-                }
+                }).await;
+
+                Msg::Unit
             }
 
-            Msg::UsrWriteVarRequest { txn, write_val } => {
+            Msg::UsrWriteVarRequest { from_mgr_addr,txn, write_val } => {
                 info!("UsrWriteVarRequest");
                 assert!(self.lock_state.has_granted_write(&txn));
 
-                self.value.update(write_val, txn);
+                self.value.update(write_val, txn.clone());
+
+
+                info!("send UsrWriteVarFinish to manager");
+                let _ = from_mgr_addr.tell(Msg::UsrWriteVarFinish {
+                    name: self.name.clone(),
+                    txn,
+                }).await;
 
                 Msg::Unit
             }
@@ -142,6 +152,7 @@ impl Actor for VarActor {
 
                 // else, every 100 ms ticks
                 _ = interval.tick() => {
+                    info!("{} has value {:?}", self.name, self.value);
                     let _ = self.tick().await;
                 }
             }
@@ -154,25 +165,15 @@ impl VarActor {
     async fn tick(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // if can grant new waiting lock
         if let Some((lock, mgr)) = self.lock_state.grant_oldest_wait() {
-            info!("grant lock {:?} to manager {}", lock, mgr.id());
+            assert!(self.lock_state.has_granted(&lock.txn_id));
+            info!("{:?} grant {:?} to manager {}",self.name, lock, mgr.id());
 
             let msg = Msg::LockGranted {
                 from_name: self.name.clone(),
                 lock,
             };
 
-            info!(
-                "VAR {} → MANAGER[{}]: about to tell LockGranted",
-                self.name,
-                mgr.id()
-            );
-            let res = mgr.ask(msg).await?;
-            info!(
-                "VAR {} → MANAGER[{}]: tell result = {:?}",
-                self.name,
-                mgr.id(),
-                res
-            );
+            let _ = mgr.ask(msg).await?;
         }
         Ok(())
     }

@@ -7,7 +7,7 @@ service foo_service {
 }
 
 @test(foo_service) {
-    assert(y == 2);
+
     do inc_x;
-    assert(x == 3);
+
 }

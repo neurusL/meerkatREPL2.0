@@ -8,6 +8,7 @@ use crate::runtime::def_actor::{DefActor, TickFunc};
 use crate::runtime::message::{CmdMsg, Msg};
 use crate::runtime::transaction::Txn;
 use kameo::{error::Infallible, prelude::*};
+use kameo::mailbox::Signal;
 
 pub const TICK_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -35,6 +36,9 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                         Box::pin(async move {
                             if (actor.value == Expr::Bool { val: true }) {
                                 let _ = mgr_ref.tell(CmdMsg::AssertSucceeded).await;
+
+                                // todo!() unrigorous logic!
+                                actor.value = Expr::Bool { val: false };
                             }
                             Ok(())
                         })
@@ -116,7 +120,9 @@ impl kameo::prelude::Message<Msg> for Manager {
                 info!("Lock Granted");
                 self.add_grant_lock(&lock.txn_id, from_name, lock.lock_kind);
                 if self.all_lock_granted(&lock.txn_id) {
-                    self.request_reads(&lock.txn_id).await;
+                    info!("all lock granted");
+                    let _ = self.request_reads(&lock.txn_id).await;
+                    info!("all read requested");
                 }
 
                 Msg::Unit
@@ -136,7 +142,7 @@ impl kameo::prelude::Message<Msg> for Manager {
                 let pred = pred.map_or_else(|| HashSet::new(), |p| HashSet::from([p]));
 
                 self.add_finished_read(&txn_id, name, result, pred);
-
+                info!("add finished read");
                 if self.all_read_finished(&txn_id) {
                     let _ = self.reeval_and_request_writes(&txn_id).await;
                     // todo!() current impl isn't optimized for best concurrency
@@ -144,8 +150,10 @@ impl kameo::prelude::Message<Msg> for Manager {
                     // feel free to spawn a new thread
                     // or put it in tick()
                 }
+                info!("reeval_and_request_writes");
                 Msg::Unit
             }
+
             Msg::UsrReadDefResult {
                 txn: txn_id,
                 name,
@@ -165,6 +173,19 @@ impl kameo::prelude::Message<Msg> for Manager {
                 }
                 Msg::Unit
             }
+
+            Msg::UsrWriteVarFinish {
+                txn: txn_id,
+                name,
+            } => {
+                info!("UsrWriteVarFinish");
+                self.add_finished_write(&txn_id, name);
+
+                if self.all_write_finished(&txn_id) {
+                    let _ = self.release_locks(&txn_id).await;
+                }
+                Msg::Unit
+            },
 
             Msg::LockAbort { from_name: _, lock } => {
                 info!("Lock Abort");
@@ -195,6 +216,28 @@ impl Actor for Manager {
         info!("MANAGER on_start got ActorRef with id {}", actor_ref.id());
         self.address = Some(actor_ref.clone());
         Ok(())
+    }
+    async fn next(
+        &mut self,
+        _actor_ref: WeakActorRef<Self>,
+        mailbox_rx: &mut MailboxReceiver<Self>,
+    ) -> Option<Signal<Self>> {
+        let mut interval = tokio::time::interval(TICK_INTERVAL);
+
+        loop {
+            tokio::select! {
+                // if a real message waiting, return immediately:
+                maybe_signal = mailbox_rx.recv() => {
+                    return maybe_signal;
+                }
+
+                // else, every 100 ms ticks
+                _ = interval.tick() => {
+                    info!("tick");
+                }
+            }
+            // println!("[{}] ticked, now value is {:?}", self.name, self.value);
+        }
     }
 }
 

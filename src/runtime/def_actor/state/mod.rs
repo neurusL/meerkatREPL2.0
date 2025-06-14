@@ -32,6 +32,7 @@ impl ChangeState {
         arg_to_vars: HashMap<String, HashSet<String>>, // args to their transitively dependent vars
     ) -> Self {
         let mut var_to_args = HashMap::new();
+        println!("arg_to_vars: {:#?}", arg_to_vars);
 
         for (arg, vars) in arg_to_vars {
             for var in vars {
@@ -41,6 +42,8 @@ impl ChangeState {
                     .insert(arg.clone());
             }
         }
+
+        println!("var_to_args: {:#?}", var_to_args);
 
         ChangeState {
             id_cnt: 0,

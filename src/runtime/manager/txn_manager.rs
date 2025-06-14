@@ -36,6 +36,7 @@ pub enum WriteState {
     Requested, // default
     Granted,
     Aborted,
+    Writed,
 }
 
 impl TxnManager {
@@ -84,6 +85,11 @@ impl TxnManager {
         self.preds.extend(pred);
     }
 
+    pub fn add_finished_write(&mut self, name: String) {
+        assert!(self.writes.get(&name) == Some(WriteState::Granted).as_ref());
+        self.writes.insert(name, WriteState::Writed);
+    }
+
     pub fn all_lock_granted(&self) -> bool {
         self.reads.iter().all(|(_, v)| *v == ReadState::Granted)
             && self.writes.iter().all(|(_, v)| *v == WriteState::Granted)
@@ -103,6 +109,10 @@ impl TxnManager {
                 _ => panic!("read not finished"),
             })
             .collect()
+    }
+
+    pub fn all_write_finished(&self) -> bool {
+        self.writes.iter().all(|(_, v)| *v == WriteState::Writed)
     }
 
     pub fn abort_lock(&mut self) {
@@ -190,9 +200,11 @@ impl Manager {
     // invoke the macro to generate one‐line wrappers:
     delegate_to_txn!(mut add_grant_lock(name: String, kind: LockKind));
     delegate_to_txn!(mut add_finished_read(name: String, result: Expr, pred: HashSet<Txn>));
+    delegate_to_txn!(mut add_finished_write(name: String));
     delegate_to_txn!(mut abort_lock());
     delegate_to_txn!(imm all_lock_granted() -> bool);
     delegate_to_txn!(imm all_read_finished() -> bool);
+    delegate_to_txn!(imm all_write_finished() -> bool);
     delegate_to_txn!(imm is_aborted() -> bool);
     delegate_to_txn!(imm get_client_sender() -> Sender<CmdMsg>);
 }
