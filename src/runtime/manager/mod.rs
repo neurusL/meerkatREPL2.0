@@ -36,7 +36,7 @@ pub struct Manager {
     pub evaluator: Evaluator,
 
     pub dep_graph: HashMap<String, HashSet<String>>,
-    pub dep_transtive: HashMap<String, HashSet<String>>,
+    pub dep_tran_vars: HashMap<String, HashSet<String>>,
 
     /// manager transactions and tests submitted to manager from client/developer
     pub txn_mgrs: HashMap<TxnId, TxnManager>,
@@ -56,7 +56,7 @@ impl Manager {
 
             evaluator: Evaluator::new(HashMap::new()),
             dep_graph: HashMap::new(),
-            dep_transtive: HashMap::new(),
+            dep_tran_vars: HashMap::new(),
 
             txn_mgrs: HashMap::new(),
         }

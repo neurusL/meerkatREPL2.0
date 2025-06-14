@@ -27,7 +27,7 @@ impl Manager {
         let srv_info = calc_dep_srv(srv);
 
         self.dep_graph = srv_info.dep_graph;
-        self.dep_transtive = srv_info.dep_transtive;
+        self.dep_tran_vars = srv_info.dep_vars;
 
         for name in srv_info.topo_order.iter() {
             let val = self
@@ -43,8 +43,7 @@ impl Manager {
                 self.alloc_var_actor(name, val.clone()).await;
             } else if srv_info.defs.contains(name) {
                 let def_expr = def_to_exprs.get(name).expect(&format!(
-                    "Service alloc: def expr is not 
-                    initialized: {}",
+                    "Service alloc: def expr is not initialized: {}",
                     name
                 ));
 
@@ -79,20 +78,22 @@ impl Manager {
             |def_args| def_args.clone(),       // precalculated by centralized manager
         );
 
-        let def_arg_to_vals = self
-            .evaluator
-            .reactive_name_to_vals
-            .iter()
-            .filter(|(k, _)| def_args.contains(*k))
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect::<HashMap<String, Expr>>();
+        let def_arg_to_vals = def_args.iter()
+        .map(|name| (
+            name.clone(), 
+            self.evaluator.reactive_name_to_vals.get(name)
+            .expect(&format!("DefActor alloc: var/def is not initialized: {}", name))
+            .clone()))
+        .collect::<HashMap<String, Expr>>();
 
-        let def_arg_to_vars = self
-            .dep_transtive
-            .iter()
-            .filter(|(k, _)| def_args.contains(*k))
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect::<HashMap<String, HashSet<String>>>();
+
+        let def_arg_to_vars = def_args.iter()
+        .map(|name|(
+            name.clone(), 
+            self.dep_tran_vars.get(name)
+            .expect(&format!("DefActor alloc: var/def is not initialized: {}", name))
+            .clone()
+        )).collect::<HashMap<String, HashSet<String>>>();
 
         let mut val = expr.clone();
         let _ = self.evaluator.eval_expr(&mut val);

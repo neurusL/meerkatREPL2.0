@@ -40,6 +40,7 @@ impl DefActor {
         value: Expr,                                   // def's initialized value
         arg_to_values: HashMap<String, Expr>,          // def's args to their initialized values
         arg_to_vars: HashMap<String, HashSet<String>>, // args to their transitively dependent vars
+                                                       // if arg itself is var, then arg_to_vars[arg] = {arg}
         customized_tick: Option<TickFunc>,
     ) -> DefActor {
         DefActor {
