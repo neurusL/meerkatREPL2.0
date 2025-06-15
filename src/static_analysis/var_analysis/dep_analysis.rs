@@ -1,4 +1,7 @@
-use std::{collections::{HashMap, HashSet}, vec};
+use std::{
+    collections::{HashMap, HashSet},
+    vec,
+};
 
 use crate::ast;
 

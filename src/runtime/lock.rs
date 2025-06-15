@@ -80,7 +80,7 @@ impl LockState {
                 return false;
             }
         }
-        
+
         self.waiting_locks
             .insert(lock.txn_id.clone(), (lock, who_request));
 
@@ -94,11 +94,12 @@ impl LockState {
     pub fn grant_oldest_wait(&mut self) -> Option<(Lock, ActorRef<Manager>)> {
         assert!(self.check_granted_isvalid());
         if let Some((_, lock)) = self.granted_locks.first_key_value() {
-            if lock.is_write() { // if current granted lock is write lock
-                return None;     // cannot grant another lock
+            if lock.is_write() {
+                // if current granted lock is write lock
+                return None; // cannot grant another lock
             }
         }
-        
+
         // if current granted lock are read locks
         if let Some((lock, mgr)) = self.pop_oldest_wait() {
             self.granted_locks.insert(lock.txn_id.clone(), lock.clone());
@@ -117,7 +118,8 @@ impl LockState {
         if let Some(Lock {
             lock_kind: LockKind::Read,
             ..
-        }) = self.granted_locks.get(txn_id) {
+        }) = self.granted_locks.get(txn_id)
+        {
             self.remove_granted(txn_id);
         }
     }

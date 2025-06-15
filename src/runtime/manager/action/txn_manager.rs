@@ -6,13 +6,14 @@ use crate::{
     ast::Expr,
     runtime::{
         lock::LockKind,
-        manager::{action::{ReadState, TxnManager, WriteState}, Manager},
+        manager::{
+            action::{ReadState, TxnManager, WriteState},
+            Manager,
+        },
         message::CmdMsg,
         transaction::{Txn, TxnId},
     },
 };
-
-
 
 impl TxnManager {
     /// when receive a granted lock from name,

@@ -5,8 +5,8 @@ use std::time::Duration;
 use std::{collections::HashSet, error::Error};
 
 use crate::runtime::message::{CmdMsg, Msg};
-use kameo::{error::Infallible, prelude::*};
 use kameo::mailbox::Signal;
+use kameo::{error::Infallible, prelude::*};
 
 pub const TICK_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -147,10 +147,7 @@ impl kameo::prelude::Message<Msg> for Manager {
                 Msg::Unit
             }
 
-            Msg::UsrWriteVarFinish {
-                txn: txn_id,
-                name,
-            } => {
+            Msg::UsrWriteVarFinish { txn: txn_id, name } => {
                 info!("UsrWriteVarFinish");
                 self.add_finished_write(&txn_id, name);
 
@@ -160,12 +157,12 @@ impl kameo::prelude::Message<Msg> for Manager {
                     info!("release all locks, send commit transaction");
                     let client_sender = self.get_client_sender(&txn_id);
                     client_sender
-                    .send(CmdMsg::TransactionCommitted { txn_id })
-                    .await
-                    .unwrap();
+                        .send(CmdMsg::TransactionCommitted { txn_id })
+                        .await
+                        .unwrap();
                 }
                 Msg::Unit
-            },
+            }
 
             Msg::LockAbort { from_name: _, lock } => {
                 info!("Lock Abort");

@@ -19,9 +19,9 @@ pub mod state;
 // pub type TickFunc = Box<
 //     dyn for<'a> FnMut(
 //             &'a mut DefActor,
-//         ) -> Pin<Box 
+//         ) -> Pin<Box
 //                 <dyn Future<Output = Result<(), Box<dyn Error + Send>>> + Send + 'a>
-//             > 
+//             >
 //             + Send + 'static,
 // >;
 
@@ -42,9 +42,9 @@ impl DefActor {
         expr: Expr,                                    // def's expr
         value: Expr,                                   // def's initialized value
         arg_to_values: HashMap<String, Expr>,          // def's args to their initialized values
-        arg_to_vars: HashMap<String, HashSet<String>>, // args to their transitively dependent vars   
-                                                       // if arg itself is var, then arg_to_vars[arg] = {arg}
-        testid_and_manager: Option<(TestId,ActorRef<Manager>)>
+        arg_to_vars: HashMap<String, HashSet<String>>, // args to their transitively dependent vars
+        // if arg itself is var, then arg_to_vars[arg] = {arg}
+        testid_and_manager: Option<(TestId, ActorRef<Manager>)>,
     ) -> DefActor {
         DefActor {
             name,
@@ -55,6 +55,4 @@ impl DefActor {
             state: ChangeState::new(expr, arg_to_values, arg_to_vars),
         }
     }
-
-
 }

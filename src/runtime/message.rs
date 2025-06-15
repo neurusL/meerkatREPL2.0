@@ -52,7 +52,6 @@ pub enum Msg {
     // UnsafeReadResult {
     //     result: Expr,
     // },
-
     LockRequest {
         // for notifying var/def that a lock is requested
         from_mgr_addr: ActorRef<Manager>,

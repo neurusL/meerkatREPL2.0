@@ -39,22 +39,38 @@ impl Manager {
             |def_args| def_args.clone(),       // precalculated by centralized manager
         );
 
-        let def_arg_to_vals = def_args.iter()
-        .map(|name| (
-            name.clone(), 
-            self.evaluator.reactive_name_to_vals.get(name)
-            .expect(&format!("DefActor alloc: var/def is not initialized: {}", name))
-            .clone()))
-        .collect::<HashMap<String, Expr>>();
+        let def_arg_to_vals = def_args
+            .iter()
+            .map(|name| {
+                (
+                    name.clone(),
+                    self.evaluator
+                        .reactive_name_to_vals
+                        .get(name)
+                        .expect(&format!(
+                            "DefActor alloc: var/def is not initialized: {}",
+                            name
+                        ))
+                        .clone(),
+                )
+            })
+            .collect::<HashMap<String, Expr>>();
 
-
-        let def_arg_to_vars = def_args.iter()
-        .map(|name|(
-            name.clone(), 
-            self.dep_tran_vars.get(name)
-            .expect(&format!("DefActor alloc: var/def is not initialized: {}", name))
-            .clone()
-        )).collect::<HashMap<String, HashSet<String>>>();
+        let def_arg_to_vars = def_args
+            .iter()
+            .map(|name| {
+                (
+                    name.clone(),
+                    self.dep_tran_vars
+                        .get(name)
+                        .expect(&format!(
+                            "DefActor alloc: var/def is not initialized: {}",
+                            name
+                        ))
+                        .clone(),
+                )
+            })
+            .collect::<HashMap<String, HashSet<String>>>();
 
         let mut val = expr.clone();
         let _ = self.evaluator.eval_expr(&mut val);
@@ -65,7 +81,7 @@ impl Manager {
             val,
             def_arg_to_vals,
             def_arg_to_vars,
-            testid_and_its_manager
+            testid_and_its_manager,
         ));
         self.defname_to_actors
             .insert(name.clone(), actor_ref.clone());
@@ -85,8 +101,7 @@ impl Manager {
                 )
                 .await?;
 
-            
-            if !matches!(back_msg, Msg::SubscribeGranted{..}) {
+            if !matches!(back_msg, Msg::SubscribeGranted { .. }) {
                 panic!("Service alloc: receive wrong message type during subscription");
             }
 

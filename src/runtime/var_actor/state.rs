@@ -59,8 +59,10 @@ impl Into<Expr> for VarValueState {
             VarValueState::Val(val) => val,
             VarValueState::Trans(old_val, _) => {
                 if let Some(val) = old_val {
-                    info!("var is requested for subscription when in a value transition state,
-                           send subscriber with old value in transition state");
+                    info!(
+                        "var is requested for subscription when in a value transition state,
+                           send subscriber with old value in transition state"
+                    );
                     val
                 } else {
                     panic!("var is not initialized")

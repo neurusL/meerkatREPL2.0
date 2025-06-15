@@ -17,7 +17,6 @@ use crate::{
 
 pub mod alloc_actors;
 
-
 impl Manager {
     pub async fn alloc_service(&mut self, srv: &Service) {
         // intial evaluation of srv
@@ -28,7 +27,10 @@ impl Manager {
         self.dep_tran_vars = srv_info.dep_vars;
 
         for name in srv_info.topo_order.iter() {
-            let val = self.evaluator.reactive_name_to_vals.get(name)
+            let val = self
+                .evaluator
+                .reactive_name_to_vals
+                .get(name)
                 .expect(&format!(
                     "Service alloc: var/def is not initialized: {}",
                     name

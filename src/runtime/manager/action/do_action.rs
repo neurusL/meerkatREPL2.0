@@ -21,7 +21,20 @@ use std::{collections::HashSet, error::Error};
 
 use tokio::sync::mpsc::Sender;
 
-use crate::{ast::{Assn, Expr}, runtime::{evaluator::eval_assns, lock::{Lock, LockKind}, manager::{action::{ReadState, TxnManager, WriteState}, Manager}, message::{CmdMsg, Msg}, transaction::{Txn, TxnId}}, static_analysis::var_analysis::read_write::{calc_read_set, calc_write_set}};
+use crate::{
+    ast::{Assn, Expr},
+    runtime::{
+        evaluator::eval_assns,
+        lock::{Lock, LockKind},
+        manager::{
+            action::{ReadState, TxnManager, WriteState},
+            Manager,
+        },
+        message::{CmdMsg, Msg},
+        transaction::{Txn, TxnId},
+    },
+    static_analysis::var_analysis::read_write::{calc_read_set, calc_write_set},
+};
 
 impl Manager {
     /// 1. initialize a new transaction manager

@@ -5,21 +5,16 @@ service foo_service {
     def g = x * y;
     def h = g - f;
 
-    
-    
     pub def inc_x = action { x = x + 1; };
 }
 
 @test(foo_service) {
     
     do inc_x;
-    
     assert(g == 4);
     assert(f == 4);
 
     do inc_x;
-    
-    
     assert(g == 6);
     assert(f == 4);
     assert(h == 1);

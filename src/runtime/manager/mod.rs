@@ -14,11 +14,10 @@ use super::evaluator::Evaluator;
 use super::transaction::TxnId;
 use super::var_actor::VarActor;
 
-
-pub mod init;
-pub mod handler;
 pub mod action;
 pub mod assert;
+pub mod handler;
+pub mod init;
 
 #[derive(Debug)]
 pub struct Manager {

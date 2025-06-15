@@ -33,10 +33,10 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 Msg::SubscribeGranted {
                     name: self.name.clone(),
                     value: self.value.clone().into(),
-                    preds: self.latest_write_txn.clone().map_or_else(
-                            || HashSet::new(), 
-                            |txn| HashSet::from([txn])
-                        )
+                    preds: self
+                        .latest_write_txn
+                        .clone()
+                        .map_or_else(|| HashSet::new(), |txn| HashSet::from([txn])),
                 }
             }
 
@@ -68,7 +68,8 @@ impl kameo::prelude::Message<Msg> for VarActor {
 
             Msg::LockRelease { txn, mut preds } => {
                 info!("Lock Release for txn {:?}", txn.id);
-                assert!(self.lock_state.has_granted(&txn.id),
+                assert!(
+                    self.lock_state.has_granted(&txn.id),
                     "lock for txn {:?} should be granted before release",
                     txn.id
                 );
@@ -113,28 +114,35 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 // self.lock_state.remove_granted_if_read(&txn);
 
                 info!("sending UsrReadVarResult to {:?}", from_mgr_addr);
-                let _ = from_mgr_addr.tell(Msg::UsrReadVarResult {
-                    txn,
-                    name: self.name.clone(),
-                    result: self.value.clone().into(),
-                    pred: self.latest_write_txn.clone(),
-                }).await;
+                let _ = from_mgr_addr
+                    .tell(Msg::UsrReadVarResult {
+                        txn,
+                        name: self.name.clone(),
+                        result: self.value.clone().into(),
+                        pred: self.latest_write_txn.clone(),
+                    })
+                    .await;
 
                 Msg::Unit
             }
 
-            Msg::UsrWriteVarRequest { from_mgr_addr,txn, write_val } => {
+            Msg::UsrWriteVarRequest {
+                from_mgr_addr,
+                txn,
+                write_val,
+            } => {
                 info!("UsrWriteVarRequest");
                 assert!(self.lock_state.has_granted_write(&txn));
 
                 self.value.update(write_val, txn.clone());
 
-
                 info!("send UsrWriteVarFinish to manager");
-                let _ = from_mgr_addr.tell(Msg::UsrWriteVarFinish {
-                    name: self.name.clone(),
-                    txn,
-                }).await;
+                let _ = from_mgr_addr
+                    .tell(Msg::UsrWriteVarFinish {
+                        name: self.name.clone(),
+                        txn,
+                    })
+                    .await;
 
                 Msg::Unit
             }
@@ -178,7 +186,7 @@ impl VarActor {
         // if can grant new waiting lock
         if let Some((lock, mgr)) = self.lock_state.grant_oldest_wait() {
             assert!(self.lock_state.has_granted(&lock.txn_id));
-            info!("{:?} grant {:?} to manager {}",self.name, lock, mgr.id());
+            info!("{:?} grant {:?} to manager {}", self.name, lock, mgr.id());
 
             let msg = Msg::LockGranted {
                 from_name: self.name.clone(),

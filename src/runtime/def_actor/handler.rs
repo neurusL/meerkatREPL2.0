@@ -23,19 +23,15 @@ impl kameo::prelude::Message<Msg> for DefActor {
                 Msg::SubscribeGranted {
                     name: self.name.clone(),
                     value: self.value.clone(),
-                    preds: self.state.get_all_applied_txns() // todo we use all applied txns now
+                    preds: self.state.get_all_applied_txns(), // todo we use all applied txns now
                 }
             }
 
-            Msg::SubscribeGranted {
-                name,
-                value,
-                preds,
-            } => {
+            Msg::SubscribeGranted { name, value, preds } => {
                 // notice this is equivalent to a change message for def actor
                 self.state.receive_change(name, value, preds);
                 Msg::Unit
-            },
+            }
 
             Msg::LockRequest {
                 lock,
@@ -73,13 +69,14 @@ impl kameo::prelude::Message<Msg> for DefActor {
                 // remove read lock immediately
                 self.lock_state.remove_granted_if_read(&txn);
 
-                let _ = from_mgr_addr.tell(
-                    Msg::UsrReadDefResult {
+                let _ = from_mgr_addr
+                    .tell(Msg::UsrReadDefResult {
                         txn,
                         name: self.name.clone(),
                         result: self.value.clone().into(),
                         preds: self.state.get_all_applied_txns(), // todo!("switch to undropped txns later")
-                }).await;
+                    })
+                    .await;
 
                 Msg::Unit
             }
@@ -153,14 +150,16 @@ impl DefActor {
             self.pubsub.publish(msg).await;
         }
 
-        if let Some((test_id,manager)) = &self.is_assert_actor_of {
+        if let Some((test_id, manager)) = &self.is_assert_actor_of {
             info!("{} has value {}", self.name, self.value);
             if let Expr::Bool { val: true } = self.value {
                 info!("Def {} says Assert Succeeded: {}", self.state.expr, test_id);
-                manager.tell(CmdMsg::AssertSucceeded { test_id: *test_id }).await?;
+                manager
+                    .tell(CmdMsg::AssertSucceeded { test_id: *test_id })
+                    .await?;
 
                 // todo!("this is a hack, we should use a better way to get the actor ref
-                // and kill/stop_gracefully the actor") 
+                // and kill/stop_gracefully the actor")
                 self.is_assert_actor_of = None;
             }
         }
