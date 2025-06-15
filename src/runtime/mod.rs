@@ -50,6 +50,7 @@ pub mod var_actor;
 
 pub type TestId = u64;
 const MPSC_CHANNEL_SIZE: usize = 100;
+const TIMEOUT_INTERVAL: u64 = 5000;
 
 pub async fn run(prog: &Prog) -> Result<(), Box<dyn std::error::Error>> {
     let (dev_tx, dev_rx) = mpsc::channel::<CmdMsg>(MPSC_CHANNEL_SIZE);
@@ -178,7 +179,7 @@ pub async fn run_test(
                             }
                             }
                         }
-                        _ = tokio::time::sleep(std::time::Duration::from_secs(5)) => {
+                        _ = tokio::time::sleep(std::time::Duration::from_millis(TIMEOUT_INTERVAL)) => {
                             println!("timeout on test {}", expr);
                             process_cmd_idx += 1;
                             break;
