@@ -8,53 +8,15 @@ use std::thread::current;
 use kameo::{prelude::*, spawn, Actor};
 use log::info;
 
+use crate::runtime::manager::Manager;
+use crate::runtime::TestId;
 use crate::{
     ast::{Expr, Prog, Service},
     runtime::{def_actor::DefActor, evaluator::eval_srv, message::Msg, var_actor::VarActor},
     static_analysis::var_analysis::calc_dep_srv,
 };
 
-use super::Manager;
-
 impl Manager {
-    pub async fn alloc_service(&mut self, srv: &Service) {
-        // intial evaluation of srv
-        self.evaluator = eval_srv(srv);
-
-        let def_to_exprs = eval_srv(srv).def_name_to_exprs;
-
-        let srv_info = calc_dep_srv(srv);
-
-        self.dep_graph = srv_info.dep_graph;
-        self.dep_tran_vars = srv_info.dep_vars;
-
-        for name in srv_info.topo_order.iter() {
-            let val = self
-                .evaluator
-                .reactive_name_to_vals
-                .get(name)
-                .expect(&format!(
-                    "Service alloc: var/def is not initialized: {}",
-                    name
-                ));
-
-            if srv_info.vars.contains(name) {
-                self.alloc_var_actor(name, val.clone()).await;
-            } else if srv_info.defs.contains(name) {
-                let def_expr = def_to_exprs.get(name).expect(&format!(
-                    "Service alloc: def expr is not initialized: {}",
-                    name
-                ));
-
-                self.alloc_def_actor(name, def_expr.clone(), None)
-                    .await
-                    .unwrap();
-            }
-        }
-
-        info!("Service allocated: {}", self);
-    }
-
     pub async fn alloc_var_actor(&mut self, name: &String, val: Expr) {
         let actor_ref = spawn(VarActor::new(name.clone(), val));
         self.varname_to_actors.insert(name.clone(), actor_ref);
@@ -69,7 +31,7 @@ impl Manager {
         &mut self,
         name: &String,
         expr: Expr,
-        manager_of_assert: Option<ActorRef<Manager>>,
+        testid_and_its_manager: Option<(TestId, ActorRef<Manager>)>,
     ) -> Result<ActorRef<DefActor>, Box<dyn Error>> {
         // calculate all information for def actor
         let def_args = self.dep_graph.get(name).map_or_else(
@@ -103,13 +65,15 @@ impl Manager {
             val,
             def_arg_to_vals,
             def_arg_to_vars,
-            manager_of_assert
+            testid_and_its_manager
         ));
         self.defname_to_actors
             .insert(name.clone(), actor_ref.clone());
 
         // subscribe to its dependencies
+        // println!("{} subscribe to {:?}", name, def_args);
         for name in def_args.iter() {
+            // println!("{}", name);
             // synchronously wait for response
             let back_msg = self
                 .ask_to_name(
@@ -121,9 +85,12 @@ impl Manager {
                 )
                 .await?;
 
-            if !matches!(back_msg, Msg::SubscribeGranted) {
+            
+            if !matches!(back_msg, Msg::SubscribeGranted{..}) {
                 panic!("Service alloc: receive wrong message type during subscription");
             }
+
+            actor_ref.tell(back_msg).await?;
         }
 
         Ok(actor_ref)

@@ -19,7 +19,7 @@
 //!  4. test_manager will wait for bool_expr to be true before processing next
 //!     action, on the other hand, timeout means assertion failed
 use core::panic;
-use std::{collections::HashMap, thread::sleep};
+use std::{collections::{HashMap, HashSet}, thread::sleep};
 
 use crate::{
     ast::{Expr, Prog, ReplCmd, Service, Test},
@@ -38,11 +38,6 @@ use tokio::sync::mpsc::{self, Receiver, Sender};
 pub mod lock;
 pub mod message;
 pub mod transaction;
-// pub mod varworker;
-// pub mod defworker;
-// pub mod def_batch_utils;
-// pub mod def_eval;
-
 pub mod evaluator;
 
 pub mod def_actor;
@@ -50,6 +45,7 @@ pub mod manager;
 pub mod pubsub;
 pub mod var_actor;
 
+pub type TestId = u64;
 const MPSC_CHANNEL_SIZE: usize = 100;
 
 pub async fn run(prog: &Prog) -> Result<(), Box<dyn std::error::Error>> {
@@ -100,6 +96,9 @@ pub async fn run_test(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // start testing on the service
     println!("testing {}", test.name);
+    let mut test_id = 0_u64;
+    let mut received_passed_tests = HashSet::new();
+
     // one handler loop keep listening to incoming messages from manager
     // the main thread keep processing actions and asserts
     // if handler loop hear TransactionAbort, roll back to that transaction
@@ -120,49 +119,66 @@ pub async fn run_test(
                         from_client_addr: cli_tx.clone(),
                     })
                     .await?;
-            }
-            ReplCmd::Assert(expr) => {
-                srv_actor_ref
-                    .tell(CmdMsg::TryAssert {
-                        name: test.name.clone(),
-                        test: expr.clone(),
-                    })
-                    .await?;
-            }
-        }
 
-        'listen: loop {
-            // sleep 5 s for debugging
-            // sleep(std::time::Duration::from_secs(5));
-            println!("process_cmd_idx: {}", process_cmd_idx);
-            tokio::select! {
-                maybe_msg = dev_rx.recv() => {
-                    if let Some(CmdMsg::AssertSucceeded) = maybe_msg {
-                        println!("assert succeeded");
-                        process_cmd_idx += 1;
-                        break 'listen;
-                    }
-                }
-                maybe_msg = cli_rx.recv() => {
-                    if let Some(msg) = maybe_msg {
-                        match msg {
+                loop { tokio::select! {
+                        maybe_msg = cli_rx.recv() => {
+                        if let Some(msg) = maybe_msg {
+                            match msg {
                             CmdMsg::TransactionAborted { txn_id } => {
-                                process_cmd_idx = *txn_to_cmd_idx.get(&txn_id)
-                                .expect("txn_id not found");
-                                break 'listen;
+                                // process_cmd_idx = *txn_to_cmd_idx.get(&txn_id)
+                                // .expect("txn_id not found");
+                                // break;
+
+                                todo!("rollback")
                             }
                             CmdMsg::TransactionCommitted { txn_id } => {
                                 info!("Transaction {:?} committed", txn_id);
                                 process_cmd_idx += 1;
-                                break 'listen;
+                                break;
                             }
                             _ => panic!("unexpected message")
+                            }
+                        }
+                        }
+                }}
+            }
+            ReplCmd::Assert(expr) => {
+                test_id += 1;
+
+                srv_actor_ref
+                    .tell(CmdMsg::TryAssert {
+                        name: test.name.clone(),
+                        test: expr.clone(),
+                        test_id: test_id,
+                    })
+                    .await?;
+
+                loop {
+                // sleep 5 s for debugging
+                // sleep(std::time::Duration::from_secs(5));
+
+                if received_passed_tests.contains(&test_id) {
+                    process_cmd_idx += 1;
+                    break;
+                }
+
+                tokio::select! {
+                    maybe_msg = dev_rx.recv() => {
+                        if let Some(CmdMsg::AssertSucceeded { test_id: recv_id }) = maybe_msg {
+                        info!("Manager received Assertion {} passed", recv_id);
+                        received_passed_tests.insert(recv_id);
+
+                        if received_passed_tests.contains(&test_id) {
+
+                            process_cmd_idx += 1;
+                            break;
+                        }
                         }
                     }
-                }
+                    
+                }}
             }
-
-            println!(".");
+        
         }
     }
     println!("pass");

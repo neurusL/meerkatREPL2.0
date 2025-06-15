@@ -5,19 +5,20 @@ use std::fmt::Display;
 use kameo::prelude::*;
 use tokio::sync::mpsc::Sender;
 
-use crate::runtime::manager::txn_manager::TxnManager;
+use crate::runtime::manager::action::TxnManager;
 use crate::runtime::message::CmdMsg;
+use crate::runtime::TestId;
 
 use super::def_actor::DefActor;
 use super::evaluator::Evaluator;
 use super::transaction::TxnId;
 use super::var_actor::VarActor;
 
-pub mod alloc_actors;
-pub mod txn_manager;
-pub mod txn_utils;
-// pub mod try_test;
+
+pub mod init;
 pub mod handler;
+pub mod action;
+pub mod assert;
 
 #[derive(Debug)]
 pub struct Manager {
@@ -40,6 +41,7 @@ pub struct Manager {
 
     /// manager transactions and tests submitted to manager from client/developer
     pub txn_mgrs: HashMap<TxnId, TxnManager>,
+    pub test_mgrs: HashMap<TestId, ActorRef<DefActor>>,
 }
 
 impl Manager {
@@ -59,6 +61,7 @@ impl Manager {
             dep_tran_vars: HashMap::new(),
 
             txn_mgrs: HashMap::new(),
+            test_mgrs: HashMap::new(),
         }
     }
 }

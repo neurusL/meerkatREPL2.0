@@ -17,27 +17,11 @@
 //! * alternatively, we can spawn new thread for each transaction, combined with
 //!   channel to communicate between threads OR with Arc<Mutex or DashMap>
 //!   to lock the shared state of each transaction.
-use std::{collections::HashSet, error::Error, hash::Hash};
+use std::{collections::HashSet, error::Error};
 
-use kameo::actor::ActorRef;
 use tokio::sync::mpsc::Sender;
 
-use crate::{
-    ast::{Assn, Expr},
-    runtime::{
-        evaluator::eval_assns,
-        lock::{
-            Lock,
-            LockKind::{Read, Write},
-        },
-        manager::txn_manager::{ReadState, TxnManager, WriteState},
-        message::{CmdMsg, Msg},
-        transaction::{Txn, TxnId},
-    },
-    static_analysis::var_analysis::read_write::{calc_read_set, calc_write_set},
-};
-
-use super::Manager;
+use crate::{ast::{Assn, Expr}, runtime::{evaluator::eval_assns, lock::{Lock, LockKind}, manager::{action::{ReadState, TxnManager, WriteState}, Manager}, message::{CmdMsg, Msg}, transaction::{Txn, TxnId}}, static_analysis::var_analysis::read_write::{calc_read_set, calc_write_set}};
 
 impl Manager {
     /// 1. initialize a new transaction manager
@@ -162,7 +146,7 @@ impl Manager {
                 Msg::LockAbort {
                     from_name: self.name.clone(),
                     lock: Lock {
-                        lock_kind: Read,
+                        lock_kind: LockKind::Read,
                         txn_id: txn_id.clone(),
                     },
                 },
@@ -175,7 +159,7 @@ impl Manager {
                 Msg::LockAbort {
                     from_name: self.name.clone(),
                     lock: Lock {
-                        lock_kind: Write,
+                        lock_kind: LockKind::Write,
                         txn_id: txn_id.clone(),
                     },
                 },

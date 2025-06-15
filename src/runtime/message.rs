@@ -5,7 +5,7 @@ use tokio::sync::mpsc::Sender;
 
 use crate::{
     ast::{Assn, Expr, Prog, Service, Test},
-    runtime::{lock::Lock, transaction::TxnId},
+    runtime::{lock::Lock, transaction::TxnId, TestId},
 };
 
 use super::{def_actor::DefActor, manager::Manager, transaction::Txn, var_actor::VarActor};
@@ -80,7 +80,11 @@ pub enum Msg {
         from_addr: ActorRef<DefActor>,
     },
 
-    SubscribeGranted,
+    SubscribeGranted {
+        name: String,
+        value: Expr,
+        preds: HashSet<Txn>,
+    },
 
     // propagate change of name's value, with a set of txns (pred) as prereq
     PropChange {
@@ -116,6 +120,9 @@ pub enum CmdMsg {
     TryAssert {
         name: String,
         test: Expr,
+        test_id: TestId,
     },
-    AssertSucceeded,
+    AssertSucceeded {
+        test_id: TestId,
+    },
 }

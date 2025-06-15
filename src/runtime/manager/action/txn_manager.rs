@@ -1,68 +1,22 @@
 use std::collections::{HashMap, HashSet};
 
-use kameo::actor::ActorRef;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
     ast::Expr,
     runtime::{
         lock::LockKind,
-        manager::Manager,
+        manager::{action::{ReadState, TxnManager, WriteState}, Manager},
         message::CmdMsg,
         transaction::{Txn, TxnId},
     },
 };
 
-#[derive(Clone, Debug)]
-pub struct TxnManager {
-    pub txn: Txn,
-    pub from_client: Sender<CmdMsg>,
-    pub reads: HashMap<String, ReadState>,
-    pub writes: HashMap<String, WriteState>,
-    pub preds: HashSet<Txn>,
-}
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum ReadState {
-    Requested, // default
-    Granted,
-    Aborted,
-    Read(Expr),
-    // Failed,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum WriteState {
-    Requested, // default
-    Granted,
-    Aborted,
-    Writed,
-}
 
 impl TxnManager {
-    pub fn new(
-        txn: Txn,
-        from_client: Sender<CmdMsg>,
-        reads: HashSet<String>,
-        writes: HashSet<String>,
-    ) -> Self {
-        TxnManager {
-            txn,
-            from_client,
-            reads: HashMap::from_iter(
-                reads
-                    .iter()
-                    .map(|name| (name.clone(), ReadState::Requested)),
-            ),
-            writes: HashMap::from_iter(
-                writes
-                    .iter()
-                    .map(|name| (name.clone(), WriteState::Requested)),
-            ),
-            preds: HashSet::new(),
-        }
-    }
-
+    /// when receive a granted lock from name,
+    /// update transaction manager's read/write state
     pub fn add_grant_lock(&mut self, name: String, kind: LockKind) {
         if kind == LockKind::Read {
             assert!(self.reads.get(&name) == Some(ReadState::Requested).as_ref());
@@ -78,6 +32,7 @@ impl TxnManager {
         }
     }
 
+    /// when receive a finished read from name ..
     pub fn add_finished_read(&mut self, name: String, result: Expr, pred: HashSet<Txn>) {
         assert!(self.reads.get(&name) == Some(ReadState::Granted).as_ref());
         self.reads.insert(name, ReadState::Read(result));
@@ -85,22 +40,26 @@ impl TxnManager {
         self.preds.extend(pred);
     }
 
+    /// when receive a finished write from name ..
     pub fn add_finished_write(&mut self, name: String) {
         assert!(self.writes.get(&name) == Some(WriteState::Granted).as_ref());
         self.writes.insert(name, WriteState::Writed);
     }
 
+    /// check if all locks are granted
     pub fn all_lock_granted(&self) -> bool {
         self.reads.iter().all(|(_, v)| *v == ReadState::Granted)
             && self.writes.iter().all(|(_, v)| *v == WriteState::Granted)
     }
 
+    /// check if all reads are finished
     pub fn all_read_finished(&self) -> bool {
         self.reads
             .iter()
             .all(|(_, v)| matches!(v, ReadState::Read(_)))
     }
 
+    /// get all read results
     pub fn get_read_results(&self) -> HashMap<String, Expr> {
         self.reads
             .iter()
@@ -111,10 +70,12 @@ impl TxnManager {
             .collect()
     }
 
+    /// check if all writes are finished
     pub fn all_write_finished(&self) -> bool {
         self.writes.iter().all(|(_, v)| *v == WriteState::Writed)
     }
 
+    /// record that the transaction is aborted due to lock aborted
     pub fn abort_lock(&mut self) {
         for (_, state) in self.reads.iter_mut() {
             *state = ReadState::Aborted;
@@ -124,6 +85,7 @@ impl TxnManager {
         }
     }
 
+    /// check if any lock of thetransaction is aborted
     pub fn is_aborted(&self) -> bool {
         self.reads.iter().any(|(_, v)| *v == ReadState::Aborted)
             || self.writes.iter().any(|(_, v)| *v == WriteState::Aborted)
@@ -134,8 +96,7 @@ impl TxnManager {
     }
 }
 
-/// derived methods on service manager
-///
+/// derived methods on service manager, wrt txn id
 macro_rules! delegate_to_txn {
     // Mutable delegates take (&mut self, &TxnId, ...) ->  call &mut TxnManager
     (mut $fn_name:ident ( $($arg:ident : $arg_ty:ty),* ) ) => {

@@ -72,7 +72,7 @@ impl ChangeState {
     }
 
     pub fn apply_batch(&mut self, changes: &HashSet<ChangeId>) -> Expr {
-        // println!("applying changes: {:#?}", changes);
+        // println!("{} applying changes: {:#?}", self.expr, changes);
         self.pending_changes.remove_batch_from_pending(changes);
 
         for change_id in changes.iter() {

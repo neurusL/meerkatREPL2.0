@@ -20,9 +20,22 @@ impl kameo::prelude::Message<Msg> for DefActor {
         match msg {
             Msg::Subscribe { from_addr, .. } => {
                 self.pubsub.subscribe(from_addr);
-                Msg::SubscribeGranted
+                Msg::SubscribeGranted {
+                    name: self.name.clone(),
+                    value: self.value.clone(),
+                    preds: self.state.get_all_applied_txns() // todo we use all applied txns now
+                }
             }
-            Msg::SubscribeGranted => Msg::Unit,
+
+            Msg::SubscribeGranted {
+                name,
+                value,
+                preds,
+            } => {
+                // notice this is equivalent to a change message for def actor
+                self.state.receive_change(name, value, preds);
+                Msg::Unit
+            },
 
             Msg::LockRequest {
                 lock,
@@ -104,7 +117,7 @@ impl Actor for DefActor {
 
                 // else, every 100 ms ticks
                 _ = interval.tick() => {
-                    info!("{} has value {:?}", self.name, self.value);
+                    info!("{} has value {}", self.name, self.value);
                     if let Err(e) = self.tick().await {
                         eprintln!("[{}] tick() failed: {:?}", self.name, e);
                     }
@@ -140,9 +153,11 @@ impl DefActor {
             self.pubsub.publish(msg).await;
         }
 
-        if let Some(manager) = &self.is_assert_actor_of {
+        if let Some((test_id,manager)) = &self.is_assert_actor_of {
+            info!("{} has value {}", self.name, self.value);
             if let Expr::Bool { val: true } = self.value {
-                manager.tell(CmdMsg::AssertSucceeded).await?;
+                info!("Def {} says Assert Succeeded: {}", self.state.expr, test_id);
+                manager.tell(CmdMsg::AssertSucceeded { test_id: *test_id }).await?;
 
                 // todo!("this is a hack, we should use a better way to get the actor ref
                 // and kill/stop_gracefully the actor") 

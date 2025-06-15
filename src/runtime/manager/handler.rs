@@ -1,14 +1,10 @@
 use core::panic;
 
-use std::sync::{Arc, Mutex};
 use log::info;
 use std::time::Duration;
 use std::{collections::HashSet, error::Error};
 
-use crate::ast::Expr;
-use crate::runtime::def_actor::DefActor;
 use crate::runtime::message::{CmdMsg, Msg};
-use crate::runtime::transaction::Txn;
 use kameo::{error::Infallible, prelude::*};
 use kameo::mailbox::Signal;
 
@@ -27,26 +23,17 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
             TryAssert {
                 name,
                 test: bool_expr,
+                test_id,
             } => {
                 info!("Try Test");
-                let mgr_ref = self.address.clone().unwrap();
-                let _ = self
-                    .alloc_def_actor(
-                        &format!("{}_assert_{}", name, bool_expr),
-                        bool_expr.clone(),
-                        Some(mgr_ref),
-                    )
-                    .await;
+                self.new_test(name, bool_expr, test_id).await;
 
                 None
             }
 
-            AssertSucceeded => {
+            AssertSucceeded { test_id } => {
                 info!("Assert Succeeded");
-                self.from_developer
-                    .send(CmdMsg::AssertSucceeded)
-                    .await
-                    .unwrap();
+                self.on_test_finish(test_id).await;
 
                 None
             }

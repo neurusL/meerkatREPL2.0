@@ -1,6 +1,7 @@
 //! Logic for Var Actor
 //!
 
+use std::collections::HashSet;
 use std::time::Duration;
 
 use kameo::mailbox::Signal;
@@ -28,7 +29,15 @@ impl kameo::prelude::Message<Msg> for VarActor {
             } => {
                 info!("Subscribe from {:?}", from_addr);
                 self.pubsub.subscribe(from_addr);
-                Msg::SubscribeGranted
+
+                Msg::SubscribeGranted {
+                    name: self.name.clone(),
+                    value: self.value.clone().into(),
+                    preds: self.latest_write_txn.clone().map_or_else(
+                            || HashSet::new(), 
+                            |txn| HashSet::from([txn])
+                        )
+                }
             }
 
             Msg::LockRequest {
