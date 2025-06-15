@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    vec,
+};
 
 use crate::ast;
 
@@ -62,25 +65,31 @@ impl DependAnalysis {
         }
 
         visited.insert(name.clone());
+        // if visit var, notice var is transitively depend on itself
+        if vars.contains(name) {
+            calced.insert(name.clone(), HashSet::from([name.clone()]));
+            finished.push(name.clone());
+            return;
+        }
+
+        // else visit def
         let mut dep = HashSet::new();
 
         for dep_name in graph
             .get(name)
             .expect(&format!("No such name in dep graph: {}", name))
         {
-            if !vars.contains(dep_name) {
-                Self::dfs_helper(graph, vars, visited, finished, calced, dep_name);
-                dep.extend(
-                    calced
-                        .get(dep_name)
-                        .expect(&format!(
-                            "Not finished transitive dependency 
-                calculation of: {}",
-                            dep_name
-                        ))
-                        .clone(),
-                );
-            }
+            Self::dfs_helper(graph, vars, visited, finished, calced, dep_name);
+            dep.extend(
+                calced
+                    .get(dep_name)
+                    .expect(&format!(
+                        "Not finished transitive dependency 
+                        calculation of: {}",
+                        dep_name
+                    ))
+                    .clone(),
+            );
             dep.insert(dep_name.clone());
         }
 
@@ -90,20 +99,19 @@ impl DependAnalysis {
 
     pub fn calc_dep_vars(&mut self) {
         let mut visited = HashSet::new();
-        let mut topo_order = Vec::new();
 
-        for name in self.defs.iter() {
+        for name in self.vars.iter().chain(self.defs.iter()) {
             Self::dfs_helper(
                 &self.dep_graph,
                 &self.vars,
                 &mut visited,
-                &mut topo_order,
+                &mut self.topo_order,
                 &mut self.dep_transtive,
                 name,
             );
         }
 
-        for name in self.defs.iter() {
+        for name in self.vars.iter().chain(self.defs.iter()) {
             self.dep_vars.insert(
                 name.clone(),
                 self.dep_transtive

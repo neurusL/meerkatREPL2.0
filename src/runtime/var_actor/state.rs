@@ -1,5 +1,7 @@
 //! state of value maintained by var actor
 
+use log::info;
+
 use crate::{ast::Expr, runtime::transaction::TxnId};
 
 #[derive(Debug, Clone)]
@@ -55,8 +57,16 @@ impl Into<Expr> for VarValueState {
         match self {
             VarValueState::Uninit => panic!("uninit state should not be converted to value"),
             VarValueState::Val(val) => val,
-            VarValueState::Trans(_, _) => {
-                panic!("transition state should not be converted to value")
+            VarValueState::Trans(old_val, _) => {
+                if let Some(val) = old_val {
+                    info!(
+                        "var is requested for subscription when in a value transition state,
+                           send subscriber with old value in transition state"
+                    );
+                    val
+                } else {
+                    panic!("var is not initialized")
+                }
             }
         }
     }

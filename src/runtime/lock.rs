@@ -59,16 +59,14 @@ impl Lock {
 /// 1. peek min granted lock (for wait-die checking)
 /// 2. peek and pop min, delete arbitrary waiting lock
 pub struct LockState {
-    pub granted_locks: HashMap<TxnId, Lock>, // current lock granted
-    pub oldest_granted_lock_txnid: Option<TxnId>,
+    pub granted_locks: BTreeMap<TxnId, Lock>, // current lock granted
     pub waiting_locks: BTreeMap<TxnId, (Lock, ActorRef<Manager>)>, // locks waiting to be granted
 }
 
 impl LockState {
     pub fn new() -> Self {
         LockState {
-            granted_locks: HashMap::new(),
-            oldest_granted_lock_txnid: None,
+            granted_locks: BTreeMap::new(),
             waiting_locks: BTreeMap::new(),
         }
     }
@@ -76,14 +74,16 @@ impl LockState {
     /// only allow lock older than all granted locks to wait
     /// return true if lock added to waiting list
     pub fn add_wait(&mut self, lock: Lock, who_request: ActorRef<Manager>) -> bool {
-        if let Some(oldest) = &self.oldest_granted_lock_txnid {
+        if let Some((oldest, _)) = self.granted_locks.first_key_value() {
             // if receive lock younger than oldest granted lock, ignore
             if lock.txn_id > *oldest {
                 return false;
             }
         }
+
         self.waiting_locks
             .insert(lock.txn_id.clone(), (lock, who_request));
+
         return true;
     }
 
@@ -92,14 +92,17 @@ impl LockState {
     }
 
     pub fn grant_oldest_wait(&mut self) -> Option<(Lock, ActorRef<Manager>)> {
+        assert!(self.check_granted_isvalid());
+        if let Some((_, lock)) = self.granted_locks.first_key_value() {
+            if lock.is_write() {
+                // if current granted lock is write lock
+                return None; // cannot grant another lock
+            }
+        }
+
+        // if current granted lock are read locks
         if let Some((lock, mgr)) = self.pop_oldest_wait() {
             self.granted_locks.insert(lock.txn_id.clone(), lock.clone());
-
-            if let Some(prev_oldest) = &self.oldest_granted_lock_txnid {
-                if lock.txn_id < *prev_oldest {
-                    self.oldest_granted_lock_txnid = Some(lock.txn_id.clone());
-                }
-            }
 
             assert!(self.check_granted_isvalid());
             return Some((lock, mgr));
@@ -108,11 +111,7 @@ impl LockState {
     }
 
     pub fn remove_granted(&mut self, txn_id: &TxnId) -> Option<Lock> {
-        let lock = self.granted_locks.remove(txn_id);
-        if self.oldest_granted_lock_txnid.as_ref() == Some(txn_id) {
-            self.oldest_granted_lock_txnid = None;
-        }
-        lock
+        self.granted_locks.remove(txn_id)
     }
 
     pub fn remove_granted_if_read(&mut self, txn_id: &TxnId) {
@@ -146,7 +145,6 @@ impl LockState {
 
     pub fn clear_granted(&mut self) {
         self.granted_locks.clear();
-        self.oldest_granted_lock_txnid = None;
     }
 
     pub fn has_granted(&self, txn_id: &TxnId) -> bool {

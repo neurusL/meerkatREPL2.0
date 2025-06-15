@@ -1,44 +1,56 @@
 use std::collections::HashSet;
 
 use kameo::{actor::ActorRef, Reply};
+use tokio::sync::mpsc::Sender;
 
 use crate::{
-    ast::{Expr, Prog, Service},
-    runtime::{lock::Lock, transaction::TxnId},
+    ast::{Assn, Expr, Prog, Service, Test},
+    runtime::{lock::Lock, transaction::TxnId, TestId},
 };
 
-use super::{def_actor::DefActor, manager::Manager, var_actor::VarActor};
+use super::{def_actor::DefActor, manager::Manager, transaction::Txn, var_actor::VarActor};
 
 #[derive(Debug, Clone, Reply)]
 pub enum Msg {
+    Unit,
+
     UsrReadVarRequest {
+        from_mgr_addr: ActorRef<Manager>,
         txn: TxnId,
     },
     UsrReadVarResult {
         txn: TxnId,
         name: String,
         result: Expr,
-        pred: Option<TxnId>,
-    },
-    UsrWriteVarRequest {
-        txn: TxnId,
-        write_val: Expr,
-        // requires: HashSet<TxnId>,
+        pred: Option<Txn>,
     },
 
     UsrReadDefRequest {
+        from_mgr_addr: ActorRef<Manager>,
         txn: TxnId,
-        // requires: HashSet<TxnId>, // ?? Why we need this
+        // requires: HashSet<Txn>, // ?? Why we need this
     },
     UsrReadDefResult {
         txn: TxnId,
         name: String,
         result: Expr,
-        preds: HashSet<TxnId>,
+        preds: HashSet<Txn>,
     },
 
-    // Propagate {
-    //     propa_change: PropaChange, // a small change, make batch valid easier
+    UsrWriteVarRequest {
+        from_mgr_addr: ActorRef<Manager>,
+        txn: TxnId,
+        write_val: Expr,
+        // requires: HashSet<Txn>,
+    },
+    UsrWriteVarFinish {
+        txn: TxnId,
+        name: String,
+    },
+
+    // UnsafeRead, // for test only
+    // UnsafeReadResult {
+    //     result: Expr,
     // },
     LockRequest {
         // for notifying var/def that a lock is requested
@@ -47,8 +59,8 @@ pub enum Msg {
     },
     LockRelease {
         // for notifying var/def that a lock should be released
-        txn: TxnId,
-        preds: HashSet<TxnId>,
+        txn: Txn,
+        preds: HashSet<Txn>,
     },
     LockGranted {
         // for notifying manager that a lock request is granted
@@ -67,43 +79,49 @@ pub enum Msg {
         from_addr: ActorRef<DefActor>,
     },
 
-    SubscribeGranted,
-
-    Change {
-        from_name: String,
-        val: Expr,
-        preds: HashSet<TxnId>,
+    SubscribeGranted {
+        name: String,
+        value: Expr,
+        preds: HashSet<Txn>,
     },
 
+    // propagate change of name's value, with a set of txns (pred) as prereq
+    PropChange {
+        from_name: String,
+        val: Expr,
+        preds: HashSet<Txn>,
+    },
+}
+
+#[derive(Debug, Clone, Reply)]
+pub enum CmdMsg {
     // Meerkat 2.0 only support non-distributed CodeUpdate
     CodeUpdate {
         srv: Service,
     },
+    CodeUpdateGranted {
+        srv_name: String,
+    },
+
+    DoAction {
+        from_client_addr: Sender<CmdMsg>,
+        txn_id: TxnId,
+        action: Expr,
+    },
+
+    TransactionAborted {
+        txn_id: TxnId,
+    },
+    TransactionCommitted {
+        txn_id: TxnId,
+    },
+
+    TryAssert {
+        name: String,
+        test: Expr,
+        test_id: TestId,
+    },
+    AssertSucceeded {
+        test_id: TestId,
+    },
 }
-
-// #[derive(PartialEq, Eq, Clone, Debug)]
-// pub struct PropaChange {
-//     pub from_name: String,
-//     pub new_val: Val,
-//     pub provides: HashSet<Txn>,
-//     pub requires: HashSet<Txn>,
-// }
-
-// #[derive(PartialEq, Eq, Hash, Clone, Debug)]
-// pub struct TxnAndName {
-//     pub txn: Txn,
-//     pub name: String,
-// }
-
-// #[derive(PartialEq, Eq, Clone, Debug)]
-// pub struct _PropaChange {
-//     pub propa_id: i32,
-//     pub propa_change: PropaChange,
-//     pub deps: HashSet<TxnAndName>,
-// }
-
-// impl Hash for _PropaChange {
-//     fn hash<H: Hasher>(&self, state: &mut H) {
-//         self.propa_id.hash(state);
-//     }
-// }

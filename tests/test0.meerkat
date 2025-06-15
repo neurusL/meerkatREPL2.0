@@ -1,0 +1,31 @@
+service foo_service {
+    var x = 1;
+    var y = 2;
+    def f = x + y;
+    def g = x * y;
+    def h = g - f;
+
+    pub def inc_x = action { x = x + 1; };
+}
+
+@test(foo_service) {
+    
+    do inc_x;  // txn 1
+    assert(g == 4);
+    assert(f == 4);
+
+    do inc_x;  // txn 2
+    // assert (f == 4)
+    /* 
+    if we move assert f == 4 here 
+    there's a chance of passed test
+    */
+    /* 
+    will fix this by adding txn2 as pred 
+    of def actor of assert(f == 4)
+    */
+
+    assert(g == 6);
+    assert(f == 4);
+    assert(h == 1);
+}

@@ -2,7 +2,7 @@ use core::fmt;
 use std::hash::{Hash, Hasher};
 use tokio::time::Instant;
 
-use crate::ast::Expr;
+use crate::ast::{Assn, Expr};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Hash)]
 pub struct TxnId {
@@ -28,10 +28,10 @@ pub struct WriteToName {
 // (txid, writes)
 // writes := a list of updates to state vars
 // Clone, PartialEq, Eq, Hash, Debug
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Txn {
     pub id: TxnId,
-    pub writes: Vec<WriteToName>,
+    pub assns: Vec<Assn>,
 }
 
 impl PartialEq for Txn {
@@ -39,7 +39,6 @@ impl PartialEq for Txn {
         self.id == other.id
     }
 }
-
 impl Eq for Txn {}
 
 impl Hash for Txn {
@@ -48,8 +47,15 @@ impl Hash for Txn {
     }
 }
 
-impl fmt::Debug for Txn {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Txn").finish()
+impl Txn {
+    pub fn new(id: TxnId, assns: Vec<Assn>) -> Txn {
+        Txn { id, assns }
+    }
+
+    pub fn new_without_id(assns: Vec<Assn>) -> Txn {
+        Txn {
+            id: TxnId::new(),
+            assns,
+        }
     }
 }

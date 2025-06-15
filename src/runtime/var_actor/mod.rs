@@ -5,28 +5,27 @@ use kameo::Actor;
 
 use super::lock::LockState;
 use super::pubsub::PubSub;
-use super::transaction::TxnId;
+use super::transaction::Txn;
 use crate::ast::Expr;
 
 pub mod handler;
-pub mod value_state;
+pub mod state;
 
-#[derive(Actor)]
 pub struct VarActor {
     pub name: String, // this actor's var name
-    pub value: value_state::VarValueState,
+    pub value: state::VarValueState,
 
     pub pubsub: PubSub,
     pub lock_state: LockState,
 
-    pub latest_write_txn: Option<TxnId>,
+    pub latest_write_txn: Option<Txn>,
 }
 
 impl VarActor {
     pub fn new(name: String, val: Expr) -> VarActor {
         VarActor {
             name,
-            value: value_state::VarValueState::new(val),
+            value: state::VarValueState::new(val),
             pubsub: PubSub::new(),
             lock_state: LockState::new(),
             latest_write_txn: None,

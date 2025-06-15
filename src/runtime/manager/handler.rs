@@ -1,55 +1,219 @@
 use core::panic;
+
+use log::info;
+use std::time::Duration;
 use std::{collections::HashSet, error::Error};
 
-use crate::runtime::message::Msg;
-use kameo::{error, prelude::*};
+use crate::runtime::message::{CmdMsg, Msg};
+use kameo::mailbox::Signal;
+use kameo::{error::Infallible, prelude::*};
 
-use super::{Manager, TxnManager};
+pub const TICK_INTERVAL: Duration = Duration::from_millis(100);
 
-impl kameo::prelude::Message<Msg> for Manager {
-    type Reply = Option<Msg>;
+use super::Manager;
 
-    async fn handle(&mut self, msg: Msg, _ctx: &mut Context<Self, Self::Reply>) -> Self::Reply {
+/// message between manager and REPL
+impl kameo::prelude::Message<CmdMsg> for Manager {
+    type Reply = Option<CmdMsg>;
+
+    async fn handle(&mut self, msg: CmdMsg, _ctx: &mut Context<Self, Self::Reply>) -> Self::Reply {
+        use CmdMsg::*;
+        info!("MANAGER {} RECEIVE form Command Line: ", self.name);
         match msg {
-            Msg::CodeUpdate { srv } => {
+            TryAssert {
+                name,
+                test: bool_expr,
+                test_id,
+            } => {
+                info!("Try Test");
+                self.new_test(name, bool_expr, test_id).await;
+
+                None
+            }
+
+            AssertSucceeded { test_id } => {
+                info!("Assert Succeeded");
+                self.on_test_finish(test_id).await;
+
+                None
+            }
+
+            DoAction {
+                from_client_addr,
+                txn_id,
+                action,
+            } => {
+                info!("Do Action");
+                let assns = self.eval_action(action).unwrap();
+
+                let txn_mgr = self.new_txn(txn_id.clone(), assns, from_client_addr);
+                self.txn_mgrs.insert(txn_id.clone(), txn_mgr);
+
+                // request locks
+                let _ = self.request_locks(&txn_id).await;
+
+                None
+            }
+
+            TransactionAborted { txn_id } => {
+                info!("Transaction Aborted");
+                let client_sender = self.get_client_sender(&txn_id);
+                client_sender
+                    .send(CmdMsg::TransactionAborted { txn_id })
+                    .await
+                    .unwrap();
+
+                None
+            }
+
+            CodeUpdate { srv } => {
+                info!("Code Update");
                 self.alloc_service(&srv).await;
-                None
+                // todo(): handle alloc_service asynchronously
+                // to do so, exploit the developer sender
+                // for delayed response
+                // and change logic in runtime.mod
+                Some(CodeUpdateGranted { srv_name: srv.name })
             }
+            _ => {
+                panic!("Manager should not receive message from REPL");
+            }
+        }
+    }
+}
+
+/// message between manager and var/def actors
+impl kameo::prelude::Message<Msg> for Manager {
+    type Reply = Msg;
+
+    async fn handle(&mut self, msg: Msg, ctx: &mut Context<Self, Self::Reply>) -> Self::Reply {
+        info!("MANAGER {} RECEIVE: ", self.name);
+        match msg {
             Msg::LockGranted { from_name, lock } => {
-                self.get_mut_txn_mgr(&lock.txn_id)
-                    .add_grant_lock(from_name, lock.lock_kind);
-                None
+                info!("Lock Granted");
+                self.add_grant_lock(&lock.txn_id, from_name, lock.lock_kind);
+                if self.all_lock_granted(&lock.txn_id) {
+                    info!("all lock granted");
+                    let _ = self.request_reads(&lock.txn_id).await;
+                    info!("all read requested");
+                }
+
+                Msg::Unit
             }
+
             Msg::UsrReadVarResult {
-                txn,
+                txn: txn_id,
                 name,
                 result,
                 pred,
             } => {
-                let pred = if let Some(p) = pred {
-                    HashSet::from([p])
-                } else {
-                    HashSet::new()
-                };
+                info!("UsrReadVarResult");
+                if self.is_aborted(&txn_id) {
+                    return Msg::Unit;
+                }
 
-                self.add_finished_read(&txn, name, result, pred);
-                None
+                let pred = pred.map_or_else(|| HashSet::new(), |p| HashSet::from([p]));
+
+                self.add_finished_read(&txn_id, name, result, pred);
+                info!("add finished read");
+                if self.all_read_finished(&txn_id) {
+                    let _ = self.reeval_and_request_writes(&txn_id).await;
+                    // todo!() current impl isn't optimized for best concurrency
+                    // if re-eval block for too long
+                    // feel free to spawn a new thread
+                    // or put it in tick()
+                }
+                info!("reeval_and_request_writes");
+                Msg::Unit
             }
+
             Msg::UsrReadDefResult {
-                txn,
+                txn: txn_id,
                 name,
                 result,
                 preds,
             } => {
-                self.add_finished_read(&txn, name, result, preds);
-                None
-            }
-            Msg::LockAbort { from_name, lock } => {
-                self.add_abort_lock(&lock.txn_id, from_name, lock.lock_kind);
+                info!("UsrReadDefResult");
+                if self.is_aborted(&txn_id) {
+                    return Msg::Unit;
+                }
 
-                None
+                self.add_finished_read(&txn_id, name, result, preds);
+
+                if self.all_read_finished(&txn_id) {
+                    let _ = self.reeval_and_request_writes(&txn_id).await;
+                    // todo!() same above
+                }
+                Msg::Unit
             }
-            _ => panic!("Manager: receive wrong message type"),
+
+            Msg::UsrWriteVarFinish { txn: txn_id, name } => {
+                info!("UsrWriteVarFinish");
+                self.add_finished_write(&txn_id, name);
+
+                if self.all_write_finished(&txn_id) {
+                    let _ = self.release_locks(&txn_id).await;
+
+                    info!("release all locks, send commit transaction");
+                    let client_sender = self.get_client_sender(&txn_id);
+                    client_sender
+                        .send(CmdMsg::TransactionCommitted { txn_id })
+                        .await
+                        .unwrap();
+                }
+                Msg::Unit
+            }
+
+            Msg::LockAbort { from_name: _, lock } => {
+                info!("Lock Abort");
+                let _ = self.request_abort_locks(&lock.txn_id).await;
+                self.abort_lock(&lock.txn_id); // turn all txn's lock state to aborted
+
+                // notify another mailbox of manager myself
+                let _ = ctx
+                    .actor_ref()
+                    .tell(CmdMsg::TransactionAborted {
+                        txn_id: lock.txn_id,
+                    })
+                    .await;
+
+                Msg::Unit
+            }
+            _ => panic!("Manager should not receive message from var/def actors"),
+        }
+    }
+}
+
+impl Actor for Manager {
+    type Error = Infallible;
+
+    /// customized on_start impl of Actor trait    
+    /// to allow manager self reference to its addr
+    async fn on_start(&mut self, actor_ref: ActorRef<Self>) -> Result<(), Self::Error> {
+        info!("MANAGER on_start got ActorRef with id {}", actor_ref.id());
+        self.address = Some(actor_ref.clone());
+        Ok(())
+    }
+    async fn next(
+        &mut self,
+        _actor_ref: WeakActorRef<Self>,
+        mailbox_rx: &mut MailboxReceiver<Self>,
+    ) -> Option<Signal<Self>> {
+        let mut interval = tokio::time::interval(TICK_INTERVAL);
+
+        loop {
+            tokio::select! {
+                // if a real message waiting, return immediately:
+                maybe_signal = mailbox_rx.recv() => {
+                    return maybe_signal;
+                }
+
+                // else, every 100 ms ticks
+                _ = interval.tick() => {
+                    info!("tick");
+                }
+            }
+            // println!("[{}] ticked, now value is {:?}", self.name, self.value);
         }
     }
 }
@@ -67,11 +231,7 @@ impl Manager {
         Ok(())
     }
 
-    pub async fn ask_to_name(
-        &self,
-        name: &String,
-        msg: Msg,
-    ) -> Result<Option<Msg>, Box<dyn Error>> {
+    pub async fn ask_to_name(&self, name: &String, msg: Msg) -> Result<Msg, Box<dyn Error>> {
         let back_msg = if let Some(actor) = self.varname_to_actors.get(name) {
             actor.ask(msg).await?
         } else if let Some(actor) = self.defname_to_actors.get(name) {

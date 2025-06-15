@@ -1,8 +1,11 @@
-use crate::ast::{Assn, Expr, Prog, Service, Test, ReplCmd, Decl};
+use crate::ast::{Assn, Decl, Expr, Prog, ReplCmd, Service, Test};
 use std::{
     collections::{HashMap, HashSet},
+    env,
     fmt::Display,
 };
+
+use super::{manager::Manager, message::Msg};
 
 mod eval_expr;
 mod eval_stmt;
@@ -16,96 +19,59 @@ pub enum Val {
     Func(Vec<String>, Box<Expr>),
 }
 
+#[derive(Debug, Clone)]
 pub struct Evaluator {
     var_id_cnt: i32,
     pub reactive_names: HashSet<String>,
 
-    // context are modally separated into, we didn't use lambda expr var
-    // as we subst directly in place when we eval expr
-    // reactive def/var name -> val
+    /// context are modally separated into, we didn't use lambda expr var
+    /// as we subst directly in place when we eval expr
+    /// reactive def/var name -> val
     pub reactive_name_to_vals: HashMap<String, Expr>,
-    // lambda expr var name -> val
-    // pub exprvar_name_to_val: HashMap<String, Expr>,
+    /// lambda expr var name -> val
+    /// exprvar_name_to_val: HashMap<String, Expr>,
+    pub def_name_to_exprs: HashMap<String, Expr>,
 }
 
 impl Evaluator {
-    pub fn new(reactive_names_to_vals: HashMap<String, Expr>) -> Evaluator {
+    pub fn new(reactive_name_to_vals: HashMap<String, Expr>) -> Evaluator {
         Evaluator {
             var_id_cnt: 0,
             reactive_names: HashSet::new(),
-            reactive_name_to_vals: reactive_names_to_vals,
+            reactive_name_to_vals,
+            def_name_to_exprs: HashMap::new(),
         }
     }
-
-
-    
-
 }
 
-pub fn eval_assns(assns: &mut Vec<Assn>, env: HashMap<String, Expr>) {
+/// used for def actor eval their expression
+pub fn eval_def_expr(def_expr: &Expr, env: &HashMap<String, Expr>) -> Expr {
+    let mut eval = Evaluator::new(env.clone());
+    let mut evaled_expr = def_expr.clone();
+    eval.eval_expr(&mut evaled_expr);
+    evaled_expr
+}
+
+/// used for manager eval assns when action is triggered
+pub fn eval_assns(assns: &Vec<Assn>, env: HashMap<String, Expr>) -> Vec<Assn> {
     let mut eval = Evaluator::new(env);
-    for assn in assns.iter_mut() {
+    let mut evaled_assns = assns.clone();
+    for assn in evaled_assns.iter_mut() {
         eval.eval_assn(assn);
     }
+
+    evaled_assns
 }
-pub fn eval_test(test: &Test, env: &HashMap<String, Expr>) -> Result<(), String> {
-        
-        let mut eval = Evaluator::new(env.clone());
 
-        for cmd in &test.commands {
-            match cmd {
-                ReplCmd::Do(expr) => {
-                    let mut expr_clone = expr.clone();
-                    let _ = eval.eval_expr(&mut expr_clone);
-                }
-                ReplCmd::Assert(expr) => {
-                    let mut expr_clone = expr.clone();
-                    eval.eval_assert(&mut expr_clone)?;
-                    match expr_clone {
-                        Expr::Bool {val} => {
-                            if !val {
-                                return Err(format!("{} returned false", expr));
-                            }
-                            
-                        }
-                        _=> {
-                            return Err(format!("Assert requires a boolean"))
-                        }
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
+/// used for initial eval of all declarations in a service
 pub fn eval_srv(srv: &Service) -> Evaluator {
     let mut srv = srv.clone();
     let mut eval = Evaluator::new(HashMap::new());
     for decl in srv.decls.iter_mut() {
-        eval.eval_decl(decl);
-        println!("{}", decl);
+        let _ = eval.eval_decl(decl);
+        // println!("{}", decl);
     }
     eval
-}
-
-pub fn eval_prog(prog: &Prog) {
-    let mut global_vals = HashMap::new();  // global vals from services
-    for srv in prog.services.iter() {
-        let srv_evaluator = eval_srv(srv);
-
-        global_vals.extend(srv_evaluator.reactive_name_to_vals);   // adding service's vals to global
-    }
-
-
-    for test in prog.tests.iter() {
-        if let Err(e) = eval_test(test, &global_vals) {
-            println!("{} failed because {}", test.name,e);
-            
-        }
-        else {
-            println!("{} passed", test.name);
-        }
-    }
 }
 
 impl From<Val> for Expr {

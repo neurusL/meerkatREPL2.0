@@ -1,9 +1,10 @@
+use clap::Parser;
+use log::LevelFilter;
 use std::error::Error;
 use std::{env, fs};
 
-use kameo::spawn;
 use parser::meerkat;
-use runtime::manager::Manager;
+
 use tokio;
 
 pub mod ast;
@@ -11,21 +12,40 @@ pub mod parser;
 pub mod runtime;
 pub mod static_analysis;
 
+/// example usage
+/// cargo run -- -f test0.meerkat -v
+#[derive(Parser, Debug)]
+#[command(author, version, about)]
+struct Args {
+    #[arg(short = 'f', long = "file", default_value = "test0.meerkat")]
+    input_file: String,
+
+    /// verbose for debug info printing
+    /// all such printing go to info!("...")
+    #[arg(short = 'v', long = "verbose", default_value_t = false)]
+    verbose: bool,
+}
+
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
+    let args = Args::parse();
 
-    let file_name = &args[1]; // the second argument be test.meerkat
+    let log_level = if args.verbose {
+        LevelFilter::Info
+    } else {
+        log::LevelFilter::Warn
+    };
+    env_logger::Builder::from_default_env()
+        .filter_level(log_level)
+        .init();
 
-    let prog = parser::parser::parse(file_name.clone())  // using helper function which reads from file name and parses
-        .map_err(|e| format!("Parse error: {e}"))?;
+    let file_name = args.input_file; // the second argument be test.meerkat
+
+    let prog = parser::parser::parse(file_name.clone())  // using iterator instead of string for updated parse
+    .map_err(|e| format!("Parse error: {e}"))?;
 
     let _ = static_analysis::typecheck::typecheck_prog(&prog);
-    let _ = static_analysis::var_analysis::calc_dep_prog(&prog);
-    let _ = runtime::evaluator::eval_prog(&prog);
-
-    let mgr = Manager::new("main_service".to_string());
-    let mgr_actor_ref = spawn(mgr);
+    let _ = runtime::run(&prog).await;
 
     // runtime.repl
     Ok(())

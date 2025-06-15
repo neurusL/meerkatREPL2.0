@@ -54,6 +54,9 @@ impl Evaluator {
     }
 
     /// inplace evaluator of Expr
+    /// todo: change implementation to context stack,
+    /// - better performance
+    /// - not necessary to mut self
     pub fn eval_expr(&mut self, expr: &mut Expr) -> Result<(), String> {
         match expr {
             Expr::Number { val } => Ok(()),

@@ -19,6 +19,11 @@ impl Evaluator {
             }
             Decl::DefDecl { name, val, is_pub } => {
                 self.reactive_names.insert(name.clone());
+
+                // unevaled expr of def should be stored
+                self.def_name_to_exprs.insert(name.clone(), val.clone());
+
+                // then eval def
                 self.eval_expr(val)?;
                 self.reactive_name_to_vals.insert(name.clone(), val.clone());
             }
@@ -29,14 +34,14 @@ impl Evaluator {
 
     pub fn eval_assn(&mut self, assn: &mut Assn) -> Result<(), String> {
         self.eval_expr(&mut assn.src)?;
-        
+
         // since assn only appears in action,
         // their effect should not protrude to the expression level language's env
         // self.env.insert(assn.dest.clone(), assn.src.clone());
         Ok(())
     }
 
-    pub fn eval_assert(&mut self, expr: &mut Expr) ->  Result<(), String> {
+    pub fn eval_assert(&mut self, expr: &mut Expr) -> Result<(), String> {
         self.eval_expr(expr)?;
 
         Ok(())
