@@ -154,10 +154,8 @@ pub async fn run_test(
                     .await?;
 
                 loop {
-                // sleep 5 s for debugging
-                // sleep(std::time::Duration::from_secs(5));
-
                 if received_passed_tests.contains(&test_id) {
+                    println!("pass test {}", expr);
                     process_cmd_idx += 1;
                     break;
                 }
@@ -169,18 +167,22 @@ pub async fn run_test(
                         received_passed_tests.insert(recv_id);
 
                         if received_passed_tests.contains(&test_id) {
-
+                            println!("pass test {}", expr);
                             process_cmd_idx += 1;
                             break;
                         }
                         }
                     }
-                    
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(5)) => {
+                        println!("timeout on test {}", expr);
+                        process_cmd_idx += 1;
+                        break;
+                    }
                 }}
             }
         
         }
     }
-    println!("pass");
+    println!("testing {} finished", test.name);
     Ok(())
 }

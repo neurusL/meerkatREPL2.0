@@ -19,6 +19,8 @@ service foo_service {
 
     do inc_x;
     
-    assert(f == 3);
+    
     assert(g == 6);
+    assert(f == 4);
+    assert(h == 1);
 }
