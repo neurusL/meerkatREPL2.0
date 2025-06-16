@@ -131,6 +131,8 @@ pub enum Token<'a> {
   Semicolon,
   #[token(",")]
   Comma,
+  #[token(":")]
+  Colon,
 
   // Reserved Keywords
   #[token("service")]
@@ -149,6 +151,8 @@ pub enum Token<'a> {
   PUB_KW,
   #[token("def")]
   DEF_KW,
+  #[token("table")]
+  TABLE_KW,
   #[token("action")]
   ACTION_KW,
   #[token("fn")]
@@ -159,6 +163,12 @@ pub enum Token<'a> {
   IF_KW,
   #[token("else")]
   ELSE_KW,
+  #[token("number")]
+  NUMBER_KW,
+  #[token("string")]
+  STRING_KW,
+  #[token("bool")]
+  BOOL_KW,
   
   
 

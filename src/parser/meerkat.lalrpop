@@ -7,7 +7,7 @@
 // Grammar 
 grammar<'input>;
 
-use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test};
+use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test, Type};
 use lalrpop_util::ParseError;
 use crate::parser::lex::Token;
 
@@ -26,11 +26,15 @@ extern {
         "var" => Token::VAR_KW,
         "pub" => Token::PUB_KW,
         "def" => Token::DEF_KW,
+        "table" => Token::TABLE_KW,
         "action" => Token::ACTION_KW,
         "fn" => Token::FN_KW,
         "then" => Token::THEN_KW,
         "if" => Token::IF_KW,
         "else" => Token::ELSE_KW,
+        "number" => Token::NUMBER_KW,
+        "string" => Token::STRING_KW,
+        "bool" => Token::BOOL_KW,
         ";" => Token::Semicolon,
         "=" => Token::Assgn,
         "=>" => Token::Fn_Assgn,
@@ -48,12 +52,12 @@ extern {
         
         
         "ident" => Token::Ident(<&'input str>),
-        "number" => Token::Number(i64),
         "{" => Token::LBrace,
         "}" => Token::RBrace,
         "(" => Token::LParen,
         ")" => Token::RParen,
         "," => Token::Comma,
+        ":" => Token::Colon,
         "true" => Token::TRUE,
         "false" => Token::FALSE,
     }
@@ -102,10 +106,39 @@ Decl: Decl = {
     "def" <i:Ident> "=" <e:Expr> ";" => {
         Decl::DefDecl { name: i, val: e, is_pub: false }
     },
+    "table" <i:Ident> "{" <recs: Records> "}" ";" => {
+        Decl::TableDecl {name: i, records: recs }
+    }
 }
 
 Decls: Vec<Decl> = Decl*;
 
+Record: Record = {
+    <i:Ident> ":" <t: Type> ","=> {
+        Record {name: i, type_: t }
+    }
+}
+
+Records: Vec<Record> = {
+    <items: NonEmptyRecords> => items,
+    () => vec![], // Allows `table MyTable {};`
+};
+
+// Helper rule for one or more records, to resolve shift-reduce
+NonEmptyRecords: Vec<Record> = {
+    <r:Record> => vec![r],
+    <r:Record> <rest:NonEmptyRecords> => {
+        let mut res = vec![r];
+        res.extend(rest);
+        res
+    }
+}; 
+
+Type: Type = {
+    "number" => Type::Number,
+    "string" => Type::String,
+    "bool" => Type::Bool,
+}
 Assn: Assn = {
     <i:Ident> "=" <e:Expr> ";" => Assn { dest: i, src: e }
 }
@@ -255,7 +288,7 @@ Bool: bool = {
 }
 
 Number: i32 = {
-    <n: "number"> => n.into_number().unwrap() // i32::from_str(s).unwrap()
+    <n:Number> => n as i32 // i32::from_str(s).unwrap()
 }
 
 Ident: String = {

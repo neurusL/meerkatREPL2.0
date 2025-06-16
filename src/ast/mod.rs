@@ -85,6 +85,23 @@ pub enum Decl {
         val: Expr,
         is_pub: bool,
     },
+    TableDecl {
+        name: String,
+        records: Vec<Record>,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Record {
+    pub name: String,
+    pub type_: Type,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Type {
+    String,
+    Number,
+    Bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
