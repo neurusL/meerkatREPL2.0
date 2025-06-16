@@ -25,21 +25,17 @@ service test4 {
     pub def update = (fn x => (x+5));
 
     pub def updated_val = update(x);
-    pub def new = updated_val + 4;
-
+    pub def new = updated_val + 4;      // writing comments
+    /* Multiple line comments
+    Second line comment
+    */
     
 }
 
-service tt {
-  var x = 1;
-  pub def w = x + 1;
-}
 
-@test (test5) {
-  do act;
-  assert(x==2);
-}
+@test (test4) {
 
-@test (test3) {
-  assert(w==2);
+  assert(x==1);    // first assert
+  assert(z==4);    // second assert
+
 }
