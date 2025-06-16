@@ -7,7 +7,7 @@
 // Grammar 
 grammar<'input>;
 
-use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test, Type};
+use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test, Type, Record};
 use lalrpop_util::ParseError;
 use crate::parser::lex::Token;
 
@@ -52,6 +52,7 @@ extern {
         
         
         "ident" => Token::Ident(<&'input str>),
+        "num" => Token::Number(<i32>),
         "{" => Token::LBrace,
         "}" => Token::RBrace,
         "(" => Token::LParen,
@@ -73,14 +74,27 @@ Service: Service = {
     },
 }
 
-Services: Vec<Service> = Service*;
+Services: Vec<Service> = {
+    => vec![],
+    <mut v:Services> <s:Service> => {
+        v.push(s);
+        v
+    }
+}
 
 Test: Test = {
     "@test" "(" <i:Ident> ")" "{" <cms: ReplCmds> "}" => {
         Test { name: i, commands: cms }
     },
 }
-Tests: Vec<Test> = Test*;
+
+Tests: Vec<Test> = {
+    => vec![],
+    <mut v:Tests> <t:Test> => {
+        v.push(t);
+        v
+    }
+}
 
 ReplCmd: ReplCmd = {
     "do" <e: Expr> ";" => {
@@ -91,7 +105,13 @@ ReplCmd: ReplCmd = {
     },
 }
 
-ReplCmds: Vec<ReplCmd> = ReplCmd*;
+ReplCmds: Vec<ReplCmd> = {
+    => vec![],
+    <mut v:ReplCmds> <c:ReplCmd> => {
+        v.push(c);
+        v
+    }
+}
 
 Decl: Decl = {
     "import" <i:Ident> ";" => {
@@ -114,36 +134,36 @@ Decl: Decl = {
 Decls: Vec<Decl> = Decl*;
 
 Record: Record = {
-    <i:Ident> ":" <t: Type> ","=> {
-        Record {name: i, type_: t }
-    }
+   <i:Ident> ":" <t: Type> "," => {
+    Record {name: i, type_: t}
+   } 
 }
 
-Records: Vec<Record> = {
-    <items: NonEmptyRecords> => items,
-    () => vec![], // Allows `table MyTable {};`
-};
+Records: Vec<Record> = Record*;
 
-// Helper rule for one or more records, to resolve shift-reduce
-NonEmptyRecords: Vec<Record> = {
-    <r:Record> => vec![r],
-    <r:Record> <rest:NonEmptyRecords> => {
-        let mut res = vec![r];
-        res.extend(rest);
-        res
+/*Records: Vec<Record> = {
+    <mut v:(<Ident> ":" <Type> ",")*> => {
+        v.into_iter().map(|(name, type_)| Record { name, type_ }).collect()
     }
-}; 
+}*/
 
 Type: Type = {
     "number" => Type::Number,
     "string" => Type::String,
     "bool" => Type::Bool,
 }
+
 Assn: Assn = {
     <i:Ident> "=" <e:Expr> ";" => Assn { dest: i, src: e }
 }
 
-Assns: Vec<Assn> = Assn*;
+Assns: Vec<Assn> = {
+    => vec![],
+    <mut v:Assns> <a:Assn> => {
+        v.push(a);
+        v
+    }
+}
 
 Params: Vec<String> = {
     <mut v:(<Ident> ",")*> <e:Ident?> => 
@@ -288,7 +308,7 @@ Bool: bool = {
 }
 
 Number: i32 = {
-    <n:Number> => n as i32 // i32::from_str(s).unwrap()
+    <n:"num"> => n
 }
 
 Ident: String = {

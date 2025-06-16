@@ -14,6 +14,7 @@ impl TypecheckEnv {
                 let typ = self.infer_expr(&val);
                 self.var_context.insert(name.clone(), typ);
             }
+            Decl::TableDecl { name, records } => todo! {}
         }
     }
 

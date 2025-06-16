@@ -29,6 +29,8 @@ service test4 {
     /* Multiple line comments
     Second line comment
     */
+
+    table table1 {id: number,};
     
 }
 

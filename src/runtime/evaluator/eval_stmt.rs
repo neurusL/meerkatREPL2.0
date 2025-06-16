@@ -27,6 +27,7 @@ impl Evaluator {
                 self.eval_expr(val)?;
                 self.reactive_name_to_vals.insert(name.clone(), val.clone());
             }
+            Decl::TableDecl { name, records } => todo!{}
         }
 
         Ok(())
