@@ -1,5 +1,6 @@
 use crate::ast::{Assn, Decl};
 
+use std::collections::HashSet;
 use super::TypecheckEnv;
 
 impl TypecheckEnv {
@@ -14,7 +15,14 @@ impl TypecheckEnv {
                 let typ = self.infer_expr(&val);
                 self.var_context.insert(name.clone(), typ);
             }
-            Decl::TableDecl { name, records } => todo! {}
+            Decl::TableDecl { name, records } =>  {
+                let mut names = HashSet::new();
+                for record in records {
+                    if !names.insert(record.name.clone()) {
+                        panic!("Duplicate names found in table {}", name)
+                    }
+                }
+            }
         }
     }
 

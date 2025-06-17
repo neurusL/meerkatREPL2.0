@@ -1,4 +1,4 @@
-use crate::ast::{Assn, Decl, Expr, Prog, ReplCmd, Service, Test};
+use crate::ast::{Assn, Decl, Expr, Prog, ReplCmd, Service, Test, Type};
 use std::{
     collections::{HashMap, HashSet},
     env,
@@ -31,6 +31,9 @@ pub struct Evaluator {
     /// lambda expr var name -> val
     /// exprvar_name_to_val: HashMap<String, Expr>,
     pub def_name_to_exprs: HashMap<String, Expr>,
+    /// evaluator will have table name to its schema
+    /// table name -> vector of columns (name and type tuple)
+    pub table_name_to_schema: HashMap<String, Vec<(String, Type)>>,
 }
 
 impl Evaluator {
@@ -40,6 +43,7 @@ impl Evaluator {
             reactive_names: HashSet::new(),
             reactive_name_to_vals,
             def_name_to_exprs: HashMap::new(),
+            table_name_to_schema: HashMap::new(),
         }
     }
 }

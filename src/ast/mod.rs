@@ -217,8 +217,8 @@ impl Display for Decl {
                     write!(f, "def {} = {}", name, val)
                 }
             }
-            Decl::TableDecl { name, records } => todo!{
-                
+            Decl::TableDecl { name, records } => {
+                write!(f, "table {} created", name)
             }
         }
     }

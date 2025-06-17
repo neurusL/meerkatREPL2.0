@@ -1,0 +1,12 @@
+service test7 {
+
+  var x = 1;
+  def y = x + 2;
+
+  table sample {id: number, name: string, }; 
+
+}
+
+@test(test7) {
+
+}
