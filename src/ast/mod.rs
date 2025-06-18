@@ -28,6 +28,22 @@ pub struct Assn {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Insert {
+    pub row: Row ,
+    pub table_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Row {
+    pub val: Vec<Entry>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Entry {
+    pub name: String,  // column name
+    pub val: Expr,    // value to be inserted
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
     /// Basic Lambda Core expressions
     Number {
@@ -35,6 +51,9 @@ pub enum Expr {
     },
     Bool {
         val: bool,
+    },
+    String {
+        val: String,
     },
     Variable {
         ident: String,
@@ -68,6 +87,7 @@ pub enum Expr {
     /// Action
     Action {
         assns: Vec<Assn>,
+        inserts: Vec<Insert>,
     },
 }
 
@@ -94,11 +114,11 @@ pub enum Decl {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Record {
     pub name: String,
-    pub type_: Type,
+    pub type_: DataType,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Type {
+pub enum DataType {
     String,
     Number,
     Bool,
@@ -168,6 +188,7 @@ impl Display for Expr {
         match self {
             Expr::Number { val } => write!(f, "{}", val),
             Expr::Bool { val } => write!(f, "{}", val),
+            Expr::String { val } => write!(f,"{}", val),
             Expr::Variable { ident } => write!(f, "{}", ident),
             Expr::Unop { op, expr } => write!(f, "{}{}", op, expr),
             Expr::Binop { op, expr1, expr2 } => write!(f, "{} {} {}", expr1, op, expr2),
@@ -184,7 +205,7 @@ impl Display for Expr {
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
-            Expr::Action { assns } => write!(
+            Expr::Action { assns, inserts } => write!(
                 f,
                 "Action({:?})",
                 assns

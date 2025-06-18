@@ -15,6 +15,7 @@ impl Evaluator {
         match expr {
             Expr::Number { val } => {}
             Expr::Bool { val } => {}
+            Expr::String {val} => {}
             Expr::Variable { ident } => {
                 if let Some(e) = var_to_expr.get(ident) {
                     *expr = e.clone();
@@ -65,7 +66,7 @@ impl Evaluator {
                     self.subst(arg, var_to_expr);
                 }
             }
-            Expr::Action { assns } => {
+            Expr::Action { assns, inserts } => {
                 for assn in assns {
                     // dest should not be substituted, only src should
                     self.subst(&mut assn.src, var_to_expr);

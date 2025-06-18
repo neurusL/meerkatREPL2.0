@@ -1,4 +1,4 @@
-use crate::ast::{Assn, Decl, Expr, Prog, ReplCmd, Service, Test, Type};
+use crate::ast::{Assn, Decl, Expr, Prog, ReplCmd, Service, Test, DataType, Insert, Entry, Row};
 use std::{
     collections::{HashMap, HashSet},
     env,
@@ -15,7 +15,7 @@ mod utils;
 pub enum Val {
     Number(i32),
     Bool(bool),
-    Action(Vec<Assn>),
+    Action(Vec<Assn>, Vec<Insert>),
     Func(Vec<String>, Box<Expr>),
 }
 
@@ -33,7 +33,9 @@ pub struct Evaluator {
     pub def_name_to_exprs: HashMap<String, Expr>,
     /// evaluator will have table name to its schema
     /// table name -> vector of columns (name and type tuple)
-    pub table_name_to_schema: HashMap<String, Vec<(String, Type)>>,
+    pub table_name_to_schema: HashMap<String, Vec<(String, DataType)>>, // column names and data types
+
+    pub table_name_to_data: HashMap<String, Vec<Row>>, // table consists of vector of rows
 }
 
 impl Evaluator {
@@ -44,6 +46,7 @@ impl Evaluator {
             reactive_name_to_vals,
             def_name_to_exprs: HashMap::new(),
             table_name_to_schema: HashMap::new(),
+            table_name_to_data: HashMap::new(),
         }
     }
 }
@@ -83,7 +86,7 @@ impl From<Val> for Expr {
         match val {
             Val::Number(i) => Expr::Number { val: i },
             Val::Bool(b) => Expr::Bool { val: b },
-            Val::Action(assns) => Expr::Action { assns },
+            Val::Action(assns, inserts) => Expr::Action { assns, inserts },
             Val::Func(params, body) => Expr::Func { params, body },
         }
     }

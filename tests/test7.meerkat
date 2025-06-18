@@ -2,11 +2,14 @@ service test7 {
 
   var x = 1;
   def y = x + 2;
+  var z = "hello";
 
-  table sample {id: number, name: string, }; 
+  table sample {id: number, name: string, age: number, }; 
+
+  def act = action { insert {id: 1, name: "Sunay", age: 18, } into sample };
 
 }
 
 @test(test7) {
-
+    do act;
 }

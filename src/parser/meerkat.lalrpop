@@ -7,7 +7,7 @@
 // Grammar 
 grammar<'input>;
 
-use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test, Type, Record};
+use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test, DataType, Record, Insert, Entry, Row};
 use lalrpop_util::ParseError;
 use crate::parser::lex::Token;
 
@@ -27,6 +27,8 @@ extern {
         "pub" => Token::PUB_KW,
         "def" => Token::DEF_KW,
         "table" => Token::TABLE_KW,
+        "insert" => Token::INSERT_KW,
+        "into" => Token::INTO_KW,
         "action" => Token::ACTION_KW,
         "fn" => Token::FN_KW,
         "then" => Token::THEN_KW,
@@ -51,6 +53,7 @@ extern {
 
         
         
+        "strlit" => Token::StrLit(<&'input str>),
         "ident" => Token::Ident(<&'input str>),
         "num" => Token::Number(<i32>),
         "{" => Token::LBrace,
@@ -134,7 +137,7 @@ Decl: Decl = {
 Decls: Vec<Decl> = Decl*;
 
 Record: Record = {
-   <i:Ident> ":" <t: Type> "," => {
+   <i:Ident> ":" <t: DataType> "," => {
     Record {name: i, type_: t}
    } 
 }
@@ -147,11 +150,28 @@ Records: Vec<Record> = Record*;
     }
 }*/
 
-Type: Type = {
-    "number" => Type::Number,
-    "string" => Type::String,
-    "bool" => Type::Bool,
+DataType: DataType = {
+    "number" => DataType::Number,
+    "string" => DataType::String,
+    "bool" => DataType::Bool,
 }
+Entry: Entry = {
+    <c: Ident> ":" <e: Expr> "," => {
+        Entry {name: c, val: e }
+    }
+}
+Row: Row = {
+    <entries: Entry*> => Row {val: entries}
+}
+
+Insert: Insert = {
+    "insert" "{" <r: Row> "}" "into" <t: Ident> => {
+        Insert {row: r, table_name: t}
+    }
+}
+
+
+Inserts: Vec<Insert> = Insert*;
 
 Assn: Assn = {
     <i:Ident> "=" <e:Expr> ";" => Assn { dest: i, src: e }
@@ -190,13 +210,14 @@ Args: Vec<Expr> = {
 SubExpr: Expr = {
     <n:Number> => Expr::Number { val: n },
     <b:Bool> => Expr::Bool { val: b },
+    <s: "strlit"> => Expr::String {val: s.to_owned()},
     <i:Ident> => Expr::Variable { ident: i },
     "(" <Expr> ")" => <>,
     
     <expr:SubExpr> "(" <args:Args> ")" => 
         Expr::FuncApply { func: Box::new(expr), args },
 
-    "action" "{" <assns: Assns> "}" => Expr::Action { assns },
+    "action" "{" <assns: Assns><inserts: Inserts> "}" => Expr::Action { assns, inserts },
     
 
 }

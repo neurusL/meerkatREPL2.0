@@ -61,6 +61,7 @@ impl Evaluator {
         match expr {
             Expr::Number { val } => Ok(()),
             Expr::Bool { val } => Ok(()),
+            Expr::String {val} => Ok(()),
             Expr::Variable { ident } => {
                 let val = self
                     .reactive_name_to_vals
@@ -160,7 +161,7 @@ impl Evaluator {
                 }
             }
 
-            Expr::Action { assns } => {
+            Expr::Action { assns , inserts} => {
                 // for assn in assns.iter_mut() {
                 //     self.eval_assn(assn)?;
                 // }
