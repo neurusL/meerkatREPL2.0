@@ -9,6 +9,7 @@ impl TypecheckEnv {
         match expr {
             Expr::Number { val: _ } => Int,
             Expr::Bool { val: _ } => Bool,
+            Expr::String {val: _} => String,
             Expr::Variable { ident } => self
                 .var_context
                 .get(ident)
@@ -168,8 +169,10 @@ impl TypecheckEnv {
             }
 
             // more todo on Action type
-            Expr::Action { assns } => {
+            Expr::Action { assns , inserts} => {
                 assns.iter().for_each(|assn| self.typecheck_assn(assn));
+                inserts.iter().for_each(|insert| self.typecheck_insert(insert));
+
                 Action
             }
         }

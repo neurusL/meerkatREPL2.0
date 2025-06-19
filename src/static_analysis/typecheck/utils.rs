@@ -9,7 +9,7 @@ use std::{
 impl Type {
     fn free_var(&self, typ_var_binded: &HashSet<String>) -> HashSet<String> {
         match self {
-            Type::Int | Type::Bool | Type::Unit | Type::Action => HashSet::new(),
+            Type::Int | Type::Bool | Type::String | Type::Unit | Type::Action => HashSet::new(),
             // Calculate free type var in function type
             // e.g. (a, int, bool) -> b has free_var
             // for convenience, we clone the whole type bindings from previous
@@ -45,6 +45,7 @@ impl TypecheckEnv {
             var_context: initial_context, // using it as var context
             typevar_id: 0,
             acc_subst: HashMap::new(),
+            table_context: HashMap::new()
         }
     }
 
@@ -72,7 +73,7 @@ impl TypecheckEnv {
     // union-find based unification
     pub fn find(&self, typ: &Type) -> Type {
         match typ {
-            Type::Int | Type::Bool | Type::Unit | Type::Action | Type::Fun(_, _) => typ.clone(),
+            Type::Int | Type::Bool | Type::String | Type::Unit | Type::Action | Type::Fun(_, _) => typ.clone(),
 
             Type::TypVar(name) => {
                 let canonical_typ = self

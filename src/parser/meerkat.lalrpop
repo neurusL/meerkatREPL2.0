@@ -7,7 +7,7 @@
 // Grammar 
 grammar<'input>;
 
-use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test};
+use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test, DataType, Record, Insert, Entry, Row};
 use lalrpop_util::ParseError;
 use crate::parser::lex::Token;
 
@@ -26,11 +26,17 @@ extern {
         "var" => Token::VAR_KW,
         "pub" => Token::PUB_KW,
         "def" => Token::DEF_KW,
+        "table" => Token::TABLE_KW,
+        "insert" => Token::INSERT_KW,
+        "into" => Token::INTO_KW,
         "action" => Token::ACTION_KW,
         "fn" => Token::FN_KW,
         "then" => Token::THEN_KW,
         "if" => Token::IF_KW,
         "else" => Token::ELSE_KW,
+        "number" => Token::NUMBER_KW,
+        "string" => Token::STRING_KW,
+        "bool" => Token::BOOL_KW,
         ";" => Token::Semicolon,
         "=" => Token::Assgn,
         "=>" => Token::Fn_Assgn,
@@ -47,13 +53,15 @@ extern {
 
         
         
+        "strlit" => Token::StrLit(<&'input str>),
         "ident" => Token::Ident(<&'input str>),
-        "number" => Token::Number(i64),
+        "num" => Token::Number(<i32>),
         "{" => Token::LBrace,
         "}" => Token::RBrace,
         "(" => Token::LParen,
         ")" => Token::RParen,
         "," => Token::Comma,
+        ":" => Token::Colon,
         "true" => Token::TRUE,
         "false" => Token::FALSE,
     }
@@ -69,14 +77,27 @@ Service: Service = {
     },
 }
 
-Services: Vec<Service> = Service*;
+Services: Vec<Service> = {
+    => vec![],
+    <mut v:Services> <s:Service> => {
+        v.push(s);
+        v
+    }
+}
 
 Test: Test = {
     "@test" "(" <i:Ident> ")" "{" <cms: ReplCmds> "}" => {
         Test { name: i, commands: cms }
     },
 }
-Tests: Vec<Test> = Test*;
+
+Tests: Vec<Test> = {
+    => vec![],
+    <mut v:Tests> <t:Test> => {
+        v.push(t);
+        v
+    }
+}
 
 ReplCmd: ReplCmd = {
     "do" <e: Expr> ";" => {
@@ -87,7 +108,13 @@ ReplCmd: ReplCmd = {
     },
 }
 
-ReplCmds: Vec<ReplCmd> = ReplCmd*;
+ReplCmds: Vec<ReplCmd> = {
+    => vec![],
+    <mut v:ReplCmds> <c:ReplCmd> => {
+        v.push(c);
+        v
+    }
+}
 
 Decl: Decl = {
     "import" <i:Ident> ";" => {
@@ -102,15 +129,61 @@ Decl: Decl = {
     "def" <i:Ident> "=" <e:Expr> ";" => {
         Decl::DefDecl { name: i, val: e, is_pub: false }
     },
+    "table" <i:Ident> "{" <recs: Records> "}" ";" => {
+        Decl::TableDecl {name: i, records: recs }
+    }
 }
 
 Decls: Vec<Decl> = Decl*;
+
+Record: Record = {
+   <i:Ident> ":" <t: DataType> "," => {
+    Record {name: i, type_: t}
+   } 
+}
+
+Records: Vec<Record> = Record*;
+
+/*Records: Vec<Record> = {
+    <mut v:(<Ident> ":" <Type> ",")*> => {
+        v.into_iter().map(|(name, type_)| Record { name, type_ }).collect()
+    }
+}*/
+
+DataType: DataType = {
+    "number" => DataType::Number,
+    "string" => DataType::String,
+    "bool" => DataType::Bool,
+}
+Entry: Entry = {
+    <c: Ident> ":" <e: Expr> "," => {
+        Entry {name: c, val: e }
+    }
+}
+Row: Row = {
+    <entries: Entry*> => Row {val: entries}
+}
+
+Insert: Insert = {
+    "insert" "{" <r: Row> "}" "into" <t: Ident> => {
+        Insert {row: r, table_name: t}
+    }
+}
+
+
+Inserts: Vec<Insert> = Insert*;
 
 Assn: Assn = {
     <i:Ident> "=" <e:Expr> ";" => Assn { dest: i, src: e }
 }
 
-Assns: Vec<Assn> = Assn*;
+Assns: Vec<Assn> = {
+    => vec![],
+    <mut v:Assns> <a:Assn> => {
+        v.push(a);
+        v
+    }
+}
 
 Params: Vec<String> = {
     <mut v:(<Ident> ",")*> <e:Ident?> => 
@@ -137,13 +210,14 @@ Args: Vec<Expr> = {
 SubExpr: Expr = {
     <n:Number> => Expr::Number { val: n },
     <b:Bool> => Expr::Bool { val: b },
+    <s: "strlit"> => Expr::String {val: s.to_owned()},
     <i:Ident> => Expr::Variable { ident: i },
     "(" <Expr> ")" => <>,
     
     <expr:SubExpr> "(" <args:Args> ")" => 
         Expr::FuncApply { func: Box::new(expr), args },
 
-    "action" "{" <assns: Assns> "}" => Expr::Action { assns },
+    "action" "{" <assns: Assns><inserts: Inserts> "}" => Expr::Action { assns, inserts },
     
 
 }
@@ -255,7 +329,7 @@ Bool: bool = {
 }
 
 Number: i32 = {
-    <n: "number"> => n.into_number().unwrap() // i32::from_str(s).unwrap()
+    <n:"num"> => n
 }
 
 Ident: String = {

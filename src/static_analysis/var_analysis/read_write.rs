@@ -10,7 +10,7 @@ impl Expr {
         var_binded: &HashSet<String>, // should be initialized by all reactive name declared in the service
     ) -> HashSet<String> {
         match self {
-            Expr::Number { .. } | Expr::Bool { .. } => HashSet::new(),
+            Expr::Number { .. } | Expr::Bool { .. } | Expr::String { .. }=> HashSet::new(),
             Expr::Variable { ident } => {
                 if var_binded.contains(ident) {
                     HashSet::new()
@@ -45,7 +45,7 @@ impl Expr {
 
             // x in FV(l) => x in FV(action { ..., l = r, ...})
             // x in FV(r) => x in FV(action { ..., l = r, ...})
-            Expr::Action { assns } => {
+            Expr::Action {assns, inserts} => {
                 let mut free_vars = HashSet::new();
                 for assn in assns {
                     // dest should never be free, each dest should be declared before use

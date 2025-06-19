@@ -12,12 +12,13 @@ mod utils;
 
 use std::{collections::HashMap, fmt::Display};
 
-use crate::ast::Prog;
+use crate::ast::{Prog, DataType, Record};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Type {
     Int,
     Bool,
+    String,
     Unit,
     Action,
 
@@ -44,6 +45,7 @@ impl Display for Type {
         match self {
             Type::Int => write!(f, "int"),
             Type::Bool => write!(f, "bool"),
+            Type::String => write!(f, "string"),
             Type::Unit => write!(f, "unit"),
             Type::Action => write!(f, "action"),
             Type::Fun(args, ret) => {
@@ -71,6 +73,9 @@ pub struct TypecheckEnv {
     pub typevar_id: u64,
     // Type::var to type (canonical form)
     pub acc_subst: HashMap<String, Type>,
+
+    // table context for insert typecheck
+    pub table_context: HashMap<String, Vec<Record>>,
 }
 
 impl Display for TypecheckEnv {

@@ -52,7 +52,7 @@ impl Manager {
 
         // set up txn manager
         let txn_mgr = TxnManager::new(txn, from_client, read_set, write_set);
-
+            
         txn_mgr
     }
 
@@ -216,7 +216,7 @@ impl Manager {
     pub fn eval_action(&mut self, mut expr: Expr) -> Result<Vec<Assn>, String> {
         self.evaluator.eval_expr(&mut expr)?;
 
-        if let Expr::Action { assns } = expr {
+        if let Expr::Action { assns, inserts } = expr {
             Ok(assns.clone())
         } else {
             Err(format!("do requires action expression"))
