@@ -61,8 +61,10 @@ impl TypecheckEnv {
                         DataType::Number => Type::Int,
                         DataType::String => Type::String,
                     };
-                    if self.infer_expr(&insert.row.val[i].val) != expected_type {
-                        panic!("Data type of entry {} does not match the schema, expected {}, got {}", &insert.row.val[i].name, expected_type, self.infer_expr(&insert.row.val[i].val))
+                    let infered_expr = self.infer_expr(&insert.row.val[i].val);
+                    
+                    if !self.unify(&infered_expr, &expected_type){
+                        panic!("Data type of entry {} does not match the schema, expected {}, got {}", &insert.row.val[i].name, &expected_type, &infered_expr)
                     }
                 }
                 

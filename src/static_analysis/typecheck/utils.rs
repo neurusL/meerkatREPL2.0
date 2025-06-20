@@ -95,6 +95,7 @@ impl TypecheckEnv {
         match (typ1, typ2) {
             (Type::Int, Type::Int)
             | (Type::Bool, Type::Bool)
+            | (Type::String, Type::String)
             | (Type::Unit, Type::Unit)
             | (Type::Action, Type::Action) => true,
 
