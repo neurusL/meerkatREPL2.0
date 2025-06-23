@@ -1,6 +1,63 @@
-use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test};
+// L1 Compiler
+//! Parser Grammar
+// Author: Miles Conn <mconn@andrew.cmu.edu>
 
-grammar;
+// Initial grammar for L1 
+
+// Grammar 
+grammar<'input>;
+
+use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test};
+use lalrpop_util::ParseError;
+use crate::parser::lex::Token;
+
+use std::str::FromStr;
+
+extern {
+    type Location = usize;
+    type Error = String;
+
+    enum Token<'input> {
+        "service" => Token::SERVICE,
+        "@test" => Token::TEST_KW,
+        "do" => Token::DO_KW,
+        "assert" => Token::ASSERT_KW,
+        "import" => Token::IMPORT_KW,
+        "var" => Token::VAR_KW,
+        "pub" => Token::PUB_KW,
+        "def" => Token::DEF_KW,
+        "action" => Token::ACTION_KW,
+        "fn" => Token::FN_KW,
+        "then" => Token::THEN_KW,
+        "if" => Token::IF_KW,
+        "else" => Token::ELSE_KW,
+        ";" => Token::Semicolon,
+        "=" => Token::Assgn,
+        "=>" => Token::Fn_Assgn,
+        "+" => Token::Plus,
+        "-" => Token::Minus,
+        "*" => Token::Asterisk,
+        "/" => Token::Div,
+        "==" => Token::EQ_EQ,
+        "<" => Token::LT,
+        ">" => Token::GT,
+        "&&" => Token::AND_AND,
+        "||" => Token::OR_OR,
+        "!" => Token::NOT_NOT,
+
+        
+        
+        "ident" => Token::Ident(<&'input str>),
+        "number" => Token::Number(i64),
+        "{" => Token::LBrace,
+        "}" => Token::RBrace,
+        "(" => Token::LParen,
+        ")" => Token::RParen,
+        "," => Token::Comma,
+        "true" => Token::TRUE,
+        "false" => Token::FALSE,
+    }
+}
 
 pub Prog: Prog = {
     <services: Services> <tests: Tests> => Prog { services, tests }
@@ -198,9 +255,9 @@ Bool: bool = {
 }
 
 Number: i32 = {
-    <s:r"[0-9]+"> => s.parse::<i32>().expect("Not a valid number") // i32::from_str(s).unwrap()
+    <n: "number"> => n.into_number().unwrap() // i32::from_str(s).unwrap()
 }
 
 Ident: String = {
-    <i:r"[a-z_A-Z][0-9_a-z_A-Z]*"> => i.to_string()
+    <i:"ident"> => i.to_owned()
 }
