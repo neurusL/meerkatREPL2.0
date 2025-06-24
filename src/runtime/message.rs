@@ -87,9 +87,9 @@ pub enum Msg {
 
     // propagate change of name's value, with a set of txns (pred) as prereq
     PropChange {
-        from_name: String,
+        from_name: String, // name of the var/def that is changed
         val: Expr,
-        preds: HashSet<Txn>,
+        preds: HashSet<Txn>, // table probably send Hashset::new() as pred
     },
 }
 

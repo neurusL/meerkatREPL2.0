@@ -9,6 +9,7 @@ pub enum VarValueState {
     Uninit,                             // uninitialized
     Val(Expr),                          // stable state of a var actor value
     Trans(Option<Expr>, (Expr, TxnId)), // when receive write request, var actor is in transition
+    // first slot for old value, second slot for new value
 }
 
 impl VarValueState {
