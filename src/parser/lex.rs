@@ -135,6 +135,8 @@ pub enum Token<'a> {
   Comma,
   #[token(":")]
   Colon,
+  #[token(".")]
+  Dot,
 
   // Reserved Keywords
   #[token("service")]
@@ -157,6 +159,12 @@ pub enum Token<'a> {
   TABLE_KW,
   #[token("insert")]
   INSERT_KW,
+  #[token("select")]
+  SELECT_KW,
+  #[token("from")]
+  FROM_KW,
+  #[token("where")]
+  WHERE_KW,
   #[token("into")]
   INTO_KW,
   #[token("action")]

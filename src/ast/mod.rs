@@ -89,7 +89,23 @@ pub enum Expr {
         assns: Vec<Assn>,
         inserts: Vec<Insert>,
     },
+
+    TableColumn {    // table1.id for example will be treated as an expression and evaluated separately
+        table_name: String,
+        column_name: String,
+    },
+
+    Select {
+        table_name: String,
+        where_clause: Box<Expr>,
+    },
+    
+    Table {
+        rows: Vec<Row>, 
+    },
 }
+
+
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Decl {
@@ -107,12 +123,12 @@ pub enum Decl {
     },
     TableDecl {
         name: String,
-        records: Vec<Record>,
+        fields: Vec<Field>,
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Record {
+pub struct Field {
     pub name: String,
     pub type_: DataType,
 }
@@ -214,6 +230,19 @@ impl Display for Expr {
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
+            Expr::TableColumn { table_name, column_name } => write!(
+                f,
+                "{}.{}",
+                table_name,column_name
+            ),
+            Expr::Select { table_name, where_clause } => write!(
+                f,
+                "{}",
+                where_clause,
+            ),
+            Expr::Table { rows } => write!(f,"[rows]")
+
+            
         }
     }
 }
@@ -238,7 +267,7 @@ impl Display for Decl {
                     write!(f, "def {} = {}", name, val)
                 }
             }
-            Decl::TableDecl { name, records } => {
+            Decl::TableDecl { name, fields } => {
                 write!(f, "table {} created", name)
             }
         }

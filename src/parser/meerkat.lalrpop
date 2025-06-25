@@ -7,7 +7,7 @@
 // Grammar 
 grammar<'input>;
 
-use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test, DataType, Record, Insert, Entry, Row};
+use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test, DataType, Field, Insert, Entry, Row};
 use lalrpop_util::ParseError;
 use crate::parser::lex::Token;
 
@@ -28,6 +28,9 @@ extern {
         "def" => Token::DEF_KW,
         "table" => Token::TABLE_KW,
         "insert" => Token::INSERT_KW,
+        "select" => Token::SELECT_KW,
+        "from" => Token::FROM_KW,
+        "where" => Token::WHERE_KW,
         "into" => Token::INTO_KW,
         "action" => Token::ACTION_KW,
         "fn" => Token::FN_KW,
@@ -38,6 +41,7 @@ extern {
         "string" => Token::STRING_KW,
         "bool" => Token::BOOL_KW,
         ";" => Token::Semicolon,
+        "." => Token::Dot,
         "=" => Token::Assgn,
         "=>" => Token::Fn_Assgn,
         "+" => Token::Plus,
@@ -129,24 +133,24 @@ Decl: Decl = {
     "def" <i:Ident> "=" <e:Expr> ";" => {
         Decl::DefDecl { name: i, val: e, is_pub: false }
     },
-    "table" <i:Ident> "{" <recs: Records> "}" ";" => {
-        Decl::TableDecl {name: i, records: recs }
+    "table" <i:Ident> "{" <f: Fields> "}" ";" => {
+        Decl::TableDecl {name: i, fields: f }
     }
 }
 
 Decls: Vec<Decl> = Decl*;
 
-Record: Record = {
+Field: Field = {
    <i:Ident> ":" <t: DataType> "," => {
-    Record {name: i, type_: t}
+    Field {name: i, type_: t}
    } 
 }
 
-Records: Vec<Record> = Record*;
+Fields: Vec<Field> = Field*;
 
-/*Records: Vec<Record> = {
+/*Fields: Vec<Field> = {
     <mut v:(<Ident> ":" <Type> ",")*> => {
-        v.into_iter().map(|(name, type_)| Record { name, type_ }).collect()
+        v.into_iter().map(|(name, type_)| Field { name, type_ }).collect()
     }
 }*/
 
@@ -207,6 +211,8 @@ Args: Vec<Expr> = {
     }
 }
 
+
+
 SubExpr: Expr = {
     <n:Number> => Expr::Number { val: n },
     <b:Bool> => Expr::Bool { val: b },
@@ -217,9 +223,17 @@ SubExpr: Expr = {
     <expr:SubExpr> "(" <args:Args> ")" => 
         Expr::FuncApply { func: Box::new(expr), args },
 
-    "action" "{" <assns: Assns><inserts: Inserts> "}" => Expr::Action { assns, inserts },
     
 
+    "action" "{" <assns: Assns><inserts: Inserts> "}" => Expr::Action { assns, inserts },
+     <t:Ident> "." <c:Ident> => {
+        Expr::TableColumn {
+            table_name: t,
+            column_name: c
+        }
+    },
+    
+    
 }
 
 Expr: Expr = {
@@ -233,6 +247,8 @@ Expr: Expr = {
     "!" <e:Expr> => {
         Expr::Unop { expr: Box::new(e), op: UnOp::Not }
     },
+    
+    
 
     #[precedence(level="2")] #[assoc(side="left")]
     <e1:Expr> "*" <e2:Expr> => {
@@ -249,6 +265,7 @@ Expr: Expr = {
             op: BinOp::Div 
         }
     },
+    
 
     #[precedence(level="3")] #[assoc(side="left")]
     <e1:Expr> "+" <e2:Expr> => {
@@ -265,6 +282,7 @@ Expr: Expr = {
             op: BinOp::Sub 
         }
     },
+   
 
     #[precedence(level="4")] #[assoc(side="left")]
     <e1:Expr> "==" <e2:Expr> => {
@@ -297,6 +315,7 @@ Expr: Expr = {
             op: BinOp::And 
         }
     },
+   
 
     #[precedence(level="6")] #[assoc(side="left")]
     <e1:Expr> "||" <e2:Expr> => {
@@ -321,6 +340,7 @@ Expr: Expr = {
     Expr::Func {
         params, body: Box::new(e)
     },
+    "select" "from" <t: Ident> "where" <cond: Expr> => Expr::Select { table_name: t, where_clause: Box::new(cond) },
 }
 
 Bool: bool = {
