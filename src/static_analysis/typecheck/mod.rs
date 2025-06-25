@@ -12,7 +12,7 @@ mod utils;
 
 use std::{collections::HashMap, fmt::Display};
 
-use crate::ast::{Prog, DataType, Record};
+use crate::ast::{Prog, DataType, Field};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Type {
@@ -25,6 +25,7 @@ pub enum Type {
     Fun(Vec<Type>, Box<Type>), // for instantiated type
 
     TypVar(String),
+    Table
 }
 
 /// Type Scheme represents polymorphic types,
@@ -61,6 +62,7 @@ impl Display for Type {
                 }
             }
             Type::TypVar(name) => write!(f, "{}", name),
+            Type::Table => write!(f, "table")
         }
     }
 }
@@ -75,7 +77,7 @@ pub struct TypecheckEnv {
     pub acc_subst: HashMap<String, Type>,
 
     // table context for insert typecheck
-    pub table_context: HashMap<String, Vec<Record>>,
+    pub table_context: HashMap<String, Vec<Field>>,
 }
 
 impl Display for TypecheckEnv {
