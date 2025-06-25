@@ -31,9 +31,6 @@ pub struct Evaluator {
     /// lambda expr var name -> val
     /// exprvar_name_to_val: HashMap<String, Expr>,
     pub def_name_to_exprs: HashMap<String, Expr>,
-    /// evaluator will have table name to its schema
-    /// table name -> vector of columns (name and type tuple)
-    pub table_name_to_schema: HashMap<String, Vec<(String, DataType)>>, // column names and data types
 
     pub table_name_to_data: HashMap<String, Vec<Row>>, // table consists of vector of rows
 }
@@ -45,7 +42,6 @@ impl Evaluator {
             reactive_names: HashSet::new(),
             reactive_name_to_vals,
             def_name_to_exprs: HashMap::new(),
-            table_name_to_schema: HashMap::new(),
             table_name_to_data: HashMap::new(),
         }
     }

@@ -27,12 +27,11 @@ impl Evaluator {
                 self.eval_expr(val)?;
                 self.reactive_name_to_vals.insert(name.clone(), val.clone());
             }
-            Decl::TableDecl { name, records } => {
-                let mut record_vector: Vec<(String, crate::ast::DataType)> = Vec::new();
-                for record in records {
-                    record_vector.push((record.name.clone(), record.type_.clone()));
+            Decl::TableDecl { name, fields } => {
+                let mut field_vector: Vec<(String, crate::ast::DataType)> = Vec::new();
+                for field in fields {
+                    field_vector.push((field.name.clone(), field.type_.clone()));
                 }
-                self.table_name_to_schema.insert(name.clone(), record_vector); 
                 self.table_name_to_data.insert(name.clone(), Vec::new());
             }
         }
@@ -50,7 +49,7 @@ impl Evaluator {
     }
     pub fn eval_insert(&mut self, insert: &mut Insert) -> Result<(), String> {
 
-        let mut row_data = insert.row.val.iter().map(|entry| Entry {
+        let row_data = insert.row.val.iter().map(|entry| Entry {
             name: entry.name.clone(), val: entry.val.clone(),
         }).collect();
 
