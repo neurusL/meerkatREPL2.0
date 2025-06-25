@@ -79,6 +79,8 @@ impl<'a> fmt::Display for Token<'a> {
 #[derive(Clone, Logos, Debug, PartialEq, AsRefStr, EnumAsInner)]
 #[logos(subpattern identifier = r"[A-Za-z_][A-Za-z0-9_]*")]
 pub enum Token<'a> {
+  #[regex(r#""[^"]*""#, |lex| lex.slice().trim_matches('"'))] // regex for string within ""
+  StrLit(&'a str),
   #[regex(r"(?&identifier)")]
   Ident(&'a str),
 
@@ -131,6 +133,10 @@ pub enum Token<'a> {
   Semicolon,
   #[token(",")]
   Comma,
+  #[token(":")]
+  Colon,
+  #[token(".")]
+  Dot,
 
   // Reserved Keywords
   #[token("service")]
@@ -149,6 +155,18 @@ pub enum Token<'a> {
   PUB_KW,
   #[token("def")]
   DEF_KW,
+  #[token("table")]
+  TABLE_KW,
+  #[token("insert")]
+  INSERT_KW,
+  #[token("select")]
+  SELECT_KW,
+  #[token("from")]
+  FROM_KW,
+  #[token("where")]
+  WHERE_KW,
+  #[token("into")]
+  INTO_KW,
   #[token("action")]
   ACTION_KW,
   #[token("fn")]
@@ -159,6 +177,12 @@ pub enum Token<'a> {
   IF_KW,
   #[token("else")]
   ELSE_KW,
+  #[token("number")]
+  NUMBER_KW,
+  #[token("string")]
+  STRING_KW,
+  #[token("bool")]
+  BOOL_KW,
   
   
 

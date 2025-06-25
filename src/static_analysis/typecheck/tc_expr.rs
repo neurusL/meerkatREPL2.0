@@ -9,6 +9,7 @@ impl TypecheckEnv {
         match expr {
             Expr::Number { val: _ } => Int,
             Expr::Bool { val: _ } => Bool,
+            Expr::String {val: _} => String,
             Expr::Variable { ident } => self
                 .var_context
                 .get(ident)
@@ -168,12 +169,50 @@ impl TypecheckEnv {
             }
 
             // more todo on Action type
-            Expr::Action { assns } => {
+            Expr::Action { assns , inserts} => {
                 assns.iter().for_each(|assn| self.typecheck_assn(assn));
+                inserts.iter().for_each(|insert| self.typecheck_insert(insert));
+
                 Action
             }
+            Expr::Select { table_name, where_clause } => {
+                let table = self.table_context.get(table_name).unwrap_or_else(|| panic!("Table {} for selection not found",table_name));
+                
+                self.typecheck_column_access(where_clause, table_name, table);
+
+                let cond_type = self.infer_expr(where_clause);
+                if cond_type != Type::Bool {
+                    panic!("Select where clause must be boolean, got {}", cond_type);
+                }
+                
+                Table
+            }
+            Expr::TableColumn { table_name, column_name } => {
+                let found_table = self.table_context.get(table_name);
+
+                match found_table {
+                    None => panic!("Table {} for selection not found", table_name),
+                    Some(table) =>{
+                        let found_column = table.iter().find(|column| column.name == *column_name);
+                        match found_column {
+                            None => panic!("Column {} not found in {}", column_name, table_name),
+                            Some(column) => {
+                                match column.type_ {
+                                    DataType::Bool => Type::Bool,
+                                    DataType::Number => Type::Int,
+                                    DataType::String => Type::String,
+                                }
+                            }
+                        }
+                    
+                    }
+                }
+            }
+            Expr::Table { rows } => {
+                Table
+            }
         }
-    }
+}
 }
 
 // TODO List

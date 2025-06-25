@@ -1,6 +1,6 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 
-use crate::ast::{Assn, Decl, Expr};
+use crate::ast::{Assn, Decl, Expr, Insert, Row, Entry};
 
 use super::{Evaluator, Val};
 
@@ -27,6 +27,13 @@ impl Evaluator {
                 self.eval_expr(val)?;
                 self.reactive_name_to_vals.insert(name.clone(), val.clone());
             }
+            Decl::TableDecl { name, fields } => {
+                let mut field_vector: Vec<(String, crate::ast::DataType)> = Vec::new();
+                for field in fields {
+                    field_vector.push((field.name.clone(), field.type_.clone()));
+                }
+                self.table_name_to_data.insert(name.clone(), Vec::new());
+            }
         }
 
         Ok(())
@@ -38,6 +45,20 @@ impl Evaluator {
         // since assn only appears in action,
         // their effect should not protrude to the expression level language's env
         // self.env.insert(assn.dest.clone(), assn.src.clone());
+        Ok(())
+    }
+    pub fn eval_insert(&mut self, insert: &mut Insert) -> Result<(), String> {
+
+        let row_data = insert.row.val.iter().map(|entry| Entry {
+            name: entry.name.clone(), val: entry.val.clone(),
+        }).collect();
+
+        let row = Row { val: row_data };
+    
+
+        self.table_name_to_data.entry(insert.table_name.clone()).or_insert_with(Vec::new).push(row);
+        println!("Inserted row into {}", insert.table_name);
+
         Ok(())
     }
 
