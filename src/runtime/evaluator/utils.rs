@@ -72,6 +72,9 @@ impl Evaluator {
                     self.subst(&mut assn.src, var_to_expr);
                 }
             }
+            Expr::Select { table_name, where_clause } => todo!(),
+            Expr::TableColumn { table_name, column_name } => todo!(),
+            Expr::Table { rows } => todo!()
         }
     }
 }

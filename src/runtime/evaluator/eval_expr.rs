@@ -167,6 +167,57 @@ impl Evaluator {
                 // }
                 Ok(())
             }
+            Expr::Select { table_name, where_clause } => {  
+
+                let Some(table_data) = self.table_name_to_data.get(table_name).cloned() else {
+                    return Err(format!("Table {} data not found", table_name));
+                };
+
+                let mut selected_rows = Vec::new();
+
+                let original_reactive_name_to_vals = self.reactive_name_to_vals.clone();  // making a copy of the original
+
+                for row in table_data.iter() {
+                    for entry in row.val.iter() {
+                        self.reactive_name_to_vals.insert(entry.name.clone(), entry.val.clone()); // adding every entry's name (column name) and value (expression) as context for evaluating that row  
+                    }
+
+                    let mut evaluated_where = where_clause.deref().clone();    // where clause expression
+                    self.eval_expr(&mut evaluated_where)?;     // evaluating where clause with the help of all entries' context in that row (goes over to TableColumn eval below)
+
+                    if let Expr::Bool { val } = *evaluated_where {
+                        if val {
+                            selected_rows.push(row.clone());     // if condition comes out to true, push that entire row into the vector
+                        }
+                    } else {
+                        self.reactive_name_to_vals = original_reactive_name_to_vals.clone();   // if condition is not bool, return to original context
+                        return Err(format!("Where must evaluate to boolean"));
+                    }
+
+                    for entry in row.val.iter() {
+                        self.reactive_name_to_vals.remove(&entry.name);   // after a row is evaluated, remove all added context so there's no conflicts with the next row's values
+                    }
+                }
+
+                self.reactive_name_to_vals = original_reactive_name_to_vals;   // return to original context after evaluating all rows
+
+                *expr = Expr::Table { rows: selected_rows };   // return table with the rows which passed the check
+                Ok(())
+
+            }
+            Expr::TableColumn { table_name, column_name } => {
+                if let Some(val) = self.reactive_name_to_vals.get(column_name) {   // get the value from the column name in the context which was added in the select eval
+                    *expr = val.clone();
+
+                    return Ok(());
+                }
+                Err(format!("TableColumn {}.{} cannot be evaluated outside of a row context", table_name, column_name))
+            },
+            Expr::Table { rows } => Ok(()),
         }
     }
 }
+
+/* TODO:
+1. Select eval is inefficient, may look into context stack
+*/ 
