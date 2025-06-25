@@ -10,7 +10,7 @@ impl Expr {
         var_binded: &HashSet<String>, // should be initialized by all reactive name declared in the service
     ) -> HashSet<String> {
         match self {
-            Expr::Number { .. } | Expr::Bool { .. } | Expr::String { .. }=> HashSet::new(),
+            Expr::Number { .. } | Expr::Bool { .. } | Expr::String { .. } | Expr::Table { .. }=> HashSet::new(),
             Expr::Variable { ident } => {
                 if var_binded.contains(ident) {
                     HashSet::new()
@@ -55,6 +55,12 @@ impl Expr {
                     free_vars.extend(assn.src.free_var(var_binded));
                 }
                 free_vars
+            }
+            Expr::Select { table_name, where_clause } => {
+                where_clause.free_var(var_binded)
+            }
+            Expr::TableColumn { table_name, column_name } => {
+                HashSet::new()
             }
         }
     }
