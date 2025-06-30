@@ -101,8 +101,12 @@ pub enum Expr {
     },
     
     Table {
-        rows: Vec<Row>, 
+        name: String,
+        rows: Vec<Row>,     
     },
+    /* TODO: Better way to represent tables
+       could have rows as records which are essentially row.values (don't have to store column name for every row, just the values)
+     */
 }
 
 
@@ -240,7 +244,24 @@ impl Display for Expr {
                 "{}",
                 where_clause,
             ),
-            Expr::Table { rows } => write!(f,"[rows]")
+            Expr::Table { name, rows } => {
+                write!(f, "Table {}: [",name)?;
+                for (i,row) in rows.iter().enumerate() {
+                    if i > 0 {
+                        write!(f,", ")?;
+                    }
+                    write!(f,"{{")?;
+                    for(j,entry) in row.val.iter().enumerate() {
+                        if j > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write!(f, "{}: {}", entry.name, entry.val)?;
+                    }
+                    write!(f, "}}")?;
+                }
+                write!(f, "]")
+        }
+
 
             
         }
