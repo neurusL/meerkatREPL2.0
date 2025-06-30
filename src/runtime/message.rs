@@ -1,10 +1,10 @@
 use std::collections::HashSet;
 
-use kameo::{actor::ActorRef, Reply};
+use kameo::{actor::ActorRef, Actor, Reply};
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    ast::{Assn, Expr, Prog, Service, Test},
+    ast::{Assn, Expr, Prog, Service, Test, Insert},
     runtime::{lock::Lock, transaction::TxnId, TestId},
 };
 
@@ -44,6 +44,28 @@ pub enum Msg {
         // requires: HashSet<Txn>,
     },
     UsrWriteVarFinish {
+        txn: TxnId,
+        name: String,
+    },
+    // table operations
+    UserReadTableRequest {
+        txn: TxnId,
+        name: String,
+        table_name: String,
+        where_clause: Expr 
+    },
+    UserReadTableResult {
+        txn: TxnId,
+        name: String,
+        result: Expr,    // Expr::Table in this case
+        pred: Option<Txn>
+    },
+    UserWriteTableRequest {
+        from_mgr_addr: ActorRef<Manager>,
+        txn: TxnId,
+        insert: Insert,
+    },
+    UserWriteTableFinish {
         txn: TxnId,
         name: String,
     },
