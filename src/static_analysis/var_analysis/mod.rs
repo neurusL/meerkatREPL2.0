@@ -15,6 +15,7 @@ pub mod read_write;
 pub struct DependAnalysis {
     pub vars: HashSet<String>,
     pub defs: HashSet<String>,
+    pub tables: HashSet<String>,
     pub dep_graph: HashMap<String, HashSet<String>>,
     pub topo_order: Vec<String>, // topological order of vars/defs
     // transitively dependent vars/defs
@@ -53,6 +54,7 @@ impl Display for DependAnalysis {
 pub fn calc_dep_srv(ast: &ast::Service) -> DependAnalysis {
     let mut da = DependAnalysis::new(ast);
     da.calc_dep_vars();
+    //println!("{}", da);
     da
 }
 
