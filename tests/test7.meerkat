@@ -4,18 +4,22 @@ service test7 {
   def y = x + 2;
   var z = "hello";
 
-  def a = if x > 2 && x>0 then 2 else 0;
-  table sample {id: number, name: string, age: number, };
+  table sample {
+    id: number, 
+    name: string, 
+    age: number, 
+    };
 
   def b = select from sample where sample.id == 1 && sample.name == "Sunay" ;
 
-  var x = sample.id * 2;
-
-  //def act = action { insert {id: 1, name: "Sunay", age: 18, } into sample };
+  def act = action { insert {id: 1, name: "Sunay", age: 18, } into sample };
+  def act2 = action { insert {id: 2, name: "A", age: 18, } into sample };
 
 }
 
 @test(test7) {
-    //do act;
-    assert(a==2);
+    do act;
+    assert(x==1);
+    // assert(b == [{id: 1, name: "Sunay", age: 18}]);    // todo (think about testing select statements)
+    do act2;
 }
