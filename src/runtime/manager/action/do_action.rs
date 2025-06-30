@@ -22,7 +22,7 @@ use std::{collections::HashSet, error::Error};
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    ast::{Assn, Expr},
+    ast::{Assn, Expr, Insert},
     runtime::{
         evaluator::eval_assns,
         lock::{Lock, LockKind},
@@ -52,7 +52,7 @@ impl Manager {
 
         // set up txn manager
         let txn_mgr = TxnManager::new(txn, from_client, read_set, write_set);
-            
+
         txn_mgr
     }
 
@@ -213,11 +213,17 @@ impl Manager {
         Ok(expr == Expr::Bool { val: true })
     }
 
-    pub fn eval_action(&mut self, mut expr: Expr) -> Result<Vec<Assn>, String> {
+    pub fn eval_insert(&mut self, insert: &Insert) -> Result<bool,String> { 
+        
+        self.evaluator.eval_insert(&mut insert.clone());
+        Ok(true)
+    }
+
+    pub fn eval_action(&mut self, mut expr: Expr) -> Result<(Vec<Assn>, Vec<Insert>), String> {
         self.evaluator.eval_expr(&mut expr)?;
 
         if let Expr::Action { assns, inserts } = expr {
-            Ok(assns.clone())
+            Ok((assns.clone(), inserts.clone()))
         } else {
             Err(format!("do requires action expression"))
         }

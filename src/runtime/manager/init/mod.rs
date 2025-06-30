@@ -27,6 +27,11 @@ impl Manager {
         self.dep_tran_vars = srv_info.dep_vars;
 
         for name in srv_info.topo_order.iter() {
+            if srv_info.tables.contains(name) {
+                info!("Allocating table actor");
+                self.alloc_table_actor(name, Expr::Table {name: name.to_string(), rows: vec![] }).await;
+            }
+            else if srv_info.vars.contains(name) {
             let val = self
                 .evaluator
                 .reactive_name_to_vals
@@ -35,9 +40,8 @@ impl Manager {
                     "Service alloc: var/def is not initialized: {}",
                     name
                 ));
-
-            if srv_info.vars.contains(name) {
                 self.alloc_var_actor(name, val.clone()).await;
+                info!("Allocating var actor");
             } else if srv_info.defs.contains(name) {
                 let def_expr = self.evaluator.def_name_to_exprs.get(name).expect(&format!(
                     "Service alloc: def expr is not initialized: {}",

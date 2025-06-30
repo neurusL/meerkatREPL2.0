@@ -8,6 +8,8 @@ use crate::runtime::message::{CmdMsg, Msg};
 use kameo::mailbox::Signal;
 use kameo::{error::Infallible, prelude::*};
 
+use crate::runtime::Expr;
+
 pub const TICK_INTERVAL: Duration = Duration::from_millis(100);
 
 use super::Manager;
@@ -44,10 +46,40 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                 action,
             } => {
                 info!("Do Action");
-                let assns = self.eval_action(action).unwrap();
+    
+                if let Ok((assns, inserts)) = self.eval_action(action.clone()) {
+                    info!("Ok assignments");
+                    let txn_mgr = self.new_txn(txn_id.clone(), assns, from_client_addr);
+                    self.txn_mgrs.insert(txn_id.clone(), txn_mgr);
+                    
+                        if inserts.is_empty() {
+                            info!("No inserts to process");
+                        }
+                        for insert in inserts {
+                            info!("Inserts found");
+                            if let Ok(true) = self.eval_insert(&insert) {
+                                info!("Sending user write request to table actor ");
+                                //self.alloc_table_actor(&insert.table_name, Expr::Table { name: insert.clone().table_name, rows: vec![] }).await;
+                                if let Some(actor) = self.tablename_to_actors.get(&insert.table_name) {
+                                    let mgr_addr = self.address.as_ref().expect("Manager address not set");
+                                    actor
+                                    .tell(Msg::UserWriteTableRequest { 
+                                        from_mgr_addr: mgr_addr.clone(),
+                                        txn: txn_id.clone(),
+                                        insert: insert.clone()})
+                                        .await.unwrap();
+                                }
+                                else {
+                                    info!("No table actor for table: {}", insert.table_name);
+                                }
+                            }
+                        }
+                    } else {
+                        info!("Expr:: Action not found, it is {:?}", &action);
+                    }
 
-                let txn_mgr = self.new_txn(txn_id.clone(), assns, from_client_addr);
-                self.txn_mgrs.insert(txn_id.clone(), txn_mgr);
+                
+                
 
                 // request locks
                 let _ = self.request_locks(&txn_id).await;
@@ -82,7 +114,7 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
     }
 }
 
-/// message between manager and var/def actors
+/// message between manager and var/def/table actors
 impl kameo::prelude::Message<Msg> for Manager {
     type Reply = Msg;
 
@@ -164,6 +196,20 @@ impl kameo::prelude::Message<Msg> for Manager {
                 Msg::Unit
             }
 
+            Msg::UserWriteTableFinish { txn: txn_id, name } => {
+                info!("UserWriteTableFinish");
+                //self.add_finished_write(&txn_id, name);  // not required for tables
+                if self.all_write_finished(&txn_id) {
+                    let _ = self.release_locks(&txn_id).await;
+                    let client_sender = self.get_client_sender(&txn_id);
+                    client_sender
+                        .send(CmdMsg::TransactionCommitted { txn_id })
+                        .await
+                        .unwrap();
+                }
+                Msg::Unit
+            }
+
             Msg::LockAbort { from_name: _, lock } => {
                 info!("Lock Abort");
                 let _ = self.request_abort_locks(&lock.txn_id).await;
@@ -224,6 +270,8 @@ impl Manager {
             actor.tell(msg).await?;
         } else if let Some(actor) = self.defname_to_actors.get(name) {
             actor.tell(msg).await?;
+        } else if let Some(actor) = self.tablename_to_actors.get(name) {
+            actor.tell(msg).await?;
         } else {
             panic!("Service alloc: no such var or def with name: {}", name);
         }
@@ -235,6 +283,8 @@ impl Manager {
         let back_msg = if let Some(actor) = self.varname_to_actors.get(name) {
             actor.ask(msg).await?
         } else if let Some(actor) = self.defname_to_actors.get(name) {
+            actor.ask(msg).await?
+        } else if let Some(actor) = self.tablename_to_actors.get(name) {
             actor.ask(msg).await?
         } else {
             panic!("Service alloc: no such var or def with name: {}", name);
@@ -253,7 +303,9 @@ impl Manager {
             actor.tell(msg_var).await?;
         } else if let Some(actor) = self.defname_to_actors.get(name) {
             actor.tell(msg_def).await?;
-        } else {
+        } else if let Some(actor) = self.tablename_to_actors.get(name) {
+            actor.tell(msg_var).await?;
+        }else {
             panic!("Service alloc: no such var or def with name: {}", name);
         }
 

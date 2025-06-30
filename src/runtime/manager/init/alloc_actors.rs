@@ -9,6 +9,7 @@ use kameo::{prelude::*, spawn, Actor};
 use log::info;
 
 use crate::runtime::manager::Manager;
+use crate::runtime::table_actor::TableActor;
 use crate::runtime::TestId;
 use crate::{
     ast::{Expr, Prog, Service},
@@ -109,6 +110,12 @@ impl Manager {
         }
 
         Ok(actor_ref)
+    }
+
+    pub async fn alloc_table_actor(&mut self, name: &String, val: Expr) {
+        info!("spawning table actor");
+        let actor_ref = spawn(TableActor::new(name.clone(), val));
+        self.tablename_to_actors.insert(name.clone(), actor_ref);
     }
 }
 
