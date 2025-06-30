@@ -74,7 +74,7 @@ impl Evaluator {
             }
             Expr::Select { table_name, where_clause } => todo!(),
             Expr::TableColumn { table_name, column_name } => todo!(),
-            Expr::Table { rows } => todo!()
+            Expr::Table { name, rows } => todo!()
         }
     }
 }

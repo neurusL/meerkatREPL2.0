@@ -54,10 +54,16 @@ impl Evaluator {
         }).collect();
 
         let row = Row { val: row_data };
-    
+        
 
-        self.table_name_to_data.entry(insert.table_name.clone()).or_insert_with(Vec::new).push(row);
+        let rows = self.table_name_to_data.entry(insert.table_name.clone()).or_insert_with(Vec::new);
+        rows.push(row);
         println!("Inserted row into {}", insert.table_name);
+
+        let mut table_rows = rows.clone();
+        let table = Expr::Table { name: insert.table_name.clone(), rows: table_rows };
+
+        println!("Printing after insertion: {}", table);
 
         Ok(())
     }

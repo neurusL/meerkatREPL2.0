@@ -201,7 +201,10 @@ impl Evaluator {
 
                 self.reactive_name_to_vals = original_reactive_name_to_vals;   // return to original context after evaluating all rows
 
-                *expr = Expr::Table { rows: selected_rows };   // return table with the rows which passed the check
+                *expr = Expr::Table { name: table_name.to_string(), rows: selected_rows };   // return table with the rows which passed the check
+
+                println!("Select result: {}", *expr);
+              
                 Ok(())
 
             }
@@ -213,7 +216,7 @@ impl Evaluator {
                 }
                 Err(format!("TableColumn {}.{} cannot be evaluated outside of a row context", table_name, column_name))
             },
-            Expr::Table { rows } => Ok(()),
+            Expr::Table { name, rows } => Ok(()),
         }
     }
 }
