@@ -161,7 +161,7 @@ impl Evaluator {
                 }
             }
 
-            Expr::Action { assns , inserts} => {
+            Expr::Action { assns, inserts} => {
                 // for assn in assns.iter_mut() {
                 //     self.eval_assn(assn)?;
                 // }

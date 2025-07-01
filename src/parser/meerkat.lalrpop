@@ -148,22 +148,18 @@ Field: Field = {
 
 Fields: Vec<Field> = Field*;
 
-/*Fields: Vec<Field> = {
-    <mut v:(<Ident> ":" <Type> ",")*> => {
-        v.into_iter().map(|(name, type_)| Field { name, type_ }).collect()
-    }
-}*/
-
 DataType: DataType = {
     "number" => DataType::Number,
     "string" => DataType::String,
     "bool" => DataType::Bool,
 }
+
 Entry: Entry = {
     <c: Ident> ":" <e: Expr> "," => {
         Entry {name: c, val: e }
     }
 }
+
 Row: Row = {
     <entries: Entry*> => Row {val: entries}
 }
@@ -173,7 +169,6 @@ Insert: Insert = {
         Insert {row: r, table_name: t}
     }
 }
-
 
 Inserts: Vec<Insert> = Insert*;
 

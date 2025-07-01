@@ -37,6 +37,7 @@ pub struct Insert {
 pub struct Row {
     pub val: Vec<Entry>,
 }
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Entry {
     pub name: String,  // column name
