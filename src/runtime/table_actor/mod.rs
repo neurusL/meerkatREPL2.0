@@ -11,6 +11,7 @@ use crate::ast::Expr;
 pub mod handler;
 pub mod state;
 
+#[derive(Actor)]
 pub struct TableActor {
     pub name: String, 
     pub value: state::TableValueState,

@@ -1,62 +1,37 @@
-
-use crate::{ast::Expr, runtime::transaction::TxnId};
-
+use crate::{ ast::{ Expr, Insert, Record } };
 
 #[derive(Debug, Clone)]
 pub enum TableValueState {
-  Val(Expr),
-  Trans(Option<Expr>, (Expr, TxnId)),   // transition state when new row is inserted
+    Val(Expr),
 }
 
 impl TableValueState {
-  pub fn new(val: Expr) -> TableValueState {
-    TableValueState::Val(val)
-  }
-
-
-  pub fn update(&mut self, new_val: Expr , txn_id: TxnId) {     // will only occur for insert queries
-    use self::TableValueState::*;
-    match self {
-      TableValueState::Val(expr) => *self = Trans(Some(expr.clone()), (new_val, txn_id)),
-      TableValueState::Trans( _ ,_ ) => panic!("unresolved transition state")
+    pub fn new(val: Expr) -> TableValueState {
+        TableValueState::Val(val)
     }
-  }
 
-  // TODO: think about do we need trans state for tables, and consequently confirm_update since we don't use locks
-  pub fn confirm_update(&mut self) -> Option<(Expr, TxnId)> {    
-    if let TableValueState::Trans(_, (new_val, txn_id)) = self.clone() {
-      *self = TableValueState::Val(new_val.clone());
-      return Some((new_val, txn_id));
-    }
-    None
-  }
-  
-  pub fn roll_back_if_relevant(&mut self, txn: &TxnId) {
-    if let TableValueState::Trans(old_val, (_, write_txn)) = self {
-      if txn == write_txn {
-        if let Some(expr) = old_val.clone() {
-          *self = TableValueState::Val(expr);
-        }
-        else {
-          panic!("No old value to roll back to!");
+    pub fn update(&mut self, insert: &Insert) {
+        // will only occur for insert queries
+        let record = Record {
+            val: insert.row.val
+                .iter()
+                .map(|entry| entry.val.clone())
+                .collect(),
+        };
+        if let TableValueState::Val(Expr::Table {name: _,  records }) = self {
+          records.push(record);
+        } else {
+          panic!("TableValueState is not a Table variant");
         }
         
-      }
+      
     }
-  }
 }
 
 impl Into<Expr> for TableValueState {
     fn into(self) -> Expr {
         match self {
-            TableValueState::Val(val) => val,
-            TableValueState::Trans(old_val, _) => {
-                if let Some(val) = old_val {
-                    val
-                } else {
-                    panic!("table is not initialized")
-                }
-            }
+            TableValueState::Val(val) => val
         }
     }
 }
