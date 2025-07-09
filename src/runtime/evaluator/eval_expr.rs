@@ -173,13 +173,17 @@ impl Evaluator {
                     return Err(format!("Table {} data not found", table_name));
                 };
 
-                let mut selected_rows = Vec::new();
+                let Some(fields) = self.table_name_to_schema.get(table_name).cloned() else {
+                    return Err(format!("Schema for table {} not found", table_name));
+                };
+
+                let mut selected_records = Vec::new();
 
                 let original_reactive_name_to_vals = self.reactive_name_to_vals.clone();  // making a copy of the original
 
-                for row in table_data.iter() {
-                    for entry in row.val.iter() {
-                        self.reactive_name_to_vals.insert(entry.name.clone(), entry.val.clone()); // adding every entry's name (column name) and value (expression) as context for evaluating that row  
+                for record in table_data.iter() {
+                    for (field, value) in fields.iter().zip(record.val.iter()) {
+                        self.reactive_name_to_vals.insert(field.name.clone(), value.clone()); // adding every entry's name (column name) and value (expression) as context for evaluating that row  
                     }
 
                     let mut evaluated_where = where_clause.deref().clone();    // where clause expression
@@ -187,21 +191,21 @@ impl Evaluator {
 
                     if let Expr::Bool { val } = *evaluated_where {
                         if val {
-                            selected_rows.push(row.clone());     // if condition comes out to true, push that entire row into the vector
+                            selected_records.push(record.clone());     // if condition comes out to true, push that entire row into the vector
                         }
                     } else {
                         self.reactive_name_to_vals = original_reactive_name_to_vals.clone();   // if condition is not bool, return to original context
                         return Err(format!("Where must evaluate to boolean"));
                     }
 
-                    for entry in row.val.iter() {
-                        self.reactive_name_to_vals.remove(&entry.name);   // after a row is evaluated, remove all added context so there's no conflicts with the next row's values
+                    for field in fields.iter() {
+                        self.reactive_name_to_vals.remove(&field.name);   // after a row is evaluated, remove all added context so there's no conflicts with the next row's values
                     }
                 }
 
                 self.reactive_name_to_vals = original_reactive_name_to_vals;   // return to original context after evaluating all rows
 
-                *expr = Expr::Table { name: table_name.to_string(), rows: selected_rows };   // return table with the rows which passed the check
+                *expr = Expr::Table { name: table_name.to_string(), records: selected_records };   // return table with the rows which passed the check
 
                 println!("Select result: {}", *expr);
               
@@ -216,7 +220,7 @@ impl Evaluator {
                 }
                 Err(format!("TableColumn {}.{} cannot be evaluated outside of a row context", table_name, column_name))
             },
-            Expr::Table { name, rows } => Ok(()),
+            Expr::Table { name, records } => Ok(()),
         }
     }
 }

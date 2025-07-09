@@ -1,6 +1,6 @@
 use std::collections::{HashSet, HashMap};
 
-use crate::ast::{Assn, Decl, Expr, Insert, Row, Entry};
+use crate::ast::{Assn, Decl, Expr, Insert, Record, Entry};
 
 use super::{Evaluator, Val};
 
@@ -28,10 +28,8 @@ impl Evaluator {
                 self.reactive_name_to_vals.insert(name.clone(), val.clone());
             }
             Decl::TableDecl { name, fields } => {
-                let mut field_vector: Vec<(String, crate::ast::DataType)> = Vec::new();
-                for field in fields {
-                    field_vector.push((field.name.clone(), field.type_.clone()));
-                }
+                
+                self.table_name_to_schema.insert(name.clone(), fields.clone());
                 self.table_name_to_data.insert(name.clone(), Vec::new());
             }
         }
@@ -49,19 +47,19 @@ impl Evaluator {
     }
     pub fn eval_insert(&mut self, insert: &mut Insert) -> Result<(), String> {
 
-        let row_data = insert.row.val.iter().map(|entry| Entry {
-            name: entry.name.clone(), val: entry.val.clone(),
-        }).collect();
-
-        let row = Row { val: row_data };
+        let record_data = insert.row.val.iter().map(|entry| entry.val.clone()).collect();
         
+        let record = Record { val: record_data };
+        
+        let records = self.table_name_to_data.entry(insert.table_name.clone()).or_insert_with(Vec::new);
+        
+        records.push(record);
 
-        let rows = self.table_name_to_data.entry(insert.table_name.clone()).or_insert_with(Vec::new);
-        rows.push(row);
-        println!("Inserted row into {}", insert.table_name);
 
-        let mut table_rows = rows.clone();
-        let table = Expr::Table { name: insert.table_name.clone(), rows: table_rows };
+        println!("Inserted record into {}", insert.table_name);
+
+        let table_records = records.clone();
+        let table = Expr::Table { name: insert.table_name.clone(), records: table_records };
 
         println!("Printing after insertion: {}", table);
 

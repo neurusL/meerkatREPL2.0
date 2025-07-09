@@ -1,4 +1,4 @@
-use crate::ast::{Assn, Decl, Expr, Prog, ReplCmd, Service, Test, DataType, Insert, Entry, Row};
+use crate::ast::{Assn, DataType, Decl, Entry, Expr, Field, Insert, Prog, Record, ReplCmd, Service, Test};
 use std::{
     collections::{HashMap, HashSet},
     env,
@@ -32,7 +32,10 @@ pub struct Evaluator {
     /// exprvar_name_to_val: HashMap<String, Expr>,
     pub def_name_to_exprs: HashMap<String, Expr>,
 
-    pub table_name_to_data: HashMap<String, Vec<Row>>, // table consists of vector of rows
+
+    pub table_name_to_schema:  HashMap<String, Vec<Field>>,
+
+    pub table_name_to_data: HashMap<String, Vec<Record>>, // table consists of vector of rows
 }
 
 impl Evaluator {
@@ -42,6 +45,7 @@ impl Evaluator {
             reactive_names: HashSet::new(),
             reactive_name_to_vals,
             def_name_to_exprs: HashMap::new(),
+            table_name_to_schema: HashMap::new(),
             table_name_to_data: HashMap::new(),
         }
     }
