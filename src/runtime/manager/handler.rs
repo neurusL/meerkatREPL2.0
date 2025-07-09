@@ -22,11 +22,7 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
         use CmdMsg::*;
         info!("MANAGER {} RECEIVE form Command Line: ", self.name);
         match msg {
-            TryAssert {
-                name,
-                test: bool_expr,
-                test_id,
-            } => {
+            TryAssert { name, test: bool_expr, test_id } => {
                 info!("Try Test");
                 self.new_test(name, bool_expr, test_id).await;
 
@@ -40,46 +36,45 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                 None
             }
 
-            DoAction {
-                from_client_addr,
-                txn_id,
-                action,
-            } => {
+            DoAction { from_client_addr, txn_id, action } => {
                 info!("Do Action");
-    
+
                 if let Ok((assns, inserts)) = self.eval_action(action.clone()) {
-                    info!("Ok assignments");
-                    let txn_mgr = self.new_txn(txn_id.clone(), assns, from_client_addr);
+                    let txn_mgr = self.new_txn(
+                        txn_id.clone(),
+                        assns,
+                        inserts.clone(),
+                        from_client_addr
+                    );
                     self.txn_mgrs.insert(txn_id.clone(), txn_mgr);
-                    
-                        if inserts.is_empty() {
-                            info!("No inserts to process");
-                        }
-                        for insert in inserts {
-                            info!("Inserts found");
-                            if let Ok(true) = self.eval_insert(&insert) {
-                                info!("Sending user write request to table actor ");
-                                //self.alloc_table_actor(&insert.table_name, Expr::Table { name: insert.clone().table_name, rows: vec![] }).await;
-                                if let Some(actor) = self.tablename_to_actors.get(&insert.table_name) {
-                                    let mgr_addr = self.address.as_ref().expect("Manager address not set");
-                                    actor
-                                    .tell(Msg::UserWriteTableRequest { 
+
+                    if inserts.is_empty() {
+                        info!("No inserts to process");
+                    }
+                    for insert in inserts {
+                        info!("Inserts found");
+                        if let Ok(true) = self.eval_insert(&insert) {
+                            info!("Sending user write request to table actor ");
+
+                            if let Some(actor) = self.tablename_to_actors.get(&insert.table_name) {
+                                let mgr_addr = self.address
+                                    .as_ref()
+                                    .expect("Manager address not set");
+                                actor
+                                    .tell(Msg::UserWriteTableRequest {
                                         from_mgr_addr: mgr_addr.clone(),
                                         txn: txn_id.clone(),
-                                        insert: insert.clone()})
-                                        .await.unwrap();
-                                }
-                                else {
-                                    info!("No table actor for table: {}", insert.table_name);
-                                }
+                                        insert: insert.clone(),
+                                    }).await
+                                    .unwrap();
+                            } else {
+                                info!("No table actor for table: {}", insert.table_name);
                             }
                         }
-                    } else {
-                        info!("Expr:: Action not found, it is {:?}", &action);
                     }
-
-                
-                
+                } else {
+                    info!("Expr:: Action not found, it is {:?}", &action);
+                }
 
                 // request locks
                 let _ = self.request_locks(&txn_id).await;
@@ -90,10 +85,7 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
             TransactionAborted { txn_id } => {
                 info!("Transaction Aborted");
                 let client_sender = self.get_client_sender(&txn_id);
-                client_sender
-                    .send(CmdMsg::TransactionAborted { txn_id })
-                    .await
-                    .unwrap();
+                client_sender.send(CmdMsg::TransactionAborted { txn_id }).await.unwrap();
 
                 None
             }
@@ -133,18 +125,16 @@ impl kameo::prelude::Message<Msg> for Manager {
                 Msg::Unit
             }
 
-            Msg::UsrReadVarResult {
-                txn: txn_id,
-                name,
-                result,
-                pred,
-            } => {
+            Msg::UsrReadVarResult { txn: txn_id, name, result, pred } => {
                 info!("UsrReadVarResult");
                 if self.is_aborted(&txn_id) {
                     return Msg::Unit;
                 }
 
-                let pred = pred.map_or_else(|| HashSet::new(), |p| HashSet::from([p]));
+                let pred = pred.map_or_else(
+                    || HashSet::new(),
+                    |p| HashSet::from([p])
+                );
 
                 self.add_finished_read(&txn_id, name, result, pred);
                 info!("add finished read");
@@ -159,12 +149,7 @@ impl kameo::prelude::Message<Msg> for Manager {
                 Msg::Unit
             }
 
-            Msg::UsrReadDefResult {
-                txn: txn_id,
-                name,
-                result,
-                preds,
-            } => {
+            Msg::UsrReadDefResult { txn: txn_id, name, result, preds } => {
                 info!("UsrReadDefResult");
                 if self.is_aborted(&txn_id) {
                     return Msg::Unit;
@@ -179,6 +164,18 @@ impl kameo::prelude::Message<Msg> for Manager {
                 Msg::Unit
             }
 
+            Msg::UserReadTableResult { txn, name, result, pred } => {
+                info!("UserReadTableResult");
+
+                let pred = pred.map_or_else(
+                    || HashSet::new(),
+                    |p| HashSet::from([p])
+                );
+
+                self.add_finished_read(&txn, name, result, pred);
+                Msg::Unit
+            }
+
             Msg::UsrWriteVarFinish { txn: txn_id, name } => {
                 info!("UsrWriteVarFinish");
                 self.add_finished_write(&txn_id, name);
@@ -188,25 +185,17 @@ impl kameo::prelude::Message<Msg> for Manager {
 
                     info!("release all locks, send commit transaction");
                     let client_sender = self.get_client_sender(&txn_id);
-                    client_sender
-                        .send(CmdMsg::TransactionCommitted { txn_id })
-                        .await
-                        .unwrap();
+                    client_sender.send(CmdMsg::TransactionCommitted { txn_id }).await.unwrap();
                 }
                 Msg::Unit
             }
 
-            Msg::UserWriteTableFinish { txn: txn_id, name } => {
+            Msg::UserWriteTableFinish {txn: txn_id, ..} => {
                 info!("UserWriteTableFinish");
-                //self.add_finished_write(&txn_id, name);  // not required for tables
-                if self.all_write_finished(&txn_id) {
-                    let _ = self.release_locks(&txn_id).await;
-                    let client_sender = self.get_client_sender(&txn_id);
-                    client_sender
-                        .send(CmdMsg::TransactionCommitted { txn_id })
-                        .await
-                        .unwrap();
-                }
+
+                let client_sender = self.get_client_sender(&txn_id);
+                client_sender.send(CmdMsg::TransactionCommitted { txn_id }).await.unwrap();
+
                 Msg::Unit
             }
 
@@ -216,12 +205,9 @@ impl kameo::prelude::Message<Msg> for Manager {
                 self.abort_lock(&lock.txn_id); // turn all txn's lock state to aborted
 
                 // notify another mailbox of manager myself
-                let _ = ctx
-                    .actor_ref()
-                    .tell(CmdMsg::TransactionAborted {
-                        txn_id: lock.txn_id,
-                    })
-                    .await;
+                let _ = ctx.actor_ref().tell(CmdMsg::TransactionAborted {
+                    txn_id: lock.txn_id,
+                }).await;
 
                 Msg::Unit
             }
@@ -233,7 +219,7 @@ impl kameo::prelude::Message<Msg> for Manager {
 impl Actor for Manager {
     type Error = Infallible;
 
-    /// customized on_start impl of Actor trait    
+    /// customized on_start impl of Actor trait
     /// to allow manager self reference to its addr
     async fn on_start(&mut self, actor_ref: ActorRef<Self>) -> Result<(), Self::Error> {
         info!("MANAGER on_start got ActorRef with id {}", actor_ref.id());
@@ -243,7 +229,7 @@ impl Actor for Manager {
     async fn next(
         &mut self,
         _actor_ref: WeakActorRef<Self>,
-        mailbox_rx: &mut MailboxReceiver<Self>,
+        mailbox_rx: &mut MailboxReceiver<Self>
     ) -> Option<Signal<Self>> {
         let mut interval = tokio::time::interval(TICK_INTERVAL);
 
@@ -298,14 +284,15 @@ impl Manager {
         name: &String,
         msg_var: Msg,
         msg_def: Msg,
+        msg_tab: Msg
     ) -> Result<(), Box<dyn Error>> {
         if let Some(actor) = self.varname_to_actors.get(name) {
             actor.tell(msg_var).await?;
         } else if let Some(actor) = self.defname_to_actors.get(name) {
             actor.tell(msg_def).await?;
         } else if let Some(actor) = self.tablename_to_actors.get(name) {
-            actor.tell(msg_var).await?;
-        }else {
+            actor.tell(msg_tab).await?;
+        } else {
             panic!("Service alloc: no such var or def with name: {}", name);
         }
 

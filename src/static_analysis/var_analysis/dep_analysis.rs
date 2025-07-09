@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    vec,
-};
+use std::{ collections::{ HashMap, HashSet }, vec };
 
 use crate::ast;
 
@@ -26,11 +23,9 @@ impl DependAnalysis {
                     let deps = val.free_var(&HashSet::new());
                     dep_graph.insert(name.clone(), deps);
                 }
-                ast::Decl::TableDecl { name, fields } => {
+                ast::Decl::TableDecl { name, .. } => {
                     tables.insert(name.clone());
                     dep_graph.insert(name.clone(), HashSet::new());
-                    
-
                 }
                 _ => {}
             }
@@ -51,6 +46,7 @@ impl DependAnalysis {
     /// the transitive dependencies for a given variable or definition.
     /// # Arguments
     /// * `vars` - set of variable names (no dependencies).
+    /// * `tables` - set of table names (no dependencies).
     /// * `visited` - set of visited nodes in dfs.
     /// * `calced` - map of def to their computed dependencies, only appeared
     ///    when finished computing for a def.
@@ -63,7 +59,7 @@ impl DependAnalysis {
         visited: &mut HashSet<String>,
         finished: &mut Vec<String>,
         calced: &mut HashMap<String, HashSet<String>>,
-        name: &String,
+        name: &String
     ) {
         if calced.contains_key(name) {
             return;
@@ -75,7 +71,7 @@ impl DependAnalysis {
 
         visited.insert(name.clone());
         // if visit var, notice var is transitively depend on itself
-        if vars.contains(name) || tables.contains(name){
+        if vars.contains(name) || tables.contains(name) {
             calced.insert(name.clone(), HashSet::from([name.clone()]));
             finished.push(name.clone());
             return;
@@ -84,20 +80,16 @@ impl DependAnalysis {
         // else visit def
         let mut dep = HashSet::new();
 
-        for dep_name in graph
-            .get(name)
-            .expect(&format!("No such name in dep graph: {}", name))
-        {
+        for dep_name in graph.get(name).expect(&format!("No such name in dep graph: {}", name)) {
             Self::dfs_helper(graph, vars, tables, visited, finished, calced, dep_name);
             dep.extend(
                 calced
                     .get(dep_name)
-                    .expect(&format!(
-                        "Not finished transitive dependency 
-                        calculation of: {}",
-                        dep_name
-                    ))
-                    .clone(),
+                    .expect(
+                        &format!("Not finished transitive dependency 
+                        calculation of: {}", dep_name)
+                    )
+                    .clone()
             );
             dep.insert(dep_name.clone());
         }
@@ -117,19 +109,20 @@ impl DependAnalysis {
                 &mut visited,
                 &mut self.topo_order,
                 &mut self.dep_transtive,
-                name,
+                name
             );
         }
 
+        let vars_and_tables: HashSet<_> = self.vars.union(&self.tables).cloned().collect();
         for name in self.vars.iter().chain(self.defs.iter().chain(self.tables.iter())) {
             self.dep_vars.insert(
                 name.clone(),
                 self.dep_transtive
                     .get(name)
                     .expect(&format!("cannot find def {} in trans dep", name))
-                    .intersection(&self.vars)
+                    .intersection(&vars_and_tables)
                     .cloned()
-                    .collect(),
+                    .collect()
             );
         }
     }

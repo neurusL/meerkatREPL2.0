@@ -43,6 +43,7 @@ impl Manager {
         let def_arg_to_vals = def_args
             .iter()
             .map(|name| {
+                if self.evaluator.reactive_name_to_vals.contains_key(name) {
                 (
                     name.clone(),
                     self.evaluator
@@ -54,6 +55,17 @@ impl Manager {
                         ))
                         .clone(),
                 )
+            } else if self.evaluator.table_name_to_data.contains_key(name) {
+                (
+                    name.clone(),
+                    Expr::Table {
+                        name: name.clone(),
+                        records: self.evaluator.table_name_to_data.get(name).unwrap().clone() 
+                    },
+                )
+            } else {
+                panic!("Var/table/def not initialized");
+            }
             })
             .collect::<HashMap<String, Expr>>();
 

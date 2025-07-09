@@ -42,13 +42,14 @@ impl Manager {
         &mut self,
         txn_id: TxnId,
         assns: Vec<Assn>,
+        inserts: Vec<Insert>,
         from_client: Sender<CmdMsg>,
     ) -> TxnManager {
         // static info of txn, the read and write set, which may overlap
         let read_set = calc_read_set(&assns);
         let write_set = calc_write_set(&assns);
 
-        let txn = Txn::new(txn_id, assns);
+        let txn = Txn::new(txn_id, assns, inserts);
 
         // set up txn manager
         let txn_mgr = TxnManager::new(txn, from_client, read_set, write_set);

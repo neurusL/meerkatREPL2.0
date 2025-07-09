@@ -29,7 +29,7 @@ impl Manager {
         for name in srv_info.topo_order.iter() {
             if srv_info.tables.contains(name) {
                 info!("Allocating table actor");
-                self.alloc_table_actor(name, Expr::Table {name: name.to_string(), rows: vec![] }).await;
+                self.alloc_table_actor(name, Expr::Table {name: name.to_string(), records: vec![] }).await;
             }
             else if srv_info.vars.contains(name) {
             let val = self

@@ -208,7 +208,7 @@ impl TypecheckEnv {
                     }
                 }
             }
-            Expr::Table { name, rows } => {
+            Expr::Table { name, records } => {
                 Table
             }
         }

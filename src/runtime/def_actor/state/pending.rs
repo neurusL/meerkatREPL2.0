@@ -52,7 +52,7 @@ impl PendingChanges {
         // then for all arg in var_to_inputs[var] should see t,
         // namely change depends a change on arg, whose preds contains t
         // recorded as (arg, t)
-        for Txn { id: txn_id, assns } in change.preds.iter() {
+        for Txn { id: txn_id, assns, .. } in change.preds.iter() {
             for Assn { dest, .. } in assns.iter() {
                 for arg in self
                     .var_to_args

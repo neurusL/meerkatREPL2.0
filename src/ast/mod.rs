@@ -29,7 +29,7 @@ pub struct Assn {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Insert {
-    pub row: Row ,
+    pub row: Row,
     pub table_name: String,
 }
 
@@ -40,8 +40,13 @@ pub struct Row {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Entry {
-    pub name: String,  // column name
-    pub val: Expr,    // value to be inserted
+    pub name: String, // column name
+    pub val: Expr, // value to be inserted
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Record {
+    pub val: Vec<Expr>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -91,7 +96,7 @@ pub enum Expr {
         inserts: Vec<Insert>,
     },
 
-    TableColumn {    // table1.id for example will be treated as an expression and evaluated separately
+    TableColumn { // table1.id for example will be treated as an expression and evaluated separately
         table_name: String,
         column_name: String,
     },
@@ -100,17 +105,15 @@ pub enum Expr {
         table_name: String,
         where_clause: Box<Expr>,
     },
-    
+
     Table {
         name: String,
-        rows: Vec<Row>,     
+        records: Vec<Record>,
     },
     /* TODO: Better way to represent tables
        could have rows as records which are essentially row.values (don't have to store column name for every row, just the values)
      */
 }
-
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Decl {
@@ -129,7 +132,7 @@ pub enum Decl {
     TableDecl {
         name: String,
         fields: Vec<Field>,
-    }
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -209,7 +212,7 @@ impl Display for Expr {
         match self {
             Expr::Number { val } => write!(f, "{}", val),
             Expr::Bool { val } => write!(f, "{}", val),
-            Expr::String { val } => write!(f,"{}", val),
+            Expr::String { val } => write!(f, "{}", val),
             Expr::Variable { ident } => write!(f, "{}", ident),
             Expr::Unop { op, expr } => write!(f, "{}{}", op, expr),
             Expr::Binop { op, expr1, expr2 } => write!(f, "{} {} {}", expr1, op, expr2),
@@ -217,54 +220,39 @@ impl Display for Expr {
                 write!(f, "if {} then {} else {}", cond, expr1, expr2)
             }
             Expr::Func { params, body } => write!(f, "fn({})[{}]", params.join(","), body),
-            Expr::FuncApply { func, args } => write!(
-                f,
-                "{}({})",
-                func,
-                args.iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
-            Expr::Action { assns, inserts } => write!(
-                f,
-                "Action({:?})",
-                assns
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
-            Expr::TableColumn { table_name, column_name } => write!(
-                f,
-                "{}.{}",
-                table_name,column_name
-            ),
-            Expr::Select { table_name, where_clause } => write!(
-                f,
-                "{}",
-                where_clause,
-            ),
-            Expr::Table { name, rows } => {
-                write!(f, "Table {}: [",name)?;
-                for (i,row) in rows.iter().enumerate() {
+            Expr::FuncApply { func, args } =>
+                write!(
+                    f,
+                    "{}({})",
+                    func,
+                    args.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
+                ),
+            Expr::Action { assns, inserts } =>
+                write!(
+                    f,
+                    "Action({:?})",
+                    assns.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
+                ),
+            Expr::TableColumn { table_name, column_name } =>
+                write!(f, "{}.{}", table_name, column_name),
+            Expr::Select { table_name, where_clause } => write!(f, "{}", where_clause),
+            Expr::Table { name, records } => {
+                write!(f, "Table {}: [", name)?;
+                for (i, record) in records.iter().enumerate() {
                     if i > 0 {
-                        write!(f,", ")?;
+                        write!(f, ", ")?;
                     }
-                    write!(f,"{{")?;
-                    for(j,entry) in row.val.iter().enumerate() {
+                    write!(f, "{{")?;
+                    for (j, entry) in record.val.iter().enumerate() {
                         if j > 0 {
                             write!(f, ", ")?;
                         }
-                        write!(f, "{}: {}", entry.name, entry.val)?;
+                        write!(f, "{}", entry)?;
                     }
                     write!(f, "}}")?;
                 }
                 write!(f, "]")
-        }
-
-
-            
+            }
         }
     }
 }
@@ -279,9 +267,7 @@ impl Display for Decl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Decl::Import { srv_name } => todo!(),
-            Decl::VarDecl { name, val } => {
-                write!(f, "var {} = {}", name, val)
-            }
+            Decl::VarDecl { name, val } => { write!(f, "var {} = {}", name, val) }
             Decl::DefDecl { name, val, is_pub } => {
                 if *is_pub {
                     write!(f, "pub def {} = {}", name, val)
@@ -289,9 +275,7 @@ impl Display for Decl {
                     write!(f, "def {} = {}", name, val)
                 }
             }
-            Decl::TableDecl { name, fields } => {
-                write!(f, "table {} created", name)
-            }
+            Decl::TableDecl { name, fields } => { write!(f, "table {} created", name) }
         }
     }
 }
