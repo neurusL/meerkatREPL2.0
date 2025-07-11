@@ -45,7 +45,7 @@ impl Expr {
 
             // x in FV(l) => x in FV(action { ..., l = r, ...})
             // x in FV(r) => x in FV(action { ..., l = r, ...})
-            Expr::Action {assns, inserts} => {
+            Expr::Action {assns, .. } => {
                 let mut free_vars = HashSet::new();
                 for assn in assns {
                     // dest should never be free, each dest should be declared before use
@@ -57,9 +57,11 @@ impl Expr {
                 free_vars
             }
             Expr::Select { table_name, where_clause } => {
-                where_clause.free_var(var_binded)
+                let mut free_vars = where_clause.free_var(var_binded);
+                free_vars.insert(table_name.clone());
+                free_vars
             }
-            Expr::TableColumn { table_name, column_name } => {
+            Expr::TableColumn { .. } => {
                 HashSet::new()
             }
         }
