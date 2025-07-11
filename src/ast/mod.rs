@@ -236,8 +236,8 @@ impl Display for Expr {
             Expr::TableColumn { table_name, column_name } =>
                 write!(f, "{}.{}", table_name, column_name),
             Expr::Select { table_name, where_clause } => write!(f, "{}", where_clause),
-            Expr::Table { name, records } => {
-                write!(f, "Table {}: [", name)?;
+            Expr::Table {records , ..} => {
+                write!(f, "[",)?;
                 for (i, record) in records.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;

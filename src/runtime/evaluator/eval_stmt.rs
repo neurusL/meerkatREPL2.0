@@ -56,12 +56,10 @@ impl Evaluator {
         records.push(record);
 
 
-        println!("Inserted record into {}", insert.table_name);
-
         let table_records = records.clone();
         let table = Expr::Table { name: insert.table_name.clone(), records: table_records };
 
-        println!("Printing after insertion: {}", table);
+        println!("Inserted row, {} : {}", insert.table_name, table);
 
         Ok(())
     }

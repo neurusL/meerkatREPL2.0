@@ -1,3 +1,5 @@
+use log::info;
+
 use crate::ast::{Assn, BinOp, Expr, UnOp};
 use std::{collections::HashMap, iter::zip, ops::Deref};
 
@@ -42,6 +44,12 @@ impl Evaluator {
             match op {
                 BinOp::And => Ok(Expr::Bool { val: val1 && val2 }),
                 BinOp::Or => Ok(Expr::Bool { val: val1 || val2 }),
+                _ => panic!(),
+            }
+        } else if let (Expr::String { val: val1 }, Expr::String { val: val2 }) = (expr1, expr2) {
+            
+            match op {
+                BinOp::Eq => Ok(Expr::Bool { val: val1 == val2 }),
                 _ => panic!(),
             }
         } else {
@@ -93,7 +101,7 @@ impl Evaluator {
                 self.eval_expr(expr2)?;
                 use Expr::*;
                 match (expr1.as_mut(), expr2.as_mut()) {
-                    (Number { .. }, Number { .. }) | (Bool { .. }, Bool { .. }) => {
+                    (Number { .. }, Number { .. }) | (Bool { .. }, Bool { .. }) | (String { .. }, String { .. }) => {
                         *expr = Self::calc_binop(*op, expr1, expr2)?;
                         Ok(())
                     }
@@ -168,7 +176,10 @@ impl Evaluator {
                 Ok(())
             }
             Expr::Select { table_name, where_clause } => {  
-
+                
+                info!("Looking for table: {}", table_name);
+                info!("Available tables: {:?}", self.table_name_to_data.keys());
+                info!("Fields are: {:?}", self.table_name_to_schema.get(table_name));
                 let Some(table_data) = self.table_name_to_data.get(table_name).cloned() else {
                     return Err(format!("Table {} data not found", table_name));
                 };
@@ -183,48 +194,56 @@ impl Evaluator {
 
                 for record in table_data.iter() {
                     for (field, value) in fields.iter().zip(record.val.iter()) {
-                        self.reactive_name_to_vals.insert(field.name.clone(), value.clone()); // adding every entry's name (column name) and value (expression) as context for evaluating that row  
+                        self.reactive_name_to_vals.insert(field.name.clone(), value.clone());
                     }
+                    info!("Added field name and val");
 
-                    let mut evaluated_where = where_clause.deref().clone();    // where clause expression
-                    self.eval_expr(&mut evaluated_where)?;     // evaluating where clause with the help of all entries' context in that row (goes over to TableColumn eval below)
-
+                    let mut evaluated_where = where_clause.deref().clone();
+                    info!("Going to evaluate where clause");
+                    if let Err(e) = self.eval_expr(&mut evaluated_where) {
+                        info!("Error while evaluating where: {}", e);
+                        self.reactive_name_to_vals = original_reactive_name_to_vals.clone();
+                        return Err(e);
+                    }
+                    info!("Finished evaluating where");
                     if let Expr::Bool { val } = *evaluated_where {
                         if val {
-                            selected_records.push(record.clone());     // if condition comes out to true, push that entire row into the vector
+                            selected_records.push(record.clone());
                         }
                     } else {
-                        self.reactive_name_to_vals = original_reactive_name_to_vals.clone();   // if condition is not bool, return to original context
+                        self.reactive_name_to_vals = original_reactive_name_to_vals.clone();
                         return Err(format!("Where must evaluate to boolean"));
                     }
 
                     for field in fields.iter() {
-                        self.reactive_name_to_vals.remove(&field.name);   // after a row is evaluated, remove all added context so there's no conflicts with the next row's values
+                        self.reactive_name_to_vals.remove(&field.name);
                     }
                 }
 
                 self.reactive_name_to_vals = original_reactive_name_to_vals;   // return to original context after evaluating all rows
-
+                info!("Finished eval");
                 *expr = Expr::Table { name: table_name.to_string(), records: selected_records };   // return table with the rows which passed the check
 
-                println!("Select result: {}", *expr);
+                info!("Select result: {}", *expr);
               
                 Ok(())
 
             }
             Expr::TableColumn { table_name, column_name } => {
+                info!("Eval tablecolumn");
                 if let Some(val) = self.reactive_name_to_vals.get(column_name) {   // get the value from the column name in the context which was added in the select eval
                     *expr = val.clone();
-
+                    // println!("{}",val.clone());
+                
                     return Ok(());
-                }
+                } 
                 Err(format!("TableColumn {}.{} cannot be evaluated outside of a row context", table_name, column_name))
             },
-            Expr::Table { name, records } => Ok(()),
+            Expr::Table { .. } => Ok(()),
         }
     }
 }
 
 /* TODO:
 1. Select eval is inefficient, may look into context stack
-*/ 
+*/
