@@ -10,16 +10,23 @@ service test7 {
     age: number, 
     };
 
-  def b = select from sample where sample.id == 1 && sample.name == "Sunay" ;
+  def b = select from sample where sample.age == 18 ;
 
   def act = action { insert {id: 1, name: "Sunay", age: 18, } into sample };
   def act2 = action { insert {id: 2, name: "A", age: 18, } into sample };
+
+  def act3 = action {x = x + 2;};
+
 
 }
 
 @test(test7) {
     do act;
-    assert(x==1);
-    // assert(b == [{id: 1, name: "Sunay", age: 18}]);    // todo (think about testing select statements)
     do act2;
+    assert(x==1);
+    do act3;
+    assert(y==3);
+    
+    //assert(sample.id == 1);    // todo (think about testing select statements)
+    
 }
