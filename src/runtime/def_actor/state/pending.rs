@@ -52,12 +52,26 @@ impl PendingChanges {
         // then for all arg in var_to_inputs[var] should see t,
         // namely change depends a change on arg, whose preds contains t
         // recorded as (arg, t)
-        for Txn { id: txn_id, assns, .. } in change.preds.iter() {
+        for Txn { id: txn_id, assns, inserts} in change.preds.iter() {
             for Assn { dest, .. } in assns.iter() {
                 for arg in self
                     .var_to_args
                     .get(dest)
                     .expect(&format!("var {} not found in var_to_inputs", dest))
+                    .iter()
+                {
+                    self.change_to_reqs
+                        .entry(change.id)
+                        .or_insert(HashSet::new())
+                        .insert((arg.clone(), txn_id.clone()));
+                }
+            }
+
+            for insert in inserts.iter() {
+                for arg in self
+                    .var_to_args
+                    .get(&insert.table_name)
+                    .expect(&format!("table {} not found in var_to_inputs", &insert.table_name))
                     .iter()
                 {
                     self.change_to_reqs
@@ -76,6 +90,7 @@ impl PendingChanges {
                 .insert(change.id);
         }
     }
+
 
     /// todo(): try different search strategies
     /// - search for minimal batch of changes (find SCC's):
