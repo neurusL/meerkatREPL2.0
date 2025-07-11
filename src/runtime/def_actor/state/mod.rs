@@ -4,11 +4,12 @@ use std::{
 };
 
 use crate::{
-    ast::Expr,
+    ast::{Expr, Field},
     runtime::{evaluator::eval_def_expr, transaction::Txn},
 };
 
 use history::AppliedChanges;
+use log::info;
 use pending::PendingChanges;
 
 pub mod history;
@@ -52,16 +53,18 @@ impl ChangeState {
         }
     }
 
-    pub fn receive_change(&mut self, from_name: String, new_val: Expr, preds: HashSet<Txn>) {
+    pub fn receive_change(&mut self, from_name: String, new_val: Expr, preds: HashSet<Txn>, schema: Vec<Field>) {
         // println!("received change: ({}, {:?}, {:#?})", from_name, new_val, preds);
         let change = PropChange {
             id: self.id_cnt,
             from_name,
             new_val,
             preds,
+            schema,
         };
 
         self.pending_changes.add_change(&change);
+        //info!("Adding change {:?}", &change);
 
         self.id_to_change.insert(self.id_cnt, change);
         self.id_cnt += 1;
@@ -72,17 +75,27 @@ impl ChangeState {
     }
 
     pub fn apply_batch(&mut self, changes: &HashSet<ChangeId>) -> Expr {
+
+        let mut table_data = HashMap::new();
+        let mut table_schema = HashMap::new();
         // println!("{} applying changes: {:#?}", self.expr, changes);
         self.pending_changes.remove_batch_from_pending(changes);
 
         for change_id in changes.iter() {
+            
             let change = &self.id_to_change[change_id];
+            info!("change being applied: {}", &change.from_name);
+            if let Expr::Table { name, records } = &change.new_val {
+                info!("Change in table {} found", name);
+                table_data.insert(name.clone(), records.clone());
+                table_schema.insert(name.clone(), change.schema.clone());
+            }
             self.arg_to_values
                 .insert(change.from_name.clone(), change.new_val.clone());
             self.applied_changes.add_change(change);
         }
 
-        eval_def_expr(&self.expr, &self.arg_to_values)
+        eval_def_expr(&self.expr, &self.arg_to_values, &table_data, &table_schema)
     }
 
     pub fn get_preds_of_changes(&self, changes: &HashSet<ChangeId>) -> HashSet<Txn> {
@@ -113,6 +126,7 @@ pub struct PropChange {
     pub from_name: String,
     pub new_val: Expr,
     pub preds: HashSet<Txn>,
+    pub schema: Vec<Field>
 }
 
 impl PartialEq for PropChange {

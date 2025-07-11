@@ -4,7 +4,7 @@ use kameo::{actor::ActorRef, Actor, Reply};
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    ast::{Assn, Expr, Prog, Service, Test, Insert},
+    ast::{Assn, Expr, Prog, Service, Test, Insert, Field},
     runtime::{lock::Lock, transaction::TxnId, TestId},
 };
 
@@ -105,6 +105,7 @@ pub enum Msg {
         name: String,
         value: Expr,
         preds: HashSet<Txn>,
+        schema: Vec<Field>
     },
 
     // propagate change of name's value, with a set of txns (pred) as prereq
@@ -112,6 +113,7 @@ pub enum Msg {
         from_name: String,
         val: Expr,
         preds: HashSet<Txn>,
+        schema: Vec<Field>,
     },
 }
 

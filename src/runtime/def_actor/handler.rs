@@ -24,12 +24,13 @@ impl kameo::prelude::Message<Msg> for DefActor {
                     name: self.name.clone(),
                     value: self.value.clone(),
                     preds: self.state.get_all_applied_txns(), // todo we use all applied txns now
+                    schema: Vec::new(),
                 }
             }
 
-            Msg::SubscribeGranted { name, value, preds } => {
+            Msg::SubscribeGranted { name, value, preds, schema} => {
                 // notice this is equivalent to a change message for def actor
-                self.state.receive_change(name, value, preds);
+                self.state.receive_change(name, value, preds, schema);
                 Msg::Unit
             }
 
@@ -85,8 +86,9 @@ impl kameo::prelude::Message<Msg> for DefActor {
                 from_name,
                 val,
                 preds,
+                schema
             } => {
-                self.state.receive_change(from_name, val, preds);
+                self.state.receive_change(from_name, val, preds, schema);
                 Msg::Unit
             }
 
@@ -138,7 +140,9 @@ impl DefActor {
 
         // if we search for new batch of changes
         let changes = self.state.search_batch();
+        info!("Search batch found: {:?}", changes);
         if changes.len() > 0 {
+            info!("Calling apply batch function");
             self.value = self.state.apply_batch(&changes);
             let preds = self.state.get_preds_of_changes(&changes);
 
@@ -146,6 +150,7 @@ impl DefActor {
                 from_name: self.name.clone(),
                 val: self.value.clone().into(),
                 preds,
+                schema: Vec::new(),
             };
             self.pubsub.publish(msg).await;
         }

@@ -12,7 +12,7 @@ use crate::runtime::manager::Manager;
 use crate::runtime::table_actor::TableActor;
 use crate::runtime::TestId;
 use crate::{
-    ast::{Expr, Prog, Service},
+    ast::{Expr, Prog, Service, Decl, Field},
     runtime::{def_actor::DefActor, evaluator::eval_srv, message::Msg, var_actor::VarActor},
     static_analysis::var_analysis::calc_dep_srv,
 };
@@ -124,9 +124,9 @@ impl Manager {
         Ok(actor_ref)
     }
 
-    pub async fn alloc_table_actor(&mut self, name: &String, val: Expr) {
+    pub async fn alloc_table_actor(&mut self, name: &String, val: Expr, schema: Vec<Field>) {
         info!("spawning table actor");
-        let actor_ref = spawn(TableActor::new(name.clone(), val));
+        let actor_ref = spawn(TableActor::new(name.clone(), val, schema));
         self.tablename_to_actors.insert(name.clone(), actor_ref);
     }
 }

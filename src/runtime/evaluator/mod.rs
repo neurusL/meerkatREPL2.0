@@ -46,14 +46,25 @@ impl Evaluator {
             reactive_name_to_vals,
             def_name_to_exprs: HashMap::new(),
             table_name_to_schema: HashMap::new(),
-            table_name_to_data: HashMap::new(),
+            table_name_to_data: HashMap::new()
+        }
+    }
+
+   pub fn table_context(reactive_name_to_vals: HashMap<String, Expr>, table_name_to_data: HashMap<String, Vec<Record>>, table_name_to_schema: HashMap<String, Vec<Field>>) -> Evaluator {
+        Evaluator {
+            var_id_cnt: 0,
+            reactive_names: HashSet::new(),
+            reactive_name_to_vals,
+            def_name_to_exprs: HashMap::new(),
+            table_name_to_schema,
+            table_name_to_data,
         }
     }
 }
 
 /// used for def actor eval their expression
-pub fn eval_def_expr(def_expr: &Expr, env: &HashMap<String, Expr>) -> Expr {
-    let mut eval = Evaluator::new(env.clone());
+pub fn eval_def_expr(def_expr: &Expr, env: &HashMap<String, Expr>, table_data: &HashMap<String, Vec<Record>>, table_schema: &HashMap<String, Vec<Field>>) -> Expr {
+    let mut eval = Evaluator::table_context(env.clone(), table_data.clone(), table_schema.clone());
     let mut evaled_expr = def_expr.clone();
     eval.eval_expr(&mut evaled_expr);
     evaled_expr

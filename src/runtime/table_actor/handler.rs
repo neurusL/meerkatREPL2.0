@@ -38,6 +38,7 @@ impl kameo::prelude::Message<Msg> for TableActor {
                         || HashSet::new(),
                         |txn| HashSet::from([txn])
                     ),
+                    schema: self.schema.clone()
                 }
             }
 
@@ -53,18 +54,27 @@ impl kameo::prelude::Message<Msg> for TableActor {
             Msg::UserWriteTableRequest { from_mgr_addr, txn, insert } => {
                 info!("Table Actor {} inserting row", self.name);
 
-                self.value.update(&insert); // using update would be more efficient
+                self.value.update(&insert); 
 
+                let curr_txn = Txn {
+                  id: txn.clone(),
+                  assns: vec![],
+                  inserts: vec![insert.clone()],
+                };
+                //self.latest_write_txn = Some(txn.clone());
+                //self.preds.insert(curr_txn);
                 self.pubsub.publish(Msg::PropChange {
                     from_name: self.name.clone(),
                     val: self.value.clone().into(),
-                    preds: HashSet::new(),
+                    preds: HashSet::from([curr_txn]),
+                    schema: self.schema.clone(),
                 }).await;
                 info!("Prop change message sent to subscribers");
-
-                //self.latest_write_txn = Some(txn);
+                
+                
+    
                 from_mgr_addr
-                    .tell(Msg::UserWriteTableFinish { txn: txn, name: self.name.clone() }).await
+                    .tell(Msg::UserWriteTableFinish { txn: txn.clone(), name: self.name.clone() }).await
                     .unwrap();
                 info!("Sent UserWriteTableFinish to manager");
                 Msg::Unit

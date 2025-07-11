@@ -10,7 +10,7 @@ use log::info;
 
 use crate::runtime::manager::Manager;
 use crate::{
-    ast::{Expr, Prog, Service},
+    ast::{Expr, Prog, Service, Decl},
     runtime::{def_actor::DefActor, evaluator::eval_srv, message::Msg, var_actor::VarActor},
     static_analysis::var_analysis::calc_dep_srv,
 };
@@ -27,9 +27,16 @@ impl Manager {
         self.dep_tran_vars = srv_info.dep_vars;
 
         for name in srv_info.topo_order.iter() {
+            
             if srv_info.tables.contains(name) {
-                info!("Allocating table actor");
-                self.alloc_table_actor(name, Expr::Table {name: name.to_string(), records: vec![] }).await;
+                if let Some(Decl::TableDecl { name, fields}) = srv.decls.iter().find( |decl| {
+                    matches!(decl, Decl::TableDecl { name: n , .. } if n == name)
+                }) {
+                    info!("Allocating table actor");
+                    // println!("Fields: {:?}", fields);
+                    self.alloc_table_actor(name, Expr::Table {name: name.to_string(), records: vec![] }, fields.to_vec()).await;
+                }
+                
             }
             else if srv_info.vars.contains(name) {
             let val = self
