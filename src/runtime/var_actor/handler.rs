@@ -37,7 +37,6 @@ impl kameo::prelude::Message<Msg> for VarActor {
                         .latest_write_txn
                         .clone()
                         .map_or_else(|| HashSet::new(), |txn| HashSet::from([txn])),
-                    schema: Vec::new()
                 }
             }
 
@@ -100,7 +99,6 @@ impl kameo::prelude::Message<Msg> for VarActor {
                             from_name: self.name.clone(),
                             val: new_value,
                             preds: preds.clone(),
-                            schema: Vec::new()
                         })
                         .await;
                 }

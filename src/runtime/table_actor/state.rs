@@ -18,8 +18,8 @@ impl TableValueState {
                 .map(|entry| entry.val.clone())
                 .collect(),
         };
-        if let TableValueState::Val(Expr::Table {name: _,  records }) = self {
-          records.push(record);
+        if let TableValueState::Val(Expr::Table { name: _, schema: _, records }) = self {
+            records.push(record);
         } else {
           panic!("TableValueState is not a Table variant");
         }

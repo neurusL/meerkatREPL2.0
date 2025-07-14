@@ -44,30 +44,34 @@ impl Manager {
             .iter()
             .map(|name| {
                 if self.evaluator.reactive_name_to_vals.contains_key(name) {
-                (
-                    name.clone(),
-                    self.evaluator
-                        .reactive_name_to_vals
-                        .get(name)
-                        .expect(&format!(
-                            "DefActor alloc: var/def is not initialized: {}",
-                            name
-                        ))
-                        .clone(),
-                )
-            } else if self.evaluator.table_name_to_data.contains_key(name) {
-                (
-                    name.clone(),
-                    Expr::Table {
-                        name: name.clone(),
-                        records: self.evaluator.table_name_to_data.get(name).unwrap().clone() 
-                    },
-                )
-            } else {
-                panic!("Var/table/def not initialized");
-            }
+                    Ok((
+                        name.clone(),
+                        self.evaluator
+                            .reactive_name_to_vals
+                            .get(name)
+                            .expect(&format!(
+                                "DefActor alloc: var/def is not initialized: {}",
+                                name
+                            ))
+                            .clone(),
+                    ))
+                } else if self.evaluator.table_name_to_data.contains_key(name) {
+                    let Some((fields, records)) = self.evaluator.table_name_to_data.get(name) else {
+                        return Err(format!("Table not found: {}", name));
+                    };
+                    Ok((
+                        name.clone(),
+                        Expr::Table {
+                            name: name.clone(),
+                            schema: fields.clone(),
+                            records: records.clone(),
+                        },
+                    ))
+                } else {
+                    Err(format!("Var/table/def not initialized: {}", name))
+                }
             })
-            .collect::<HashMap<String, Expr>>();
+            .collect::<Result<HashMap<String, Expr>, String>>()?;
 
         let def_arg_to_vars = def_args
             .iter()
@@ -124,9 +128,9 @@ impl Manager {
         Ok(actor_ref)
     }
 
-    pub async fn alloc_table_actor(&mut self, name: &String, val: Expr, schema: Vec<Field>) {
+    pub async fn alloc_table_actor(&mut self, name: &String, val: Expr) {
         info!("spawning table actor");
-        let actor_ref = spawn(TableActor::new(name.clone(), val, schema));
+        let actor_ref = spawn(TableActor::new(name.clone(), val));
         self.tablename_to_actors.insert(name.clone(), actor_ref);
     }
 }

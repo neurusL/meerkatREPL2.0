@@ -175,28 +175,24 @@ impl Evaluator {
                 // }
                 Ok(())
             }
-            Expr::Select { table_name, where_clause } => {  
-                
-                info!("Looking for table: {}", table_name);
+            Expr::Select {
+                table_name,
+                where_clause,
+            } => {
                 info!("Available tables: {:?}", self.table_name_to_data.keys());
-                info!("Fields are: {:?}", self.table_name_to_schema.get(table_name));
-                let Some(table_data) = self.table_name_to_data.get(table_name).cloned() else {
+    
+                let Some((fields, records)) = self.table_name_to_data.get(table_name).cloned() else {
                     return Err(format!("Table {} data not found", table_name));
-                };
-
-                let Some(fields) = self.table_name_to_schema.get(table_name).cloned() else {
-                    return Err(format!("Schema for table {} not found", table_name));
                 };
 
                 let mut selected_records = Vec::new();
 
                 let original_reactive_name_to_vals = self.reactive_name_to_vals.clone();  // making a copy of the original
 
-                for record in table_data.iter() {
-                    for (field, value) in fields.iter().zip(record.val.iter()) {
+                for record in records {
+                    for(field, value) in fields.iter().zip(record.val.iter()) {
                         self.reactive_name_to_vals.insert(field.name.clone(), value.clone());
                     }
-                    info!("Added field name and val");
 
                     let mut evaluated_where = where_clause.deref().clone();
                     info!("Going to evaluate where clause");
@@ -222,7 +218,11 @@ impl Evaluator {
 
                 self.reactive_name_to_vals = original_reactive_name_to_vals;   // return to original context after evaluating all rows
                 info!("Finished eval");
-                *expr = Expr::Table { name: table_name.to_string(), records: selected_records };   // return table with the rows which passed the check
+                *expr = Expr::Table {
+                    name: table_name.to_string(),
+                    schema: fields.clone(),
+                    records: selected_records,
+                }; // return table with the rows which passed the check
 
                 info!("Select result: {}", *expr);
               

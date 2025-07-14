@@ -24,13 +24,16 @@ impl kameo::prelude::Message<Msg> for DefActor {
                     name: self.name.clone(),
                     value: self.value.clone(),
                     preds: self.state.get_all_applied_txns(), // todo we use all applied txns now
-                    schema: Vec::new(),
                 }
             }
 
-            Msg::SubscribeGranted { name, value, preds, schema} => {
+            Msg::SubscribeGranted {
+                name,
+                value,
+                preds,
+            } => {
                 // notice this is equivalent to a change message for def actor
-                self.state.receive_change(name, value, preds, schema);
+                self.state.receive_change(name, value, preds);
                 Msg::Unit
             }
 
@@ -86,9 +89,8 @@ impl kameo::prelude::Message<Msg> for DefActor {
                 from_name,
                 val,
                 preds,
-                schema
             } => {
-                self.state.receive_change(from_name, val, preds, schema);
+                self.state.receive_change(from_name, val, preds);
                 Msg::Unit
             }
 
@@ -150,11 +152,9 @@ impl DefActor {
                 from_name: self.name.clone(),
                 val: self.value.clone().into(),
                 preds,
-                schema: Vec::new(),
             };
             self.pubsub.publish(msg).await;
         }
-
         if let Some((test_id, manager)) = &self.is_assert_actor_of {
             info!("{} has value {}", self.name, self.value);
             if let Expr::Bool { val: true } = self.value {

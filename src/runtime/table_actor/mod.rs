@@ -16,7 +16,6 @@ pub mod state;
 pub struct TableActor {
     pub name: String, 
     pub value: state::TableValueState,
-    pub schema: Vec<Field>,
     pub pubsub: PubSub,
 
     pub latest_write_txn: Option<Txn>,
@@ -24,11 +23,10 @@ pub struct TableActor {
 }
 
 impl TableActor {
-    pub fn new(name: String, val: Expr, schema: Vec<Field> ) -> TableActor {
+    pub fn new(name: String, val: Expr) -> TableActor {
         TableActor {
             name,
             value: state::TableValueState::new(val),
-            schema,
             pubsub: PubSub::new(),
             latest_write_txn: None,
             //preds: HashSet::new(),

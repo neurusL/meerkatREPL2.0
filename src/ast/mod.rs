@@ -108,11 +108,9 @@ pub enum Expr {
 
     Table {
         name: String,
+        schema: Vec<Field>,
         records: Vec<Record>,
     },
-    /* TODO: Better way to represent tables
-       could have rows as records which are essentially row.values (don't have to store column name for every row, just the values)
-     */
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

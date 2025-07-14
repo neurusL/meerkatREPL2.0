@@ -1,6 +1,6 @@
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 
-use crate::ast::{Assn, Decl, Expr, Insert, Record, Entry};
+use crate::ast::{Assn, Decl, Entry, Expr, Insert, Record};
 
 use super::{Evaluator, Val};
 
@@ -28,9 +28,7 @@ impl Evaluator {
                 self.reactive_name_to_vals.insert(name.clone(), val.clone());
             }
             Decl::TableDecl { name, fields } => {
-                
-                self.table_name_to_schema.insert(name.clone(), fields.clone());
-                self.table_name_to_data.insert(name.clone(), Vec::new());
+                self.table_name_to_data.insert(name.clone(), (fields.clone(), Vec::new()));
             }
         }
 
@@ -50,14 +48,22 @@ impl Evaluator {
         let record_data = insert.row.val.iter().map(|entry| entry.val.clone()).collect();
         
         let record = Record { val: record_data };
-        
-        let records = self.table_name_to_data.entry(insert.table_name.clone()).or_insert_with(Vec::new);
-        
+
+
+        let (fields, records) = self
+            .table_name_to_data
+            .get_mut(&insert.table_name)
+            .expect("Table not declared");
+
         records.push(record);
 
-
         let table_records = records.clone();
-        let table = Expr::Table { name: insert.table_name.clone(), records: table_records };
+        let table = Expr::Table {
+            name: insert.table_name.clone(),
+            schema: fields.clone(),
+            records: table_records,
+            
+        };
 
         println!("Inserted row, {} : {}", insert.table_name, table);
 

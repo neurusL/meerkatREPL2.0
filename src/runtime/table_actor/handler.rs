@@ -34,22 +34,21 @@ impl kameo::prelude::Message<Msg> for TableActor {
                 Msg::SubscribeGranted {
                     name: self.name.clone(),
                     value: self.value.clone().into(),
-                    preds: self.latest_write_txn.clone().map_or_else(
-                        || HashSet::new(),
-                        |txn| HashSet::from([txn])
-                    ),
-                    schema: self.schema.clone()
+                    preds: self
+                        .latest_write_txn
+                        .clone()
+                        .map_or_else(|| HashSet::new(), |txn| HashSet::from([txn])),
                 }
             }
 
-            Msg::UserReadTableRequest { txn, table_name, .. } => {
-                Msg::UserReadTableResult {
-                    txn,
-                    name: table_name,
-                    result: self.value.clone().into(),
-                    pred: self.latest_write_txn.clone(),
-                }
-            }
+            Msg::UserReadTableRequest {
+                txn, table_name, ..
+            } => Msg::UserReadTableResult {
+                txn,
+                name: table_name,
+                result: self.value.clone().into(),
+                pred: self.latest_write_txn.clone(),
+            },
 
             Msg::UserWriteTableRequest { from_mgr_addr, txn, insert } => {
                 info!("Table Actor {} inserting row", self.name);
@@ -63,12 +62,13 @@ impl kameo::prelude::Message<Msg> for TableActor {
                 };
                 //self.latest_write_txn = Some(txn.clone());
                 //self.preds.insert(curr_txn);
-                self.pubsub.publish(Msg::PropChange {
-                    from_name: self.name.clone(),
-                    val: self.value.clone().into(),
-                    preds: HashSet::from([curr_txn]),
-                    schema: self.schema.clone(),
-                }).await;
+                self.pubsub
+                    .publish(Msg::PropChange {
+                        from_name: self.name.clone(),
+                        val: self.value.clone().into(),
+                        preds: HashSet::from([curr_txn]),
+                    })
+                    .await;
                 info!("Prop change message sent to subscribers");
                 
                 
