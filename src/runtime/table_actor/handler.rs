@@ -55,18 +55,11 @@ impl kameo::prelude::Message<Msg> for TableActor {
 
                 self.value.update(&insert); 
 
-                let curr_txn = Txn {
-                  id: txn.clone(),
-                  assns: vec![],
-                  inserts: vec![insert.clone()],
-                };
-                //self.latest_write_txn = Some(txn.clone());
-                //self.preds.insert(curr_txn);
                 self.pubsub
                     .publish(Msg::PropChange {
                         from_name: self.name.clone(),
                         val: self.value.clone().into(),
-                        preds: HashSet::from([curr_txn]),
+                        preds: HashSet::from([txn.clone()]),
                     })
                     .await;
                 info!("Prop change message sent to subscribers");
@@ -74,7 +67,7 @@ impl kameo::prelude::Message<Msg> for TableActor {
                 
     
                 from_mgr_addr
-                    .tell(Msg::UserWriteTableFinish { txn: txn.clone(), name: self.name.clone() }).await
+                    .tell(Msg::UserWriteTableFinish { txn: txn.id, name: self.name.clone() }).await
                     .unwrap();
                 info!("Sent UserWriteTableFinish to manager");
                 Msg::Unit

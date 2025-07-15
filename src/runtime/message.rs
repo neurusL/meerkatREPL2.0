@@ -62,7 +62,7 @@ pub enum Msg {
     },
     UserWriteTableRequest {
         from_mgr_addr: ActorRef<Manager>,
-        txn: TxnId,
+        txn: Txn,
         insert: Insert,
     },
     UserWriteTableFinish {

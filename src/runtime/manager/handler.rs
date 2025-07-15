@@ -5,6 +5,7 @@ use std::time::Duration;
 use std::{collections::HashSet, error::Error};
 
 use crate::runtime::message::{CmdMsg, Msg};
+use crate::runtime::transaction::Txn;
 use kameo::mailbox::Signal;
 use kameo::{error::Infallible, prelude::*};
 
@@ -42,7 +43,7 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                 if let Ok((assns, inserts)) = self.eval_action(action.clone()) {
                     let txn_mgr = self.new_txn(
                         txn_id.clone(),
-                        assns,
+                        assns.clone(),
                         inserts.clone(),
                         from_client_addr
                     );
@@ -51,6 +52,11 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                     if inserts.is_empty() {
                         info!("No inserts to process");
                     }
+                    let curr_txn = Txn {
+                        id: txn_id.clone(),
+                        assns: assns,
+                        inserts: inserts.clone()
+                    };
                     for insert in inserts {
                         info!("Inserts found");
                         if let Ok(true) = self.eval_insert(&insert) {
@@ -63,7 +69,7 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                                 actor
                                     .tell(Msg::UserWriteTableRequest {
                                         from_mgr_addr: mgr_addr.clone(),
-                                        txn: txn_id.clone(),
+                                        txn: curr_txn.clone(),
                                         insert: insert.clone(),
                                     }).await
                                     .unwrap();
