@@ -55,18 +55,23 @@ impl Manager {
                             ))
                             .clone(),
                     ))
-                } else if self.evaluator.table_name_to_data.contains_key(name) {
-                    let Some((fields, records)) = self.evaluator.table_name_to_data.get(name) else {
+                } else if self.evaluator.reactive_name_to_vals.contains_key(name) {
+                    let Some(table) = self.evaluator.reactive_name_to_vals.get(name) else {
                         return Err(format!("Table not found: {}", name));
                     };
-                    Ok((
+                    if let Expr::Table { name, schema, records } = table {
+                        Ok((
                         name.clone(),
                         Expr::Table {
                             name: name.clone(),
-                            schema: fields.clone(),
+                            schema: schema.clone(),
                             records: records.clone(),
                         },
                     ))
+                    } else {
+                        panic!("Table not found");
+                    }
+                    
                 } else {
                     Err(format!("Var/table/def not initialized: {}", name))
                 }

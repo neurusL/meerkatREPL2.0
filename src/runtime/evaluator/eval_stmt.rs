@@ -28,7 +28,7 @@ impl Evaluator {
                 self.reactive_name_to_vals.insert(name.clone(), val.clone());
             }
             Decl::TableDecl { name, fields } => {
-                self.table_name_to_data.insert(name.clone(), (fields.clone(), Vec::new()));
+                self.reactive_name_to_vals.insert(name.clone(), Expr::Table { name: name.to_string(), schema: fields.clone(), records:Vec::new() });
             }
         }
 
@@ -50,22 +50,18 @@ impl Evaluator {
         let record = Record { val: record_data };
 
 
-        let (fields, records) = self
-            .table_name_to_data
+        let found_table = self
+            .reactive_name_to_vals
             .get_mut(&insert.table_name)
             .expect("Table not declared");
 
-        records.push(record);
+        if let Expr::Table { records, ..} = found_table {
+            records.push(record);
+        } else {
+            panic!("Not a table");
+        }
 
-        let table_records = records.clone();
-        let table = Expr::Table {
-            name: insert.table_name.clone(),
-            schema: fields.clone(),
-            records: table_records,
-            
-        };
-
-        println!("Inserted row, {} : {}", insert.table_name, table);
+        println!("Inserted row, {} : {}", insert.table_name, found_table);
 
         Ok(())
     }

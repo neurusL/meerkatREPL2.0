@@ -59,7 +59,7 @@ impl ChangeState {
         new_val: Expr,
         preds: HashSet<Txn>,
     ) {
-        // println!("received change: ({}, {:?}, {:#?})", from_name, new_val, preds);
+        info!("received change: ({}, {:?}, {:#?})", from_name, new_val, preds);
         let change = PropChange {
             id: self.id_cnt,
             from_name,
@@ -79,23 +79,21 @@ impl ChangeState {
     }
 
     pub fn apply_batch(&mut self, changes: &HashSet<ChangeId>) -> Expr {
-        let mut table_data = HashMap::new();
+        
         // println!("{} applying changes: {:#?}", self.expr, changes);
         self.pending_changes.remove_batch_from_pending(changes);
 
         for change_id in changes.iter() {
             let change = &self.id_to_change[change_id];
             info!("change being applied: {}", &change.from_name);
-            if let Expr::Table { name, schema, records } = &change.new_val {
-                info!("Change in table {} found", name);
-                table_data.insert(name.clone(), (schema.clone(),records.clone()));
-            }
+
             self.arg_to_values
                 .insert(change.from_name.clone(), change.new_val.clone());
             self.applied_changes.add_change(change);
         }
+        info!("Printing env before re-evaluating: {:?}", self.arg_to_values);
 
-        eval_def_expr(&self.expr, &self.arg_to_values, &table_data)
+        eval_def_expr(&self.expr, &self.arg_to_values)
     }
 
     pub fn get_preds_of_changes(&self, changes: &HashSet<ChangeId>) -> HashSet<Txn> {

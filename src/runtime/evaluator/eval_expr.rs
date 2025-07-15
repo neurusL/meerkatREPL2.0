@@ -179,53 +179,52 @@ impl Evaluator {
                 table_name,
                 where_clause,
             } => {
-                info!("Available tables: {:?}", self.table_name_to_data.keys());
-    
-                let Some((fields, records)) = self.table_name_to_data.get(table_name).cloned() else {
+                
+                let Some(table) = self.reactive_name_to_vals.get(table_name).cloned() else {
                     return Err(format!("Table {} data not found", table_name));
                 };
+                info!("Table found is: {}", table);
 
-                let mut selected_records = Vec::new();
+                let original_context = self.reactive_name_to_vals.clone();
 
-                let original_reactive_name_to_vals = self.reactive_name_to_vals.clone();  // making a copy of the original
+                if let Expr::Table {schema, records , ..} = table {
+                    let mut selected_records = Vec::new();
 
-                for record in records {
-                    for(field, value) in fields.iter().zip(record.val.iter()) {
-                        self.reactive_name_to_vals.insert(field.name.clone(), value.clone());
-                    }
-
-                    let mut evaluated_where = where_clause.deref().clone();
-                    info!("Going to evaluate where clause");
-                    if let Err(e) = self.eval_expr(&mut evaluated_where) {
-                        info!("Error while evaluating where: {}", e);
-                        self.reactive_name_to_vals = original_reactive_name_to_vals.clone();
-                        return Err(e);
-                    }
-                    info!("Finished evaluating where");
-                    if let Expr::Bool { val } = *evaluated_where {
-                        if val {
-                            selected_records.push(record.clone());
+                    for record in records {
+                        for(field, value) in schema.iter().zip(record.val.iter()) {
+                            self.reactive_name_to_vals.insert(field.name.clone(), value.clone());
                         }
-                    } else {
-                        self.reactive_name_to_vals = original_reactive_name_to_vals.clone();
-                        return Err(format!("Where must evaluate to boolean"));
-                    }
 
-                    for field in fields.iter() {
-                        self.reactive_name_to_vals.remove(&field.name);
-                    }
+                        //info!("Printing reactive_name_to_vals: {:?}", self.reactive_name_to_vals);
+
+                        let mut evaluated_where = where_clause.deref().clone();
+                    
+                        if let Err(e) = self.eval_expr(&mut evaluated_where) {
+                            info!("Error while evaluating where: {}", e);
+                            return Err(e);
+                        }
+
+                        if let Expr::Bool { val } = *evaluated_where {
+                            if val {
+                                selected_records.push(record.clone());
+                            }
+                        } else {
+                            self.reactive_name_to_vals = original_context;
+                            return Err(format!("Where must evaluate to boolean"));
+                        } 
                 }
 
-                self.reactive_name_to_vals = original_reactive_name_to_vals;   // return to original context after evaluating all rows
-                info!("Finished eval");
-                *expr = Expr::Table {
+                self.reactive_name_to_vals = original_context;
+
+                *expr = Expr::Table {     // return table with the records which passed the check
                     name: table_name.to_string(),
-                    schema: fields.clone(),
+                    schema,
                     records: selected_records,
-                }; // return table with the rows which passed the check
+                };
 
                 info!("Select result: {}", *expr);
-              
+
+                }            
                 Ok(())
 
             }
@@ -244,6 +243,3 @@ impl Evaluator {
     }
 }
 
-/* TODO:
-1. Select eval is inefficient, may look into context stack
-*/
