@@ -6,6 +6,7 @@ service foo_service {
     def h = g - f;
 
     pub def inc_x = action { x = x + 1; };
+    pub def inc_y = action { y = y + 1; };
 }
 
 @test(foo_service) {
@@ -24,8 +25,14 @@ service foo_service {
     will fix this by adding txn2 as pred 
     of def actor of assert(f == 4)
     */
-
+    assert(x == 3 && y == 2);
     assert(g == 6);
-    assert(f == 4);
+    assert(f == 5);
     assert(h == 1);
+
+    do inc_y;
+    assert(x == 3 && y == 3);
+    assert(g == 9);
+    assert(f == 6);
+    assert(h == 3);
 }

@@ -35,8 +35,9 @@ pub struct Manager {
     /// might be benefitial
     pub evaluator: Evaluator,
 
-    pub dep_graph: HashMap<String, HashSet<String>>,
-    pub dep_tran_vars: HashMap<String, HashSet<String>>,
+    /// dependency graph
+    pub dep_graph: HashMap<String, HashSet<String>>, // name to all its deps
+    pub dep_tran_vars: HashMap<String, HashSet<String>>, // name to transitively dep `var`
 
     /// manager transactions and tests submitted to manager from client/developer
     pub txn_mgrs: HashMap<TxnId, TxnManager>,

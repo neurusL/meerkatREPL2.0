@@ -1,4 +1,4 @@
-use std::{collections::HashSet, hash::Hash};
+use std::{collections::{HashMap, HashSet}, hash::Hash};
 
 use crate::ast::{Assn, Expr};
 
@@ -60,14 +60,26 @@ impl Expr {
     }
 }
 
-pub fn calc_read_set(assns: &Vec<Assn>) -> HashSet<String> {
-    let mut reads = HashSet::new();
+/// calculate transitively read set (contains var only)
+/// used for lock acquisition
+pub fn calc_read_set(assns: &Vec<Assn>, trans_deps: &HashMap<String, HashSet<String>>) -> HashSet<String> {
+    let mut direct_reads = HashSet::new();
     for assn in assns {
-        reads.extend(assn.src.free_var(&HashSet::new()));
+        direct_reads.extend(assn.src.free_var(&HashSet::new()));
     }
-    reads
+
+    let mut trans_reads = HashSet::new();
+    for read in direct_reads {
+        trans_reads.extend(trans_deps.get(&read).expect(
+            &format!("read {} not found in transitive dependency", read),
+        ).clone());
+    }
+    
+    trans_reads
 }
 
+/// calculate write set (contains var only, no transitive dependency needed)
+/// used for lock acquisition
 pub fn calc_write_set(assns: &Vec<Assn>) -> HashSet<String> {
     let mut writes = HashSet::new();
     for assn in assns {
