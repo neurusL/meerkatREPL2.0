@@ -1,0 +1,32 @@
+service test7 {
+
+  var x = 1;
+  def y = x + 2;
+  var z = "hello";
+
+  table sample {
+    id: number, 
+    name: string, 
+    age: number, 
+    };
+
+  def b = select from sample where sample.age == 18 ;
+
+  def act = action { insert {id: 1, name: "Sunay", age: 18, } into sample };
+  def act2 = action { insert {id: 2, name: "A", age: 18, } into sample };
+
+  def act3 = action {x = x + 2;};
+
+
+}
+
+@test(test7) {
+    do act;
+    do act2;
+    assert(x==1);
+    do act3;
+    assert(y==3);
+    
+    //assert(sample.id == 1);    // todo (think about testing select statements)
+    
+}

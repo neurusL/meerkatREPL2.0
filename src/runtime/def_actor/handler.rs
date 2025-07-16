@@ -27,7 +27,11 @@ impl kameo::prelude::Message<Msg> for DefActor {
                 }
             }
 
-            Msg::SubscribeGranted { name, value, preds } => {
+            Msg::SubscribeGranted {
+                name,
+                value,
+                preds,
+            } => {
                 // notice this is equivalent to a change message for def actor
                 self.state.receive_change(name, value, preds);
                 Msg::Unit
@@ -138,7 +142,9 @@ impl DefActor {
 
         // if we search for new batch of changes
         let changes = self.state.search_batch();
+        info!("Search batch found: {:?}", changes);
         if changes.len() > 0 {
+            info!("Calling apply batch function");
             self.value = self.state.apply_batch(&changes);
             let preds = self.state.get_preds_of_changes(&changes);
 
@@ -149,7 +155,6 @@ impl DefActor {
             };
             self.pubsub.publish(msg).await;
         }
-
         if let Some((test_id, manager)) = &self.is_assert_actor_of {
             info!("{} has value {}", self.name, self.value);
             if let Expr::Bool { val: true } = self.value {

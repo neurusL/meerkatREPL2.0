@@ -1,3 +1,5 @@
+use log::info;
+
 use crate::ast::{Assn, BinOp, Expr, UnOp};
 use std::{collections::HashMap, iter::zip, ops::Deref};
 
@@ -44,6 +46,12 @@ impl Evaluator {
                 BinOp::Or => Ok(Expr::Bool { val: val1 || val2 }),
                 _ => panic!(),
             }
+        } else if let (Expr::String { val: val1 }, Expr::String { val: val2 }) = (expr1, expr2) {
+            
+            match op {
+                BinOp::Eq => Ok(Expr::Bool { val: val1 == val2 }),
+                _ => panic!(),
+            }
         } else {
             Err(format!(
                 "calculate binop expression cannot be applied 
@@ -61,6 +69,7 @@ impl Evaluator {
         match expr {
             Expr::Number { val } => Ok(()),
             Expr::Bool { val } => Ok(()),
+            Expr::String {val} => Ok(()),
             Expr::Variable { ident } => {
                 let val = self
                     .reactive_name_to_vals
@@ -92,7 +101,7 @@ impl Evaluator {
                 self.eval_expr(expr2)?;
                 use Expr::*;
                 match (expr1.as_mut(), expr2.as_mut()) {
-                    (Number { .. }, Number { .. }) | (Bool { .. }, Bool { .. }) => {
+                    (Number { .. }, Number { .. }) | (Bool { .. }, Bool { .. }) | (String { .. }, String { .. }) => {
                         *expr = Self::calc_binop(*op, expr1, expr2)?;
                         Ok(())
                     }
@@ -160,12 +169,77 @@ impl Evaluator {
                 }
             }
 
-            Expr::Action { assns } => {
+            Expr::Action { assns, inserts} => {
                 // for assn in assns.iter_mut() {
                 //     self.eval_assn(assn)?;
                 // }
                 Ok(())
             }
+            Expr::Select {
+                table_name,
+                where_clause,
+            } => {
+                
+                let Some(table) = self.reactive_name_to_vals.get(table_name).cloned() else {
+                    return Err(format!("Table {} data not found", table_name));
+                };
+                info!("Table found is: {}", table);
+
+                let original_context = self.reactive_name_to_vals.clone();
+
+                if let Expr::Table {schema, records , ..} = table {
+                    let mut selected_records = Vec::new();
+
+                    for record in records {
+                        for(field, value) in schema.iter().zip(record.val.iter()) {
+                            self.reactive_name_to_vals.insert(field.name.clone(), value.clone());
+                        }
+
+                        //info!("Printing reactive_name_to_vals: {:?}", self.reactive_name_to_vals);
+
+                        let mut evaluated_where = where_clause.deref().clone();
+                    
+                        if let Err(e) = self.eval_expr(&mut evaluated_where) {
+                            info!("Error while evaluating where: {}", e);
+                            return Err(e);
+                        }
+
+                        if let Expr::Bool { val } = *evaluated_where {
+                            if val {
+                                selected_records.push(record.clone());
+                            }
+                        } else {
+                            self.reactive_name_to_vals = original_context;
+                            return Err(format!("Where must evaluate to boolean"));
+                        } 
+                }
+
+                self.reactive_name_to_vals = original_context;
+
+                *expr = Expr::Table {     // return table with the records which passed the check
+                    name: table_name.to_string(),
+                    schema,
+                    records: selected_records,
+                };
+
+                info!("Select result: {}", *expr);
+
+                }            
+                Ok(())
+
+            }
+            Expr::TableColumn { table_name, column_name } => {
+                info!("Eval tablecolumn");
+                if let Some(val) = self.reactive_name_to_vals.get(column_name) {   // get the value from the column name in the context which was added in the select eval
+                    *expr = val.clone();
+                    // println!("{}",val.clone());
+                
+                    return Ok(());
+                } 
+                Err(format!("TableColumn {}.{} cannot be evaluated outside of a row context", table_name, column_name))
+            },
+            Expr::Table { .. } => Ok(()),
         }
     }
 }
+

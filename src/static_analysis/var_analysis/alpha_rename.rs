@@ -11,7 +11,7 @@ impl Expr {
         renames: &HashMap<String, String>,
     ) {
         match self {
-            Expr::Number { .. } | Expr::Bool { .. } => {}
+            Expr::Number { .. } | Expr::Bool { .. } | Expr::String { .. } | Expr::Table { .. } => {}
             Expr::Variable { ident } => {
                 if !var_binded.contains(ident) && renames.contains_key(ident) {
                     *ident = renames.get(ident).unwrap().clone();
@@ -41,7 +41,7 @@ impl Expr {
                 }
             }
 
-            Expr::Action { assns } => {
+            Expr::Action { assns, inserts} => {
                 for assn in assns {
                     // dest should never be renamed, not influenced by capture
                     // let dest = &mut assn.dest;
@@ -51,6 +51,11 @@ impl Expr {
                     assn.src.alpha_rename(var_binded, renames);
                 }
             }
+            Expr::Select { table_name, where_clause } => {
+                where_clause.alpha_rename(var_binded, renames);
+            }
+            Expr::TableColumn { table_name, column_name } => {}
+        
         }
     }
 }

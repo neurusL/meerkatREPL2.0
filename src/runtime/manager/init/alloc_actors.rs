@@ -9,9 +9,10 @@ use kameo::{prelude::*, spawn, Actor};
 use log::info;
 
 use crate::runtime::manager::Manager;
+use crate::runtime::table_actor::TableActor;
 use crate::runtime::TestId;
 use crate::{
-    ast::{Expr, Prog, Service},
+    ast::{Expr, Prog, Service, Decl, Field},
     runtime::{def_actor::DefActor, evaluator::eval_srv, message::Msg, var_actor::VarActor},
     static_analysis::var_analysis::calc_dep_srv,
 };
@@ -42,19 +43,40 @@ impl Manager {
         let def_arg_to_vals = def_args
             .iter()
             .map(|name| {
-                (
-                    name.clone(),
-                    self.evaluator
-                        .reactive_name_to_vals
-                        .get(name)
-                        .expect(&format!(
-                            "DefActor alloc: var/def is not initialized: {}",
-                            name
-                        ))
-                        .clone(),
-                )
+                if self.evaluator.reactive_name_to_vals.contains_key(name) {
+                    Ok((
+                        name.clone(),
+                        self.evaluator
+                            .reactive_name_to_vals
+                            .get(name)
+                            .expect(&format!(
+                                "DefActor alloc: var/def is not initialized: {}",
+                                name
+                            ))
+                            .clone(),
+                    ))
+                } else if self.evaluator.reactive_name_to_vals.contains_key(name) {
+                    let Some(table) = self.evaluator.reactive_name_to_vals.get(name) else {
+                        return Err(format!("Table not found: {}", name));
+                    };
+                    if let Expr::Table { name, schema, records } = table {
+                        Ok((
+                        name.clone(),
+                        Expr::Table {
+                            name: name.clone(),
+                            schema: schema.clone(),
+                            records: records.clone(),
+                        },
+                    ))
+                    } else {
+                        panic!("Table not found");
+                    }
+                    
+                } else {
+                    Err(format!("Var/table/def not initialized: {}", name))
+                }
             })
-            .collect::<HashMap<String, Expr>>();
+            .collect::<Result<HashMap<String, Expr>, String>>()?;
 
         let def_arg_to_vars = def_args
             .iter()
@@ -109,6 +131,12 @@ impl Manager {
         }
 
         Ok(actor_ref)
+    }
+
+    pub async fn alloc_table_actor(&mut self, name: &String, val: Expr) {
+        info!("spawning table actor");
+        let actor_ref = spawn(TableActor::new(name.clone(), val));
+        self.tablename_to_actors.insert(name.clone(), actor_ref);
     }
 }
 

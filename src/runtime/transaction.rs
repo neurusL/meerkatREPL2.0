@@ -2,7 +2,7 @@ use core::fmt;
 use std::hash::{Hash, Hasher};
 use tokio::time::Instant;
 
-use crate::ast::{Assn, Expr};
+use crate::ast::{Assn, Insert, Expr};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Hash)]
 pub struct TxnId {
@@ -32,6 +32,7 @@ pub struct WriteToName {
 pub struct Txn {
     pub id: TxnId,
     pub assns: Vec<Assn>,
+    pub inserts: Vec<Insert>,
 }
 
 impl PartialEq for Txn {
@@ -48,14 +49,15 @@ impl Hash for Txn {
 }
 
 impl Txn {
-    pub fn new(id: TxnId, assns: Vec<Assn>) -> Txn {
-        Txn { id, assns }
+    pub fn new(id: TxnId, assns: Vec<Assn>, inserts: Vec<Insert>) -> Txn {
+        Txn { id, assns, inserts }
     }
 
     pub fn new_without_id(assns: Vec<Assn>) -> Txn {
         Txn {
             id: TxnId::new(),
             assns,
+            inserts: Vec::new(),
         }
     }
 }
