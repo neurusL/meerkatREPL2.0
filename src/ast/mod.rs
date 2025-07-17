@@ -107,7 +107,6 @@ pub enum Expr {
     },
 
     Table {
-        name: String,
         schema: Vec<Field>,
         records: Vec<Record>,
     },

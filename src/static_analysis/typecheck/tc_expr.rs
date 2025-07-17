@@ -208,7 +208,7 @@ impl TypecheckEnv {
                     }
                 }
             }
-            Expr::Table { name, schema, records } => Table,
+            Expr::Table {schema, records } => Table,
         }
 }
 }

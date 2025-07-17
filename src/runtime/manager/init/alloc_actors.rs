@@ -59,11 +59,10 @@ impl Manager {
                     let Some(table) = self.evaluator.reactive_name_to_vals.get(name) else {
                         return Err(format!("Table not found: {}", name));
                     };
-                    if let Expr::Table { name, schema, records } = table {
+                    if let Expr::Table {schema, records } = table {
                         Ok((
                         name.clone(),
                         Expr::Table {
-                            name: name.clone(),
                             schema: schema.clone(),
                             records: records.clone(),
                         },

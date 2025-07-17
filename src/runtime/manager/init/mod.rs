@@ -34,7 +34,7 @@ impl Manager {
                 }) {
                     info!("Allocating table actor");
                     // println!("Fields: {:?}", fields);
-                    self.alloc_table_actor(name, Expr::Table {name: name.to_string(), schema: fields.to_vec(), records: vec![] }).await;
+                    self.alloc_table_actor(name, Expr::Table {schema: fields.to_vec(), records: vec![] }).await;
                 }
                 
             }

@@ -59,7 +59,7 @@ impl ChangeState {
         new_val: Expr,
         preds: HashSet<Txn>,
     ) {
-        info!("received change: ({}, {:?}, {:#?})", from_name, new_val, preds);
+        // info!("received change: ({}, {:?}, {:#?})", from_name, new_val, preds);
         let change = PropChange {
             id: self.id_cnt,
             from_name,
@@ -91,7 +91,7 @@ impl ChangeState {
                 .insert(change.from_name.clone(), change.new_val.clone());
             self.applied_changes.add_change(change);
         }
-        info!("Printing env before re-evaluating: {:?}", self.arg_to_values);
+        // info!("Printing env before re-evaluating: {:?}", self.arg_to_values);
 
         eval_def_expr(&self.expr, &self.arg_to_values)
     }

@@ -217,7 +217,6 @@ impl Evaluator {
                 self.reactive_name_to_vals = original_context;
 
                 *expr = Expr::Table {     // return table with the records which passed the check
-                    name: table_name.to_string(),
                     schema,
                     records: selected_records,
                 };

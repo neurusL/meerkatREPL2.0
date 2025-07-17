@@ -28,7 +28,7 @@ impl Evaluator {
                 self.reactive_name_to_vals.insert(name.clone(), val.clone());
             }
             Decl::TableDecl { name, fields } => {
-                self.reactive_name_to_vals.insert(name.clone(), Expr::Table { name: name.to_string(), schema: fields.clone(), records:Vec::new() });
+                self.reactive_name_to_vals.insert(name.clone(), Expr::Table {schema: fields.clone(), records:Vec::new() });
             }
         }
 
