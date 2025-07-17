@@ -3,6 +3,9 @@ service test7 {
   var x = 1;
   def y = x + 2;
   var z = "hello";
+  var age = 21;
+  def updated_age = age + 3;
+
 
   table sample {
     id: number, 
@@ -10,22 +13,30 @@ service test7 {
     age: number, 
     };
 
-  def b = select from sample where sample.age == 18 ;
+  def b = select from sample where sample.id > 1 ;
 
-  def act = action { insert {id: 1, name: "Sunay", age: 18, } into sample };
-  def act2 = action { insert {id: 2, name: "A", age: 18, } into sample };
-
-  def act3 = action {x = x + 2;};
-
+  def act1 = action { insert {id: 1, name: "Sunay", age: 18, } into sample};
+  def act2 = action { insert {id: 2, name: "A", age: 20, } into sample };
+  def act3 = action { insert {id: 3, name: "B", age: 34, } into sample };
+  def act4 = action { insert {id: 4, name: "C", age: 50, } into sample };
+  def act5 = action { insert {id: 5, name: "D", age: 25, } into sample };
+  def act6 = action { insert {id: 6, name: "E", age: 23, } into sample };
 
 }
 
 @test(test7) {
-    do act;
+    do act1;
     do act2;
-    assert(x==1);
     do act3;
-    assert(y==3);
+    do act4;
+    do act5;
+    do act6;
+
+
+    assert(x==3);
+    //assert(y==2);
+    assert(y==5);
+    assert(age==21);
     
     //assert(sample.id == 1);    // todo (think about testing select statements)
     
