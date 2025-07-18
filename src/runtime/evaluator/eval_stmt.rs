@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, hash::Hash};
 
 use crate::ast::{Assn, Decl, Expr};
 
@@ -12,7 +12,7 @@ impl Evaluator {
                 self.reactive_names.insert(name.clone());
 
                 // var should have no depend
-                assert!(val.free_var(&HashSet::new()).is_empty());
+                assert!(val.free_var(&HashSet::new(), &HashSet::new()).is_empty());
 
                 self.eval_expr(val)?;
                 self.reactive_name_to_vals.insert(name.clone(), val.clone());

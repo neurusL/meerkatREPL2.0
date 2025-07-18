@@ -3,10 +3,12 @@ use std::{collections::{HashMap, HashSet}, hash::Hash};
 use crate::ast::{Assn, Expr};
 
 impl Expr {
-    /// return free variables in expr wrt var_binded, used in eval
-    /// can also be used as variables read by the expression when var_binded set to empty
+    /// return free variables in expr wrt var_binded, used for
+    /// 1. for extracting dependency of each def declaration
+    /// 2. for evaluation a expression (substitution based evaluation)
     pub fn free_var(
         &self,
+        reactive_names: &HashSet<String>,
         var_binded: &HashSet<String>, // should be initialized by all reactive name declared in the service
     ) -> HashSet<String> {
         match self {
@@ -18,43 +20,50 @@ impl Expr {
                     HashSet::from([ident.clone()])
                 }
             }
-            Expr::Unop { op, expr } => expr.free_var(var_binded),
+            Expr::Unop { op, expr } => expr.free_var(reactive_names, var_binded),
             Expr::Binop { op, expr1, expr2 } => {
-                let mut free_vars = expr1.free_var(var_binded);
-                free_vars.extend(expr2.free_var(var_binded));
+                let mut free_vars = expr1.free_var(reactive_names, var_binded);
+                free_vars.extend(expr2.free_var(reactive_names, var_binded));
                 free_vars
             }
             Expr::If { cond, expr1, expr2 } => {
-                let mut free_vars = cond.free_var(var_binded);
-                free_vars.extend(expr1.free_var(var_binded));
-                free_vars.extend(expr2.free_var(var_binded));
+                let mut free_vars = cond.free_var(reactive_names, var_binded);
+                free_vars.extend(expr1.free_var(reactive_names, var_binded));
+                free_vars.extend(expr2.free_var(reactive_names, var_binded));
                 free_vars
             }
             Expr::Func { params, body } => {
                 let mut new_binds = var_binded.clone();
                 new_binds.extend(params.iter().cloned());
-                body.free_var(&new_binds)
+                body.free_var(reactive_names, &new_binds)
             }
             Expr::FuncApply { func, args } => {
-                let mut free_vars = func.free_var(var_binded);
+                let mut free_vars = func.free_var(reactive_names, var_binded);
                 for arg in args {
-                    free_vars.extend(arg.free_var(var_binded));
+                    free_vars.extend(arg.free_var(reactive_names, var_binded));
                 }
                 free_vars
             }
 
-            // x in FV(l) => x in FV(action { ..., l = r, ...})
-            // x in FV(r) => x in FV(action { ..., l = r, ...})
+            // x in FV(r) => x in FV(action { ..., l = r, ...}) and x not in reactive_names
+            /* it's trying to model:
+             1. def f = action{ x = y + z } has no dependencies in dependency graph, 
+                since we handle actions separately rather than propagating values of 
+                y, z to  f
+             2. def f = fn y, z => action { x = y + z } to correctly evaluate say, 
+                f(1,2) to action { x = 5 }.
+             */
             Expr::Action { assns } => {
                 let mut free_vars = HashSet::new();
                 for assn in assns {
-                    // dest should never be free, each dest should be declared before use
-                    // if var_binded.contains(&assn.dest) {
-                    //     free_vars.insert(assn.dest.clone());
-                    // }
-                    free_vars.extend(assn.src.free_var(var_binded));
+                    // dest should never be free, we do not allow such pattern
+                    // fn x => action { x = ... }
+                    // since each var action should be declared before in the service
+                    free_vars.extend(assn.src.free_var(reactive_names,var_binded));
                 }
-                free_vars
+
+                // we exclude reactive names from free_vars in action
+                free_vars.difference(reactive_names).cloned().collect()
             }
         }
     }
@@ -62,10 +71,14 @@ impl Expr {
 
 /// calculate transitively read set (contains var only)
 /// used for lock acquisition
-pub fn calc_read_set(assns: &Vec<Assn>, trans_deps: &HashMap<String, HashSet<String>>) -> HashSet<String> {
+pub fn calc_read_set(
+    assns: &Vec<Assn>, 
+    reactive_names: &HashSet<String>, 
+    trans_deps: &HashMap<String, HashSet<String>>
+) -> HashSet<String> {
     let mut direct_reads = HashSet::new();
     for assn in assns {
-        direct_reads.extend(assn.src.free_var(&HashSet::new()));
+        direct_reads.extend(assn.src.free_var(reactive_names,&HashSet::new()));
     }
 
     let mut trans_reads = HashSet::new();

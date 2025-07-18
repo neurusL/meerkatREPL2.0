@@ -1,4 +1,5 @@
 service foo_service {
+    var one = 1;
     var x = 1;
     var y = 2;
     def f = x + y;
@@ -7,16 +8,24 @@ service foo_service {
 
     pub def inc_x = action { x = x + 1; };
     pub def inc_y = action { y = y + 1; };
+    pub def inc_x_y = action { x = x + 1; y = y + 1; };
+
+    pub def inc_x_by = fn z => action { x = x + z; };
+    // pub def inc_x_by = fn x => action { x = x + z; }; // should not pass!
+    // pub def inc_x_by = fn z => action { x = x + w; }; // should not pass!
+
+    pub def inc_x_ = inc_x_by(one);
+
 }
 
 @test(foo_service) {
     
-    do inc_x;  // txn 1
+    do inc_x_;  // txn 1
     assert(g == 4);
     assert(f == 4);
 
-    do inc_x;  // txn 2
-    // assert (f == 4)
+    do inc_x_;  // txn 2
+    // assert(f == 4);
     /* 
     if we move assert f == 4 here 
     there's a chance of passed test
@@ -35,4 +44,8 @@ service foo_service {
     assert(g == 9);
     assert(f == 6);
     assert(h == 3);
+
+    do inc_x_y;
+    assert(x == 4 && y == 4);
+
 }

@@ -8,18 +8,18 @@ impl TypecheckEnv {
             Decl::Import { srv_name } => todo!(),
             Decl::VarDecl { name, val } => {
                 let typ = self.infer_expr(&val);
-                self.var_context.insert(name.clone(), typ);
+                self.name_context.insert(name.clone(), typ);
             }
             Decl::DefDecl { name, val, is_pub } => {
                 let typ = self.infer_expr(&val);
-                self.var_context.insert(name.clone(), typ);
+                self.name_context.insert(name.clone(), typ);
             }
         }
     }
 
     pub fn typecheck_assn(&mut self, assn: &Assn) {
         let dest_typ = self
-            .var_context
+            .name_context
             .get(&assn.dest)
             .cloned()
             .expect(&format!("cannot find {:?} in var context", assn.dest));

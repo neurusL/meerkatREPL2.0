@@ -57,7 +57,7 @@ impl PendingChanges {
                 for arg in self
                     .var_to_args
                     .get(dest)
-                    .expect(&format!("var {} not found in var_to_inputs", dest))
+                    .expect(&format!("var {} not found in var_to_inputs {:?}", dest, self.var_to_args))
                     .iter()
                 {
                     self.change_to_reqs

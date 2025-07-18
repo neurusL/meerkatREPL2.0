@@ -35,7 +35,7 @@ impl Manager {
     ) -> Result<ActorRef<DefActor>, Box<dyn Error>> {
         // calculate all information for def actor
         let def_args = self.dep_graph.get(name).map_or_else(
-            || expr.free_var(&HashSet::new()), // incrementally calculated
+            || expr.free_var(&self.evaluator.reactive_names, &HashSet::new()), // incrementally calculated
             |def_args| def_args.clone(),       // precalculated by centralized manager
         );
 
