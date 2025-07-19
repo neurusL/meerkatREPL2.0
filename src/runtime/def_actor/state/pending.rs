@@ -141,4 +141,8 @@ impl PendingChanges {
             self.change_to_reqs.remove(change);
         }
     }
+
+    pub fn has_no_pending_changes(&self) -> bool {
+        self.change_to_reqs.is_empty()
+    }
 }

@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     ast::Expr,
-    runtime::{evaluator::eval_def_expr, transaction::Txn},
+    runtime::{evaluator::eval_def_expr, transaction::{Txn, TxnId}},
 };
 
 use history::AppliedChanges;
@@ -92,6 +92,12 @@ impl ChangeState {
             preds.extend(change.preds.clone());
         }
         preds
+    }
+
+    pub fn has_applied_txns(&self, txns: &Vec<TxnId>) -> bool {
+        txns.iter().all(|id| {
+            self.get_all_applied_txns().iter().any(|t| t.id == *id)
+        })
     }
 
     pub fn get_all_applied_txns(&self) -> HashSet<Txn> {

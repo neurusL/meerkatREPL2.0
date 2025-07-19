@@ -69,26 +69,18 @@ impl Expr {
     }
 }
 
-/// calculate transitively read set (contains var only)
+/// Calculate direct read set
 /// used for lock acquisition
-pub fn calc_read_set(
+pub fn calc_read_sets(
     assns: &Vec<Assn>, 
     reactive_names: &HashSet<String>, 
-    trans_deps: &HashMap<String, HashSet<String>>
 ) -> HashSet<String> {
     let mut direct_reads = HashSet::new();
     for assn in assns {
         direct_reads.extend(assn.src.free_var(reactive_names,&HashSet::new()));
     }
-
-    let mut trans_reads = HashSet::new();
-    for read in direct_reads {
-        trans_reads.extend(trans_deps.get(&read).expect(
-            &format!("read {} not found in transitive dependency", read),
-        ).clone());
-    }
     
-    trans_reads
+    direct_reads
 }
 
 /// calculate write set (contains var only, no transitive dependency needed)

@@ -17,23 +17,20 @@
 //! * alternatively, we can spawn new thread for each transaction, combined with
 //!   channel to communicate between threads OR with Arc<Mutex or DashMap>
 //!   to lock the shared state of each transaction.
-use std::{collections::HashSet, error::Error};
+use core::panic;
+use std::{collections::{HashMap, HashSet}, error::Error};
 
 use tokio::sync::mpsc::Sender;
 
 use crate::{
     ast::{Assn, Expr},
     runtime::{
-        evaluator::eval_assns,
-        lock::{Lock, LockKind},
-        manager::{
-            action::{ReadState, TxnManager, WriteState},
+        def_actor::state, evaluator::eval_assns, lock::{Lock, LockKind}, manager::{
+            action::{DirectReadState, TransReadState, TxnManager, WriteState},
             Manager,
-        },
-        message::{CmdMsg, Msg},
-        transaction::{Txn, TxnId},
+        }, message::{CmdMsg, Msg}, transaction::{Txn, TxnId}
     },
-    static_analysis::var_analysis::read_write::{calc_read_set, calc_write_set},
+    static_analysis::var_analysis::read_write::{calc_read_sets as calc_read_set, calc_write_set},
 };
 
 impl Manager {
@@ -45,18 +42,26 @@ impl Manager {
         from_client: Sender<CmdMsg>,
     ) -> TxnManager {
         // static info of txn, the read and write set, which may overlap
-        let read_set = calc_read_set(&assns, &self.evaluator.reactive_names,&self.dep_tran_vars);
+        let direct_read_set = calc_read_set(
+            &assns, 
+            &self.evaluator.reactive_names,
+        );
         let write_set = calc_write_set(&assns);
 
         let txn = Txn::new(txn_id, assns);
 
         // set up txn manager
-        let txn_mgr = TxnManager::new(txn, from_client, read_set, write_set);
+        let txn_mgr = TxnManager::new(
+            txn, from_client, 
+            direct_read_set,
+            &self.dep_tran_vars, 
+            write_set
+        );
 
         txn_mgr
     }
 
-    /// 2. request read and write lock
+    /// 2. request trans read and write lock
     pub async fn request_locks(&self, txn_id: &TxnId) -> Result<(), Box<dyn Error>> {
         let mgr_addr = self
             .address
@@ -68,9 +73,9 @@ impl Manager {
         // send lock requests
         // notice it's possible for a reactive name to be both read and write
         // in this case, we only send write lock request
-        for (name, state) in txn_mgr.reads.iter() {
+        for (name, state) in txn_mgr.trans_reads.iter() {
             if txn_mgr.writes.contains_key(name) {
-                assert!(*state == ReadState::Requested);
+                assert!(*state == TransReadState::Requested);
                 continue; // already request for write lock
             }
             self.tell_to_name(
@@ -81,7 +86,7 @@ impl Manager {
                 },
             )
             .await?;
-            assert!(*state == ReadState::Requested);
+            assert!(*state == TransReadState::Requested);
         }
 
         for (name, state) in txn_mgr.writes.iter() {
@@ -102,17 +107,40 @@ impl Manager {
     /// 3. send all read requests
     /// (if all locks granted, which is handled by Manager::handler when
     /// receive new LockGranted message)
-    pub async fn request_reads(&mut self, txn_id: &TxnId) -> Result<(), Box<dyn Error>> {
+    pub async fn request_reads(
+        &mut self, 
+        txn_id: &TxnId,
+    ) -> Result<(), Box<dyn Error>> {
         let txn_mgr = self.txn_mgrs.get(txn_id).unwrap();
         assert!(txn_mgr.all_lock_granted());
 
-        for name in txn_mgr.reads.keys() {
-            self.tell_to_name(
+
+        for (name, state) in txn_mgr.direct_reads.iter() {
+            // calculate transactions needed to be applied before read
+            // since we record all such preds in trans_reads' state
+            // we sum up all name's transitive dependent names' preds
+            let mut pred = Vec::new();
+            
+            if let DirectReadState::RequestedAndDepend(name_trans_read) = state {
+                for name in name_trans_read.iter() {
+                    if let TransReadState::Granted(pred_id) = txn_mgr.trans_reads.get(name)
+                        .expect(&format!("trans read state not found")) {
+                        pred_id.as_ref().map(|id| pred.push(id.clone()));
+                    }
+                }
+            } else { panic!("direct read state should be RequestedAndDepend"); }
+
+            self.tell_to_name2(
                 &name,
                 Msg::UsrReadVarRequest {
                     txn: txn_mgr.txn.id.clone(),
                     from_mgr_addr: self.address.clone().unwrap(),
                 },
+                Msg::UsrReadDefRequest { 
+                    txn: txn_mgr.txn.id.clone(),
+                    from_mgr_addr: self.address.clone().unwrap(),
+                    pred,
+                }
             )
             .await?;
         }
@@ -129,6 +157,10 @@ impl Manager {
 
         let env = txn_mgr.get_read_results();
         let assns = eval_assns(&txn_mgr.txn.assns, env);
+
+        for assn in assns.iter() {
+            println!("assn: {}", assn);
+        }
 
         for Assn { dest, src } in assns {
             self.tell_to_name(
@@ -150,7 +182,7 @@ impl Manager {
     pub async fn request_abort_locks(&self, txn_id: &TxnId) -> Result<(), Box<dyn Error>> {
         let txn_mgr = self.txn_mgrs.get(txn_id).unwrap();
 
-        for name in txn_mgr.reads.keys() {
+        for name in txn_mgr.direct_reads.keys() {
             if txn_mgr.writes.contains_key(name) {
                 continue; // should be aborted for write lock
             }
@@ -188,7 +220,7 @@ impl Manager {
         let txn_mgr = self.txn_mgrs.get(txn_id).unwrap();
 
         // release all locks while avoid duplicated release
-        let mut names = txn_mgr.reads.keys().collect::<HashSet<&String>>();
+        let mut names = txn_mgr.trans_reads.keys().collect::<HashSet<&String>>();
         names.extend(txn_mgr.writes.keys());
 
         for name in names {

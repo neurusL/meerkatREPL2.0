@@ -28,7 +28,8 @@ pub enum Msg {
     UsrReadDefRequest {
         from_mgr_addr: ActorRef<Manager>,
         txn: TxnId,
-        // requires: HashSet<Txn>, // ?? Why we need this
+        
+        pred: Vec<TxnId>, // to obtain read result, def has to see pred in its applied txns
     },
     UsrReadDefResult {
         txn: TxnId,
@@ -66,6 +67,7 @@ pub enum Msg {
         // for notifying manager that a lock request is granted
         from_name: String,
         lock: Lock,
+        pred_id: Option<TxnId>, // txn id that has been appied by the var actor
     },
     LockAbort {
         // for notifying manager that a lock request is aborted

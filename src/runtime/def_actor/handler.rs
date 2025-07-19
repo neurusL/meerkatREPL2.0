@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
+use std::vec;
 
 use kameo::mailbox::Signal;
 use kameo::{error::Infallible, prelude::*};
@@ -63,13 +64,13 @@ impl kameo::prelude::Message<Msg> for DefActor {
             //     Msg::Unit
             // }
 
-            Msg::UsrReadDefRequest { from_mgr_addr, txn } => {
+            Msg::UsrReadDefRequest { from_mgr_addr, txn, pred } => {
                 // assert!(self.lock_state.has_granted(&txn));
-
                 // // remove read lock immediately
                 // self.lock_state.remove_granted_if_read(&txn);
 
-                let _ = from_mgr_addr
+                if pred.len() == 0 {
+                    let _ = from_mgr_addr
                     .tell(Msg::UsrReadDefResult {
                         txn,
                         name: self.name.clone(),
@@ -77,6 +78,12 @@ impl kameo::prelude::Message<Msg> for DefActor {
                         preds: self.state.get_all_applied_txns(), // todo!("switch to undropped txns later")
                     })
                     .await;
+                } else {
+                    self.read_requests.insert(txn, (from_mgr_addr, pred));
+                }
+                
+
+                
 
                 Msg::Unit
             }
@@ -148,6 +155,25 @@ impl DefActor {
                 preds,
             };
             self.pubsub.publish(msg).await;
+        }
+
+        // if we have read request and applied its preds
+        let mut processed = vec![];
+        for (txn, (from_mgr_addr, pred)) in self.read_requests.iter() {
+            if self.state.has_applied_txns(pred) {
+                let _ = from_mgr_addr
+                    .tell(Msg::UsrReadDefResult {
+                        txn: txn.clone(),
+                        name: self.name.clone(),
+                        result: self.value.clone().into(),
+                        preds: self.state.get_all_applied_txns(), // todo!("switch to undropped txns later")
+                    })
+                    .await;
+                processed.push(txn.clone());
+            }
+        }
+        for txn in processed {
+            self.read_requests.remove(&txn); // removed processed read request
         }
 
         if let Some((test_id, manager)) = &self.is_assert_actor_of {

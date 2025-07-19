@@ -43,7 +43,7 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                 txn_id,
                 action,
             } => {
-                info!("Do Action");
+                info!("Do Action");       
                 let assns = self.eval_action(action).unwrap();
 
                 let txn_mgr = self.new_txn(txn_id.clone(), assns, from_client_addr);
@@ -89,9 +89,9 @@ impl kameo::prelude::Message<Msg> for Manager {
     async fn handle(&mut self, msg: Msg, ctx: &mut Context<Self, Self::Reply>) -> Self::Reply {
         info!("MANAGER {} RECEIVE: ", self.name);
         match msg {
-            Msg::LockGranted { from_name, lock } => {
+            Msg::LockGranted { from_name, lock, pred_id } => {
                 info!("Lock Granted");
-                self.add_grant_lock(&lock.txn_id, from_name, lock.lock_kind);
+                self.add_grant_lock(&lock.txn_id, from_name, lock.lock_kind, pred_id);
                 if self.all_lock_granted(&lock.txn_id) {
                     info!("all lock granted");
                     let _ = self.request_reads(&lock.txn_id).await;
@@ -137,9 +137,9 @@ impl kameo::prelude::Message<Msg> for Manager {
                 if self.is_aborted(&txn_id) {
                     return Msg::Unit;
                 }
-
+                
                 self.add_finished_read(&txn_id, name, result, preds);
-
+                
                 if self.all_read_finished(&txn_id) {
                     let _ = self.reeval_and_request_writes(&txn_id).await;
                     // todo!() same above

@@ -191,6 +191,7 @@ impl VarActor {
             let msg = Msg::LockGranted {
                 from_name: self.name.clone(),
                 lock,
+                pred_id: self.latest_write_txn.clone().map(|t| t.id),
             };
 
             let _ = mgr.ask(msg).await?;
