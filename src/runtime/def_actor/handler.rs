@@ -63,27 +63,27 @@ impl kameo::prelude::Message<Msg> for DefActor {
             //     self.lock_state.remove_granted_or_wait(&lock.txn_id);
             //     Msg::Unit
             // }
-
-            Msg::UsrReadDefRequest { from_mgr_addr, txn, pred } => {
+            Msg::UsrReadDefRequest {
+                from_mgr_addr,
+                txn,
+                pred,
+            } => {
                 // assert!(self.lock_state.has_granted(&txn));
                 // // remove read lock immediately
                 // self.lock_state.remove_granted_if_read(&txn);
 
                 if pred.len() == 0 {
                     let _ = from_mgr_addr
-                    .tell(Msg::UsrReadDefResult {
-                        txn,
-                        name: self.name.clone(),
-                        result: self.value.clone().into(),
-                        preds: self.state.get_all_applied_txns(), // todo!("switch to undropped txns later")
-                    })
-                    .await;
+                        .tell(Msg::UsrReadDefResult {
+                            txn,
+                            name: self.name.clone(),
+                            result: self.value.clone().into(),
+                            preds: self.state.get_all_applied_txns(), // todo!("switch to undropped txns later")
+                        })
+                        .await;
                 } else {
                     self.read_requests.insert(txn, (from_mgr_addr, pred));
                 }
-                
-
-                
 
                 Msg::Unit
             }

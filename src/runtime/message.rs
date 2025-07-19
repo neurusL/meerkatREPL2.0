@@ -28,7 +28,7 @@ pub enum Msg {
     UsrReadDefRequest {
         from_mgr_addr: ActorRef<Manager>,
         txn: TxnId,
-        
+
         pred: Vec<TxnId>, // to obtain read result, def has to see pred in its applied txns
     },
     UsrReadDefResult {

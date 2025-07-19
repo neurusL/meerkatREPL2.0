@@ -21,13 +21,15 @@ impl TxnManager {
     pub fn add_grant_lock(&mut self, name: String, kind: LockKind, pred_id: Option<TxnId>) {
         if kind == LockKind::Read {
             assert!(self.trans_reads.get(&name) == Some(TransReadState::Requested).as_ref());
-            self.trans_reads.insert(name, TransReadState::Granted(pred_id));
+            self.trans_reads
+                .insert(name, TransReadState::Granted(pred_id));
         } else {
             // notice in the case the transaction requires both read and write
             // lock on the name, we only send and receive the write lock request
             // and grant, but need additionally update the read lock also granted
             if self.trans_reads.contains_key(&name) {
-                self.trans_reads.insert(name.clone(), TransReadState::Granted(pred_id));
+                self.trans_reads
+                    .insert(name.clone(), TransReadState::Granted(pred_id));
             }
             self.writes.insert(name, WriteState::Granted);
         }
@@ -35,13 +37,16 @@ impl TxnManager {
 
     /// when receive a finished read from name ..
     pub fn add_finished_read(&mut self, name: String, result: Expr, pred: HashSet<Txn>) {
-        assert!(matches!(
-            self.direct_reads.get(&name), 
-            Some(DirectReadState::RequestedAndDepend(_))
-        ),
-        "assertion fail on {:?}", self.direct_reads.get(&name)
-    );
-        self.direct_reads.insert(name, DirectReadState::Read(result));
+        assert!(
+            matches!(
+                self.direct_reads.get(&name),
+                Some(DirectReadState::RequestedAndDepend(_))
+            ),
+            "assertion fail on {:?}",
+            self.direct_reads.get(&name)
+        );
+        self.direct_reads
+            .insert(name, DirectReadState::Read(result));
 
         self.preds.extend(pred);
     }
@@ -54,7 +59,9 @@ impl TxnManager {
 
     /// check if all locks are granted
     pub fn all_lock_granted(&self) -> bool {
-        self.trans_reads.iter().all(|(_, v)| matches!(v, TransReadState::Granted(_)))
+        self.trans_reads
+            .iter()
+            .all(|(_, v)| matches!(v, TransReadState::Granted(_)))
             && self.writes.iter().all(|(_, v)| *v == WriteState::Granted)
     }
 
@@ -93,7 +100,9 @@ impl TxnManager {
 
     /// check if any lock of thetransaction is aborted
     pub fn is_aborted(&self) -> bool {
-        self.trans_reads.iter().any(|(_, v)| *v == TransReadState::Aborted)
+        self.trans_reads
+            .iter()
+            .any(|(_, v)| *v == TransReadState::Aborted)
             || self.writes.iter().any(|(_, v)| *v == WriteState::Aborted)
     }
 

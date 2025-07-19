@@ -92,25 +92,25 @@ pub async fn run_srv(
 }
 
 /// Executes a test on a specified service by processing a sequence of commands.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `test` - A reference to the `Test` structure containing the test commands.
 /// * `srv_actor_ref` - An `ActorRef` to the service manager responsible for handling the test.
 /// * `cli_tx` - A sender channel for sending `CmdMsg` commands to the client.
 /// * `cli_rx` - A receiver channel for receiving `CmdMsg` responses from the client.
 /// * `dev_rx` - A receiver channel for receiving `CmdMsg` responses from the manager.
-/// 
+///
 /// # Returns
-/// 
+///
 /// A `Result` that is `Ok` if the test completes successfully, or an error if something goes wrong.
-/// 
+///
 /// # Description
-/// 
-/// The function iterates over a list of commands in the test. It handles `Do` commands by 
-/// initiating a transaction and waiting for commit or abort messages. It handles `Assert` 
-/// commands by sending assertions to the manager and waiting for a success message or a timeout. 
-/// The test proceeds to the next command only if assertions are successful or transactions 
+///
+/// The function iterates over a list of commands in the test. It handles `Do` commands by
+/// initiating a transaction and waiting for commit or abort messages. It handles `Assert`
+/// commands by sending assertions to the manager and waiting for a success message or a timeout.
+/// The test proceeds to the next command only if assertions are successful or transactions
 /// are committed. The function concludes when all commands have been processed.
 
 pub async fn run_test(

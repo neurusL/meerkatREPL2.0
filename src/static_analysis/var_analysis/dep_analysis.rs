@@ -18,14 +18,16 @@ impl DependAnalysis {
         for decl in ast.decls.iter() {
             match decl {
                 ast::Decl::VarDecl { name, .. } => {
-                    vars.insert(name.clone()); reactive_names.insert(name.clone());
+                    vars.insert(name.clone());
+                    reactive_names.insert(name.clone());
                     dep_graph.insert(name.clone(), HashSet::new());
                 }
                 ast::Decl::DefDecl { name, val, .. } => {
-                    defs.insert(name.clone()); reactive_names.insert(name.clone());
+                    defs.insert(name.clone());
+                    reactive_names.insert(name.clone());
                     // we calculated all reactive names so far
-                    
-                    let deps = val.free_var(&reactive_names,&HashSet::new());
+
+                    let deps = val.free_var(&reactive_names, &HashSet::new());
                     dep_graph.insert(name.clone(), deps);
                 }
                 _ => {}

@@ -7,7 +7,10 @@ use tokio::sync::mpsc::Sender;
 
 use crate::{
     ast::Expr,
-    runtime::{message::CmdMsg, transaction::{Txn, TxnId}},
+    runtime::{
+        message::CmdMsg,
+        transaction::{Txn, TxnId},
+    },
 };
 
 pub mod do_action;
@@ -21,7 +24,7 @@ pub struct TxnManager {
 
     /// map of each read to the state
     pub direct_reads: HashMap<String, DirectReadState>, // direct read
-    pub trans_reads: HashMap<String, TransReadState>,   // transitive read (var only)
+    pub trans_reads: HashMap<String, TransReadState>, // transitive read (var only)
     /// .. to write state
     pub writes: HashMap<String, WriteState>,
     /// preds to apply this transaction
@@ -37,8 +40,8 @@ pub enum TransReadState {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum DirectReadState {
-    RequestedAndDepend(HashSet<String>),  // requested read to name, depend on 
-    Read(Expr), // read result received
+    RequestedAndDepend(HashSet<String>), // requested read to name, depend on
+    Read(Expr),                          // read result received
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -54,24 +57,24 @@ impl TxnManager {
         txn: Txn,
         from_client: Sender<CmdMsg>,
         direct_reads: HashSet<String>,
-        dep_tran_vars: &HashMap<String, HashSet<String>>, 
+        dep_tran_vars: &HashMap<String, HashSet<String>>,
         writes: HashSet<String>,
     ) -> Self {
         let mut direct_read_states = HashMap::new();
         let mut trans_read_states = HashMap::new();
 
         for name in direct_reads.iter() {
-            let name_trans_read = dep_tran_vars.get(name)
-                .expect(&format!("dep vars not found")).clone();
+            let name_trans_read = dep_tran_vars
+                .get(name)
+                .expect(&format!("dep vars not found"))
+                .clone();
 
             for name in name_trans_read.iter() {
-                trans_read_states.insert(
-                    name.clone(), 
-                    TransReadState::Requested);
+                trans_read_states.insert(name.clone(), TransReadState::Requested);
             }
             direct_read_states.insert(
-                name.clone(), 
-                DirectReadState::RequestedAndDepend(name_trans_read)
+                name.clone(),
+                DirectReadState::RequestedAndDepend(name_trans_read),
             );
         }
 

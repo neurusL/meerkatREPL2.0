@@ -18,17 +18,25 @@
 //!   channel to communicate between threads OR with Arc<Mutex or DashMap>
 //!   to lock the shared state of each transaction.
 use core::panic;
-use std::{collections::{HashMap, HashSet}, error::Error};
+use std::{
+    collections::{HashMap, HashSet},
+    error::Error,
+};
 
 use tokio::sync::mpsc::Sender;
 
 use crate::{
     ast::{Assn, Expr},
     runtime::{
-        def_actor::state, evaluator::eval_assns, lock::{Lock, LockKind}, manager::{
+        def_actor::state,
+        evaluator::eval_assns,
+        lock::{Lock, LockKind},
+        manager::{
             action::{DirectReadState, TransReadState, TxnManager, WriteState},
             Manager,
-        }, message::{CmdMsg, Msg}, transaction::{Txn, TxnId}
+        },
+        message::{CmdMsg, Msg},
+        transaction::{Txn, TxnId},
     },
     static_analysis::var_analysis::read_write::{calc_read_sets as calc_read_set, calc_write_set},
 };
@@ -42,20 +50,18 @@ impl Manager {
         from_client: Sender<CmdMsg>,
     ) -> TxnManager {
         // static info of txn, the read and write set, which may overlap
-        let direct_read_set = calc_read_set(
-            &assns, 
-            &self.evaluator.reactive_names,
-        );
+        let direct_read_set = calc_read_set(&assns, &self.evaluator.reactive_names);
         let write_set = calc_write_set(&assns);
 
         let txn = Txn::new(txn_id, assns);
 
         // set up txn manager
         let txn_mgr = TxnManager::new(
-            txn, from_client, 
+            txn,
+            from_client,
             direct_read_set,
-            &self.dep_tran_vars, 
-            write_set
+            &self.dep_tran_vars,
+            write_set,
         );
 
         txn_mgr
@@ -107,28 +113,29 @@ impl Manager {
     /// 3. send all read requests
     /// (if all locks granted, which is handled by Manager::handler when
     /// receive new LockGranted message)
-    pub async fn request_reads(
-        &mut self, 
-        txn_id: &TxnId,
-    ) -> Result<(), Box<dyn Error>> {
+    pub async fn request_reads(&mut self, txn_id: &TxnId) -> Result<(), Box<dyn Error>> {
         let txn_mgr = self.txn_mgrs.get(txn_id).unwrap();
         assert!(txn_mgr.all_lock_granted());
-
 
         for (name, state) in txn_mgr.direct_reads.iter() {
             // calculate transactions needed to be applied before read
             // since we record all such preds in trans_reads' state
             // we sum up all name's transitive dependent names' preds
             let mut pred = Vec::new();
-            
+
             if let DirectReadState::RequestedAndDepend(name_trans_read) = state {
                 for name in name_trans_read.iter() {
-                    if let TransReadState::Granted(pred_id) = txn_mgr.trans_reads.get(name)
-                        .expect(&format!("trans read state not found")) {
+                    if let TransReadState::Granted(pred_id) = txn_mgr
+                        .trans_reads
+                        .get(name)
+                        .expect(&format!("trans read state not found"))
+                    {
                         pred_id.as_ref().map(|id| pred.push(id.clone()));
                     }
                 }
-            } else { panic!("direct read state should be RequestedAndDepend"); }
+            } else {
+                panic!("direct read state should be RequestedAndDepend");
+            }
 
             self.tell_to_name2(
                 &name,
@@ -136,11 +143,11 @@ impl Manager {
                     txn: txn_mgr.txn.id.clone(),
                     from_mgr_addr: self.address.clone().unwrap(),
                 },
-                Msg::UsrReadDefRequest { 
+                Msg::UsrReadDefRequest {
                     txn: txn_mgr.txn.id.clone(),
                     from_mgr_addr: self.address.clone().unwrap(),
                     pred,
-                }
+                },
             )
             .await?;
         }
@@ -157,10 +164,6 @@ impl Manager {
 
         let env = txn_mgr.get_read_results();
         let assns = eval_assns(&txn_mgr.txn.assns, env);
-
-        for assn in assns.iter() {
-            println!("assn: {}", assn);
-        }
 
         for Assn { dest, src } in assns {
             self.tell_to_name(
