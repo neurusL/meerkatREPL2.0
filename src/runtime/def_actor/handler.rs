@@ -176,17 +176,47 @@ impl DefActor {
             self.read_requests.remove(&txn); // removed processed read request
         }
 
-        if let Some((test_id, manager)) = &self.is_assert_actor_of {
+        if let Some((test_id, manager, txns)) = &self.is_assert_actor_of {
             info!("{} has value {}", self.name, self.value);
-            if let Expr::Bool { val: true } = self.value {
-                info!("Def {} says Assert Succeeded: {}", self.state.expr, test_id);
-                manager
-                    .tell(CmdMsg::AssertSucceeded { test_id: *test_id })
-                    .await?;
+            if let Expr::Bool { val } = self.value {
+                let mut ready = true;
 
-                // todo!("this is a hack, we should use a better way to get the actor ref
-                // and kill/stop_gracefully the actor")
-                self.is_assert_actor_of = None;
+                let applied = self
+                    .state
+                    .get_all_applied_txns()
+                    .into_iter()
+                    .map(|txn| txn.id)
+                    .collect::<HashSet<_>>();
+                for pred in txns {
+                    if !applied.contains(&pred.id)
+                        && pred
+                            .writes
+                            .iter()
+                            .any(|w| self.state.pending_changes.var_to_args.contains_key(w))
+                    {
+                        ready = false;
+                        break;
+                    }
+                }
+
+                if ready {
+                    info!(
+                        "Def {} says Assert {}: {}",
+                        self.state.expr,
+                        if val { "Succeeded" } else { "Failed" },
+                        test_id
+                    );
+                    manager
+                        .tell(CmdMsg::AssertCompleted {
+                            test_id: *test_id,
+                            result: val,
+                        })
+                        .await?;
+
+                    // todo!("this is a hack, we should use a better way to get the actor ref
+                    // and kill/stop_gracefully the actor")
+                    self.is_assert_actor_of = None;
+                }
             }
         }
 

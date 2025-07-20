@@ -1,5 +1,8 @@
 use core::fmt;
-use std::hash::{Hash, Hasher};
+use std::{
+    collections::HashSet,
+    hash::{Hash, Hasher},
+};
 use tokio::time::Instant;
 
 use crate::ast::{Assn, Expr};
@@ -23,6 +26,12 @@ impl TxnId {
 pub struct WriteToName {
     pub name: String,
     pub expr: Expr,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct TxnPred {
+    pub id: TxnId,
+    pub writes: Vec<String>,
 }
 
 // (txid, writes)

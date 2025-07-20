@@ -1,18 +1,31 @@
+use std::collections::HashSet;
+
 use kameo::actor::ActorRef;
 
 use crate::{
     ast::Expr,
-    runtime::{manager::Manager, message::CmdMsg, TestId},
+    runtime::{
+        manager::Manager,
+        message::CmdMsg,
+        transaction::{Txn, TxnId, TxnPred},
+        TestId,
+    },
 };
 
 impl Manager {
-    pub async fn new_test(&mut self, name: String, bool_expr: Expr, test_id: TestId) {
+    pub async fn new_test(
+        &mut self,
+        name: String,
+        bool_expr: Expr,
+        test_id: TestId,
+        preds: Vec<TxnPred>,
+    ) {
         let mgr_ref = self.address.clone().unwrap();
         let actor_ref = self
             .alloc_def_actor(
                 &format!("{}_assert_{}_${}", name, bool_expr, test_id),
                 bool_expr,
-                Some((test_id, mgr_ref)),
+                Some((test_id, mgr_ref, preds)),
             )
             .await
             .unwrap();
@@ -20,10 +33,10 @@ impl Manager {
         self.test_mgrs.insert(test_id, actor_ref);
     }
 
-    pub async fn on_test_finish(&mut self, test_id: TestId) {
+    pub async fn on_test_finish(&mut self, test_id: TestId, result: bool) {
         // send AssertSucceeded back to developer channel
         self.from_developer
-            .send(CmdMsg::AssertSucceeded { test_id })
+            .send(CmdMsg::AssertCompleted { test_id, result })
             .await
             .unwrap();
 
