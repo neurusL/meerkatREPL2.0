@@ -1,15 +1,6 @@
-use std::collections::HashSet;
-
-use kameo::actor::ActorRef;
-
 use crate::{
     ast::Expr,
-    runtime::{
-        manager::Manager,
-        message::CmdMsg,
-        transaction::{Txn, TxnId, TxnPred},
-        TestId,
-    },
+    runtime::{manager::Manager, message::CmdMsg, transaction::TxnPred, TestId},
 };
 
 impl Manager {

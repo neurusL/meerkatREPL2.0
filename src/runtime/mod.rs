@@ -19,23 +19,16 @@
 //!  4. test_manager will wait for bool_expr to be true before processing next
 //!     action, on the other hand, timeout means assertion failed
 use core::panic;
-use std::{
-    collections::{HashMap, HashSet},
-    thread::sleep,
-};
+use std::collections::HashMap;
 
 use crate::{
-    ast::{Expr, Prog, ReplCmd, Service, Test},
+    ast::{Prog, ReplCmd, Service, Test},
     runtime::{
         message::CmdMsg,
-        transaction::{Txn, TxnId, TxnPred},
+        transaction::{TxnId, TxnPred},
     },
 };
-use kameo::{
-    actor::ActorRef,
-    prelude::{Context, Message},
-    spawn, Actor,
-};
+use kameo::{actor::ActorRef, spawn};
 use log::info;
 use manager::Manager;
 use tokio::sync::mpsc::{self, Receiver, Sender};

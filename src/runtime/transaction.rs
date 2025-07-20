@@ -1,8 +1,4 @@
-use core::fmt;
-use std::{
-    collections::HashSet,
-    hash::{Hash, Hasher},
-};
+use std::hash::{Hash, Hasher};
 use tokio::time::Instant;
 
 use crate::ast::{Assn, Expr};

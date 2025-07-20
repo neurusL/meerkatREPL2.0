@@ -1,20 +1,15 @@
 use core::panic;
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::rc::Rc;
-use std::thread::current;
 
-use kameo::{prelude::*, spawn, Actor};
-use log::info;
+use kameo::{prelude::*, spawn};
 
 use crate::runtime::manager::Manager;
-use crate::runtime::transaction::{Txn, TxnId, TxnPred};
+use crate::runtime::transaction::TxnPred;
 use crate::runtime::TestId;
 use crate::{
-    ast::{Expr, Prog, Service},
-    runtime::{def_actor::DefActor, evaluator::eval_srv, message::Msg, var_actor::VarActor},
-    static_analysis::var_analysis::calc_dep_srv,
+    ast::Expr,
+    runtime::{def_actor::DefActor, message::Msg, var_actor::VarActor},
 };
 
 impl Manager {

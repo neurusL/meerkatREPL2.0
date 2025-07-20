@@ -1,16 +1,11 @@
 use kameo::actor::ActorRef;
-use kameo::Actor;
 use std::collections::HashMap;
-use std::error::Error;
-use std::future::Future;
-use std::pin::Pin;
-use std::{collections::HashSet, hash::Hash};
+use std::collections::HashSet;
 
-use super::lock::LockState;
 use super::pubsub::PubSub;
 use crate::ast::Expr;
 use crate::runtime::manager::Manager;
-use crate::runtime::transaction::{Txn, TxnId, TxnPred};
+use crate::runtime::transaction::{TxnId, TxnPred};
 use crate::runtime::TestId;
 use state::ChangeState;
 
