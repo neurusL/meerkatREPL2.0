@@ -256,14 +256,12 @@ impl Evaluator {
             }
             Expr::Table { .. } => Ok(()),
             Expr::Rows { val } => {
-                //let mut schema = Vec::new();
                 let mut vals = Vec::new();
 
                 for row in val {
-                    //schema.push(entry.name);
                     vals.push(Record{val: row.val.iter().map(|entry| entry.val.clone()).collect()});
                 }
-                *expr = Expr::Table {
+                *expr = Expr::Table {                 // return a table expression with empty schema and extracted records, may just pass it as rows and handle equality above
                     schema: Vec::new(),
                     records: vals
                 };

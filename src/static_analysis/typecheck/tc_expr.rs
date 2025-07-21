@@ -184,37 +184,26 @@ impl TypecheckEnv {
                 Action
             }
             Expr::Select { table_name, column_names, where_clause } => {
-                // Get schema first, drop borrow before calling infer_expr
                 let schema = {
-                    let table_type = self.var_context.get(table_name);
+                    let table_type = self.var_context.get(table_name);    // check if table exists and extract schema
                     match table_type {
                         Some(Type::Table(fields)) => fields.clone(),
                         _ => panic!("Table {} for selection not found or not a table type", table_name),
                     }
                 };
-                let field_names: Vec<_> = schema.iter().map(|field| field.name.clone()).collect();
+                let field_names: Vec<_> = schema.iter().map(|field| field.name.clone()).collect();   // get column names and check if columns to be selected exist
                 for column_name in column_names {
                     if !field_names.contains(column_name) {
                         panic!("{} field not found in table {}", column_name, table_name);
                     }
                 }
-                // Extend context with table fields for where clause
-                let old_context = self.var_context.clone();
-                for field in &schema {
-                    let typ = match field.type_ {
-                        DataType::Bool => Type::Bool,
-                        DataType::Number => Type::Int,
-                        DataType::String => Type::String,
-                    };
-                    self.var_context.insert(field.name.clone(), typ);
-                }
+
                 let cond_type = self.infer_expr(where_clause);
-                // Restore context
-                self.var_context = old_context;
+                
                 if cond_type != Type::Bool {
                     panic!("Select where clause must be boolean, got {}", cond_type);
                 }
-                Type::Table(schema)
+                Type::Table(schema)    
             }
             Expr::TableColumn { table_name, column_name } => {
                 // Look up table type in context
