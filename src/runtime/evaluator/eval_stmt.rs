@@ -2,6 +2,8 @@ use std::{collections::HashSet, hash::Hash};
 
 use crate::ast::{Assn, Decl, Entry, Expr, Insert, Record};
 
+use log::info;
+
 use super::{Evaluator, Val};
 
 impl Evaluator {
@@ -45,21 +47,20 @@ impl Evaluator {
     }
     pub fn eval_insert(&mut self, insert: &mut Insert) -> Result<(), String> {
         self.eval_expr(&mut insert.row)?;
-        if let Expr::Rows { val: rows } = &insert.row {
+        if let Expr::Table { schema: _, records} = &insert.row {
             let found_table = self
                 .reactive_name_to_vals
                 .get_mut(&insert.table_name)
                 .expect("Table not declared");
-            if let Expr::Table { records, .. } = found_table {
-                for row in rows {
-                    let record_data = row.val.iter().map(|entry| entry.val.clone()).collect();
-                    let record = Record { val: record_data };
-                    records.push(record);
+            if let Expr::Table { records: target_records, .. } = found_table {
+                for record in records {
+                    target_records.push(record.clone());
+                    println!("Inserted record {:?} into {}", record, insert.table_name);
                 }
             } else {
                 panic!("Not a table");
             }
-            println!("Inserted row(s), {} : {}", insert.table_name, found_table);
+            
         }
         Ok(())
     }
