@@ -71,6 +71,44 @@ pub enum Expr {
     },
 }
 
+impl Expr {
+    /// Substitute all variables named `name` with the `replacement` expression recursively
+    pub fn substitute(&mut self, name: &str, replacement: &Expr) {
+        match self {
+            Expr::Variable { ident } if ident == name => {
+                *self = replacement.clone();
+            }
+            Expr::Unop { expr, .. } => {
+                expr.substitute(name, replacement);
+            }
+            Expr::Binop { expr1, expr2, .. } => {
+                expr1.substitute(name, replacement);
+                expr2.substitute(name, replacement);
+            }
+            Expr::If { cond, expr1, expr2 } => {
+                cond.substitute(name, replacement);
+                expr1.substitute(name, replacement);
+                expr2.substitute(name, replacement);
+            }
+            Expr::Func { body, .. } => {
+                body.substitute(name, replacement);
+            }
+            Expr::FuncApply { func, args } => {
+                func.substitute(name, replacement);
+                for arg in args {
+                    arg.substitute(name, replacement);
+                }
+            }
+            Expr::Action { assns } => {
+                for assn in assns {
+                    assn.src.substitute(name, replacement);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Decl {
     Import {
@@ -109,10 +147,6 @@ pub struct Prog {
 pub enum ReplCmd {
     Do(Expr),
     Assert(Expr),
-    // service related commands
-    // Service(Service),
-    // Open(String),
-    // Close,
 }
 
 impl Default for Expr {

@@ -47,10 +47,12 @@ impl Manager {
                     self.evaluator
                         .reactive_name_to_vals
                         .get(name)
-                        .expect(&format!(
-                            "DefActor alloc: var/def is not initialized: {}",
-                            name
-                        ))
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "DefActor alloc: var/def '{}' not found in reactive_name_to_vals",
+                                name
+                            )
+                        })
                         .clone(),
                 )
             })

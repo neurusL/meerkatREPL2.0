@@ -132,7 +132,17 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 write_val,
             } => {
                 info!("UsrWriteVarRequest");
-                assert!(self.lock_state.has_granted_write(&txn));
+                info!(
+                    "Checking if write lock granted for txn {:?}. Current granted locks: {:?}",
+                    txn,
+                    self.lock_state.granted_locks
+                );
+
+                assert!(
+                    self.lock_state.has_granted_write(&txn),
+                    "Write lock not granted for txn {:?}",
+                    txn
+                );
 
                 self.value.update(write_val, txn.clone());
 

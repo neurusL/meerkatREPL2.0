@@ -1,0 +1,11 @@
+service update_service {
+    var x = 1;
+    def a = x + 1;
+
+    pub def inc_x = action { x = x + 1; };
+}
+
+@test(update_service) {
+    do inc_x;
+    assert(a == 2); // example assertion
+}
