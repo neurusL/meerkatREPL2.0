@@ -79,7 +79,13 @@ impl Evaluator {
             Expr::Select { table_name, column_names, where_clause } => todo!(),
             Expr::TableColumn { table_name, column_name } => todo!(),
             Expr::Table { .. } => todo!(),
-            Expr::Rows { val } => {}
+            Expr::Rows { val } => {
+                for row in val {
+                    for entry in &mut row.val {   // substituting every entry with argument
+                        self.subst( &mut entry.val, var_to_expr);
+                    }
+                }
+            }
         }
     }
 }
