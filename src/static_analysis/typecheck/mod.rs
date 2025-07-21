@@ -25,7 +25,8 @@ pub enum Type {
     Fun(Vec<Type>, Box<Type>), // for instantiated type
 
     TypVar(String),
-    Table
+    Table(Vec<Field>),
+    Row,
 }
 
 /// Type Scheme represents polymorphic types,
@@ -62,7 +63,8 @@ impl Display for Type {
                 }
             }
             Type::TypVar(name) => write!(f, "{}", name),
-            Type::Table => write!(f, "table")
+            Type::Table( schema) => write!(f, "table {:?}", schema),
+            Type::Row => write!(f, "row")
         }
     }
 }
@@ -75,9 +77,7 @@ pub struct TypecheckEnv {
     pub typevar_id: u64,
     // Type::var to type (canonical form)
     pub acc_subst: HashMap<String, Type>,
-
-    // table context for insert typecheck
-    pub table_context: HashMap<String, Vec<Field>>,
+    
 }
 
 impl Display for TypecheckEnv {

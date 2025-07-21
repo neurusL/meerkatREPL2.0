@@ -175,40 +175,60 @@ impl TypecheckEnv {
 
                 Action
             }
-            Expr::Select { table_name, where_clause } => {
-                let table = self.table_context.get(table_name).unwrap_or_else(|| panic!("Table {} for selection not found",table_name));
-                
-                self.typecheck_column_access(where_clause, table_name, table);
-
+            Expr::Select { table_name, column_names, where_clause } => {
+                // Get schema first, drop borrow before calling infer_expr
+                let schema = {
+                    let table_type = self.var_context.get(table_name);
+                    match table_type {
+                        Some(Type::Table(fields)) => fields.clone(),
+                        _ => panic!("Table {} for selection not found or not a table type", table_name),
+                    }
+                };
+                let field_names: Vec<_> = schema.iter().map(|field| field.name.clone()).collect();
+                for column_name in column_names {
+                    if !field_names.contains(column_name) {
+                        panic!("{} field not found in table {}", column_name, table_name);
+                    }
+                }
+                // Extend context with table fields for where clause
+                let old_context = self.var_context.clone();
+                for field in &schema {
+                    let typ = match field.type_ {
+                        DataType::Bool => Type::Bool,
+                        DataType::Number => Type::Int,
+                        DataType::String => Type::String,
+                    };
+                    self.var_context.insert(field.name.clone(), typ);
+                }
                 let cond_type = self.infer_expr(where_clause);
+                // Restore context
+                self.var_context = old_context;
                 if cond_type != Type::Bool {
                     panic!("Select where clause must be boolean, got {}", cond_type);
                 }
-                
-                Table
+                Type::Table(schema)
             }
             Expr::TableColumn { table_name, column_name } => {
-                let found_table = self.table_context.get(table_name);
-
+                // Look up table type in context
+                let found_table = self.var_context.get(table_name);
                 match found_table {
-                    None => panic!("Table {} for selection not found", table_name),
-                    Some(table) =>{
-                        let found_column = table.iter().find(|column| column.name == *column_name);
+                    Some(Type::Table(fields)) => {
+                        let found_column = fields.iter().find(|field| &field.name == column_name);
                         match found_column {
-                            None => panic!("Column {} not found in {}", column_name, table_name),
-                            Some(column) => {
-                                match column.type_ {
-                                    DataType::Bool => Type::Bool,
-                                    DataType::Number => Type::Int,
-                                    DataType::String => Type::String,
-                                }
-                            }
+                            Some(field) => match field.type_ {
+                                DataType::Bool => Type::Bool,
+                                DataType::Number => Type::Int,
+                                DataType::String => Type::String,
+                            },
+                            None => panic!("Column {} not found in table {}", column_name, table_name),
                         }
-                    
                     }
+                    _ => panic!("Table {} for TableColumn not found or not a table type", table_name),
                 }
             }
-            Expr::Table {schema, records } => Table,
+            Expr::Table {schema, records } => Table(schema.to_vec()),
+            Expr::Rows { .. } => Table(vec![])            // todo
+            
         }
 }
 }

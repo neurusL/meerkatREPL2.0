@@ -23,7 +23,7 @@ impl TypecheckEnv {
                         panic!("Duplicate names found in table {}", name)
                     }
                 }
-                self.table_context.insert(name.clone(), fields.clone());
+                self.var_context.insert(name.clone(), Type::Table(fields.to_vec()));
             }
         }
     }
@@ -45,66 +45,52 @@ impl TypecheckEnv {
     }
 
     pub fn typecheck_insert(&mut self, insert: &Insert) {
-        
-        let found_table = self.table_context.get(&insert.table_name).cloned();
-
-        match found_table {
+        let found_type = self.var_context.get(&insert.table_name).cloned();
+        match found_type {
             None => panic!("Table {} for insertion not found", insert.table_name),
-            Some(table) =>{
-                if table.len() != insert.row.val.len() {
-                    panic!("Entries in the row do not match the table {} schema", insert.table_name);
-                }
-
-                for (i,j) in table.iter().enumerate() {
-                    let expected_type = match j.type_ {
-                        DataType::Bool => Type::Bool,    // match statements for DataType (while parsing types from table decl) and Type enum in Typecheckenv
-                        DataType::Number => Type::Int,
-                        DataType::String => Type::String,
-                    };
-                    let infered_expr = self.infer_expr(&insert.row.val[i].val);
-                    
-                    if !self.unify(&infered_expr, &expected_type){
-                        panic!("Data type of entry {} does not match the schema, expected {}, got {}", &insert.row.val[i].name, &expected_type, &infered_expr)
+            Some(table_type) => {
+                match &table_type {
+                    Type::Table(schema) => {
+                        match &insert.row {
+                            Expr::Rows { val: rows } => {
+                                for row in rows {
+                                    if row.val.len() != schema.len() {
+                                        panic!("Entries in the row do not match the table {} schema", insert.table_name);
+                                    }
+                                    for entry in &row.val {
+                                        // Find matching field in schema
+                                        let field_type = schema.iter().find(|f| f.name == entry.name)
+                                            .unwrap_or_else(|| panic!("Field '{}' not found in table '{}' schema", entry.name, insert.table_name));
+                                        let expected_type = match field_type.type_ {
+                                            DataType::Bool => Type::Bool,
+                                            DataType::Number => Type::Int,
+                                            DataType::String => Type::String,
+                                        };
+                                        let inferred_type = self.infer_expr(&entry.val);
+                                        if !self.unify(&inferred_type, &expected_type) {
+                                            panic!("Data type of entry '{}' does not match the schema, expected {:?}, got {:?}", entry.name, expected_type, inferred_type);
+                                        }
+                                    }
+                                }
+                            }
+                            expr => {
+                                let inferred_type = self.infer_expr(expr);
+                                let expected_type = Type::Table(schema.clone());
+                                if !self.unify(&inferred_type, &expected_type) {
+                                    panic!("Insert expression type does not match table schema, expected {:?}, got {:?}", expected_type, inferred_type);
+                                }
+                            }
+                        }
+                    }
+                    // If table_name is a parameter (type variable), unify row type with it
+                    other_type => {
+                        let row_type = self.infer_expr(&insert.row);
+                        if !self.unify(&row_type, other_type) {
+                            panic!("Insert row type does not match parameter type for '{}', expected {:?}, got {:?}", insert.table_name, other_type, row_type);
+                        }
                     }
                 }
-                
             }
-        }
-        
-
-        
-        
-    }
-
-    pub fn typecheck_column_access (&self, expr: &Expr, expected_table: &str, table: &[Field]) {
-        match expr {
-            Expr::TableColumn { table_name, column_name } => {
-                if table_name!= expected_table {
-                    panic!("Field access {}.{} does not match select table {}", table_name, column_name, expected_table)
-                }
-                if !table.iter().any(|r| r.name == *column_name) {
-                    panic!("Field {} not found in table {}", column_name, expected_table);
-                }
-            }
-            Expr::Binop { expr1, expr2, ..} => {
-                self.typecheck_column_access(expr1, expected_table, table);
-                self.typecheck_column_access(expr2, expected_table, table);
-            }
-            Expr::Unop { expr ,..} => {
-                self.typecheck_column_access(expr, expected_table, table);
-            }
-            Expr::If { cond, expr1, expr2 } => {
-                self.typecheck_column_access(cond, expected_table, table);
-                self.typecheck_column_access(expr1, expected_table, table);
-                self.typecheck_column_access(expr2, expected_table, table);
-            }
-            Expr::FuncApply { func, args } => {
-                self.typecheck_column_access(func, expected_table, table);
-                for arg in args {
-                    self.typecheck_column_access(arg, expected_table, table);
-                }
-            }
-            _ => {}
         }
     }
 }
