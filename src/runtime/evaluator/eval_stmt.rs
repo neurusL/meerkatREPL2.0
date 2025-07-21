@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, hash::Hash};
 
 use crate::ast::{Assn, Decl, Expr};
 
@@ -63,6 +63,8 @@ impl Evaluator {
 
                 // Rewrite all variable references using latest versioned names
                 rewrite_expr(val, &self.version_map);
+                // var should have no depend
+                assert!(val.free_var(&HashSet::new(), &HashSet::new()).is_empty());
 
 
                 // Substitute variable name with versioned name in its own definition

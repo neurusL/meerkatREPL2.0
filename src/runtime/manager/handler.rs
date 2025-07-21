@@ -93,9 +93,13 @@ impl kameo::prelude::Message<Msg> for Manager {
     async fn handle(&mut self, msg: Msg, ctx: &mut Context<Self, Self::Reply>) -> Self::Reply {
         info!("MANAGER {} RECEIVE: ", self.name);
         match msg {
-            Msg::LockGranted { from_name, lock } => {
+            Msg::LockGranted {
+                from_name,
+                lock,
+                pred_id,
+            } => {
                 info!("Lock Granted");
-                self.add_grant_lock(&lock.txn_id, from_name, lock.lock_kind);
+                self.add_grant_lock(&lock.txn_id, from_name, lock.lock_kind, pred_id);
                 if self.all_lock_granted(&lock.txn_id) {
                     info!("all lock granted");
                     let _ = self.request_reads(&lock.txn_id).await;

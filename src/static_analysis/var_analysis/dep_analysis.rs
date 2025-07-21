@@ -11,6 +11,7 @@ impl DependAnalysis {
     pub fn new(ast: &ast::Service) -> DependAnalysis {
         let mut vars: HashSet<String> = HashSet::new();
         let mut defs: HashSet<String> = HashSet::new();
+        let mut reactive_names = HashSet::new();
 
         let mut dep_graph: HashMap<String, HashSet<String>> = HashMap::new();
 
@@ -18,11 +19,15 @@ impl DependAnalysis {
             match decl {
                 ast::Decl::VarDecl { name, .. } => {
                     vars.insert(name.clone());
+                    reactive_names.insert(name.clone());
                     dep_graph.insert(name.clone(), HashSet::new());
                 }
                 ast::Decl::DefDecl { name, val, .. } => {
                     defs.insert(name.clone());
-                    let deps = val.free_var(&HashSet::new());
+                    reactive_names.insert(name.clone());
+                    // we calculated all reactive names so far
+
+                    let deps = val.free_var(&reactive_names, &HashSet::new());
                     dep_graph.insert(name.clone(), deps);
                 }
                 _ => {}

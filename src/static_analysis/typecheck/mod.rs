@@ -65,6 +65,7 @@ impl Display for Type {
 
 pub struct TypecheckEnv {
     pub var_context: HashMap<String, Type>, // Expr::Var to type, todo: change this to more efficient stack of hashmap
+    pub name_context: HashMap<String, Type>, // reactive name to type
     // pub var_to_typ_scheme: HashMap<String, TypeScheme>,
 
     // counter to generate new type var
@@ -88,7 +89,7 @@ pub fn typecheck_prog(prog: &Prog) {
     let mut srv_to_type_env = HashMap::new();
 
     for srvs in prog.services.iter() {
-        let mut typ_env = TypecheckEnv::new(HashMap::new());
+        let mut typ_env = TypecheckEnv::new();
         typ_env.typecheck_service(srvs);
         print!("service: {:?}\n {}", srvs.name, typ_env);
 
