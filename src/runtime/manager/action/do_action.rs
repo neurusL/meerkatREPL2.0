@@ -46,7 +46,7 @@ impl Manager {
         from_client: Sender<CmdMsg>,
     ) -> TxnManager {
         // static info of txn, the read and write set, which may overlap
-        let read_set = calc_read_set(&assns);
+        let read_set = calc_read_set(&assns, &self.evaluator.reactive_names,&self.dep_tran_vars);
         let write_set = calc_write_set(&assns);
 
         let txn = Txn::new(txn_id, assns, inserts);

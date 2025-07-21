@@ -31,7 +31,7 @@ pub struct DefActor {
     pub is_assert_actor_of: Option<(TestId, ActorRef<Manager>)>,
 
     pub pubsub: PubSub,
-    pub lock_state: LockState,
+    // pub lock_state: LockState,
 
     pub state: ChangeState,
 }
@@ -51,7 +51,7 @@ impl DefActor {
             value,
             is_assert_actor_of: testid_and_manager,
             pubsub: PubSub::new(),
-            lock_state: LockState::new(),
+            // lock_state: LockState::new(),
             state: ChangeState::new(expr, arg_to_values, arg_to_vars),
         }
     }

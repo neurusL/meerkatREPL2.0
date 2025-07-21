@@ -37,41 +37,41 @@ impl kameo::prelude::Message<Msg> for DefActor {
                 Msg::Unit
             }
 
-            Msg::LockRequest {
-                lock,
-                from_mgr_addr,
-            } => {
-                if !self.lock_state.add_wait(lock.clone(), from_mgr_addr) {
-                    return Msg::LockAbort {
-                        from_name: self.name.clone(),
-                        lock,
-                    };
-                }
-                Msg::Unit
-            }
+            // Msg::LockRequest {
+            //     lock,
+            //     from_mgr_addr,
+            // } => {
+            //     if !self.lock_state.add_wait(lock.clone(), from_mgr_addr) {
+            //         return Msg::LockAbort {
+            //             from_name: self.name.clone(),
+            //             lock,
+            //         };
+            //     }
+            //     Msg::Unit
+            // }
 
-            Msg::LockRelease { txn, .. } => {
-                assert!(self.lock_state.has_granted(&txn.id));
+            // Msg::LockRelease { txn, .. } => {
+            //     assert!(self.lock_state.has_granted(&txn.id));
 
-                let lock = self
-                    .lock_state
-                    .remove_granted_or_wait(&txn.id)
-                    .expect("lock should be granted before release");
+            //     let lock = self
+            //         .lock_state
+            //         .remove_granted_or_wait(&txn.id)
+            //         .expect("lock should be granted before release");
 
-                assert!(lock.is_read());
-                Msg::Unit
-            }
+            //     assert!(lock.is_read());
+            //     Msg::Unit
+            // }
 
-            Msg::LockAbort { lock, .. } => {
-                self.lock_state.remove_granted_or_wait(&lock.txn_id);
-                Msg::Unit
-            }
+            // Msg::LockAbort { lock, .. } => {
+            //     self.lock_state.remove_granted_or_wait(&lock.txn_id);
+            //     Msg::Unit
+            // }
 
             Msg::UsrReadDefRequest { from_mgr_addr, txn } => {
-                assert!(self.lock_state.has_granted(&txn));
+                // assert!(self.lock_state.has_granted(&txn));
 
-                // remove read lock immediately
-                self.lock_state.remove_granted_if_read(&txn);
+                // // remove read lock immediately
+                // self.lock_state.remove_granted_if_read(&txn);
 
                 let _ = from_mgr_addr
                     .tell(Msg::UsrReadDefResult {
@@ -130,15 +130,15 @@ impl Actor for DefActor {
 
 impl DefActor {
     async fn tick(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // if can grant new waiting lock
-        if let Some((lock, mgr)) = self.lock_state.grant_oldest_wait() {
-            let msg = Msg::LockGranted {
-                from_name: self.name.clone(),
-                lock,
-            };
+        // // if can grant new waiting lock
+        // if let Some((lock, mgr)) = self.lock_state.grant_oldest_wait() {
+        //     let msg = Msg::LockGranted {
+        //         from_name: self.name.clone(),
+        //         lock,
+        //     };
 
-            mgr.tell(msg).await?;
-        }
+        //     mgr.tell(msg).await?;
+        // }
 
         // if we search for new batch of changes
         let changes = self.state.search_batch();

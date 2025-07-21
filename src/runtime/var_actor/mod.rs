@@ -11,6 +11,23 @@ use crate::ast::Expr;
 pub mod handler;
 pub mod state;
 
+/**
+ * 
+ * var x := 1 
+ *  intialized 
+ *  -> receive lock request
+ *  -> managing lock 
+ * -> grant lock 
+ * -> send back lock granted
+ * -> receive write request
+ * -> temporarily change value
+ * -> send back write granted
+ * -> receive transaction finished
+ * -> commit change
+ * var y := 2
+ * ...
+ */
+
 pub struct VarActor {
     pub name: String, // this actor's var name
     pub value: state::VarValueState,
