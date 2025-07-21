@@ -1,4 +1,6 @@
 use crate::ast::{Assn, Decl, Expr, Prog, ReplCmd, Service, Test};
+use self::eval_expr::VersionMap; // <-- ADD THIS
+
 use std::{
     collections::{HashMap, HashSet},
     env,
@@ -31,6 +33,9 @@ pub struct Evaluator {
     /// lambda expr var name -> val
     /// exprvar_name_to_val: HashMap<String, Expr>,
     pub def_name_to_exprs: HashMap<String, Expr>,
+
+    // Adding THIS FIELD
+    pub version_map: VersionMap,
 }
 
 impl Evaluator {
@@ -40,6 +45,8 @@ impl Evaluator {
             reactive_names: HashSet::new(),
             reactive_name_to_vals,
             def_name_to_exprs: HashMap::new(),
+
+            version_map: VersionMap::new(), // Initialize the version map
         }
     }
 }

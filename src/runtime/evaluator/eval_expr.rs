@@ -3,7 +3,74 @@ use std::{collections::HashMap, iter::zip, ops::Deref};
 
 use super::{Evaluator, Val};
 
+/// Keeps track of the version history of all variables/definitions
+#[derive(Debug, Default, Clone)]
+pub struct VersionMap {
+    map: HashMap<String, usize>,
+}
+
+impl VersionMap {
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::new(),
+        }
+    }
+
+    /// Get current versioned name like "x0", "a1"
+    pub fn get_latest(&self, base: &str) -> String {
+        match self.map.get(base) {
+            Some(v) => format!("{base}{v}"),
+            None => format!("{base}0"),
+        }
+    }
+
+    /// Increment version and return new name
+    pub fn next_version(&mut self, base: &str) -> String {
+        let entry = self.map.entry(base.to_string()).or_insert(0);
+        *entry += 1;
+        format!("{base}{entry}")
+    }
+
+    /// Reset all versions
+    pub fn reset(&mut self) {
+        self.map.clear();
+    }
+
+}
+
+pub fn rewrite_expr(expr: &mut Expr, version_map: &VersionMap) {
+    match expr {
+        Expr::Variable { ident } => {
+            *ident = version_map.get_latest(ident);
+        }
+        Expr::Binop { expr1, expr2, .. } => {
+            rewrite_expr(expr1, version_map);
+            rewrite_expr(expr2, version_map);
+        }
+        Expr::Unop { expr, .. } => {
+            rewrite_expr(expr, version_map);
+        }
+        Expr::Func { body, .. } => {
+            rewrite_expr(body, version_map);
+        }
+        Expr::FuncApply { func, args } => {
+            rewrite_expr(func, version_map);
+            for arg in args {
+                rewrite_expr(arg, version_map);
+            }
+        }
+        Expr::Action { assns } => {
+            for assn in assns {
+                rewrite_expr(&mut assn.src, version_map);
+            }
+        }
+        _ => {}
+    }
+}
+
+
 impl Evaluator {
+
     pub fn calc_unop(op: UnOp, expr: &Expr) -> Result<Expr, String> {
         if let Expr::Number { val } = expr {
             match op {

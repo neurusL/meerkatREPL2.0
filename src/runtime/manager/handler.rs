@@ -32,8 +32,12 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
             }
 
             AssertSucceeded { test_id } => {
-                info!("Assert Succeeded");
+                info!("Test assertion passed: {:?}", test_id);
                 self.on_test_finish(test_id).await;
+
+                // Optional - exit process after last test succeeds
+                #[cfg(test)]
+                std::process::exit(0); // will only run when compiled for tests
 
                 None
             }
