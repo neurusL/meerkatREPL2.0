@@ -1,7 +1,7 @@
 use log::info;
 
-use crate::ast::{Assn, BinOp, Expr, UnOp};
-use std::{collections::HashMap, iter::zip, ops::Deref};
+use crate::ast::{Assn, BinOp, Expr, Record, UnOp};
+use std::{collections::HashMap, iter::zip, ops::Deref, vec};
 
 use super::{Evaluator, Val};
 
@@ -50,6 +50,13 @@ impl Evaluator {
             
             match op {
                 BinOp::Eq => Ok(Expr::Bool { val: val1 == val2 }),
+                _ => panic!(),
+            }
+        } else if let (Expr::Table {records: records1,.. }, Expr::Table { records: records2, .. }) = (expr1,expr2) {
+            // println!("First table: {:?}", records1);
+            // println!("Second table: {:?}", records2);
+            match op {
+                BinOp::Eq => Ok(Expr::Bool { val: records1 == records2 }),
                 _ => panic!(),
             }
         } else {
@@ -101,7 +108,7 @@ impl Evaluator {
                 self.eval_expr(expr2)?;
                 use Expr::*;
                 match (expr1.as_mut(), expr2.as_mut()) {
-                    (Number { .. }, Number { .. }) | (Bool { .. }, Bool { .. }) | (String { .. }, String { .. }) => {
+                    (Number { .. }, Number { .. }) | (Bool { .. }, Bool { .. }) | (String { .. }, String { .. }) | (Table {..},Table{..}) => {
                         *expr = Self::calc_binop(*op, expr1, expr2)?;
                         Ok(())
                     }
@@ -177,6 +184,7 @@ impl Evaluator {
             }
             Expr::Select {
                 table_name,
+                column_names,
                 where_clause,
             } => {
                 
@@ -188,45 +196,80 @@ impl Evaluator {
                 let original_context = self.reactive_name_to_vals.clone();
 
                 if let Expr::Table {schema, records , ..} = table {
+                    let mut selected_schema = Vec::new();
+                    // Build new schema for selected columns
+                    if column_names.len()!=0 {   
+                    selected_schema = schema.iter()
+                        .filter(|field| column_names.contains(&field.name))
+                        .cloned()
+                        .collect();
+                    } else {              // if no column names mentioned, select all columns
+                        selected_schema = schema.clone();
+                    }
                     let mut selected_records = Vec::new();
 
                     for record in records {
                         for(field, value) in schema.iter().zip(record.val.iter()) {
                             self.reactive_name_to_vals.insert(field.name.clone(), value.clone());
                         }
-
-                        //info!("Printing reactive_name_to_vals: {:?}", self.reactive_name_to_vals);
-
                         let mut evaluated_where = where_clause.deref().clone();
-                    
+                        // evaluate where condition with the value from current record
+                        // for example, select age from sample where age > 21;
+                        // before evaluating where, we're updating context for each record
+                        // so right now, the status is age: 18 (let's say first record's age is 18) 
                         if let Err(e) = self.eval_expr(&mut evaluated_where) {
                             info!("Error while evaluating where: {}", e);
                             return Err(e);
                         }
-
-                        if let Expr::Bool { val } = *evaluated_where {
+                        if let Expr::Bool { val } = *evaluated_where {        // if the condition satisfies for that record, add that record
                             if val {
-                                selected_records.push(record.clone());
+                                // Build new record with only selected columns
+                                let mut new_vals = Vec::new();
+                                if column_names.len()==0 {       // if no columns mentioned, add all
+                                    selected_records.push(record.clone());
+                                }
+                                else {
+                                    for col in &mut *column_names {
+                                    if let Some((i, _)) = schema.iter().enumerate().find(|(_, f)| &f.name == col) {
+                                        new_vals.push(record.val[i].clone());
+                                    } else {
+                                        return Err(format!("Column '{}' not found in schema", col));
+                                    }
+                                }
+                                selected_records.push(Record { val: new_vals });
+                            }
                             }
                         } else {
                             self.reactive_name_to_vals = original_context;
                             return Err(format!("Where must evaluate to boolean"));
-                        } 
+                        }
+                    }
+                    self.reactive_name_to_vals = original_context;
+                    *expr = Expr::Table {
+                        schema: selected_schema,
+                        records: selected_records,
+                    };
+                    info!("Select result: {}", *expr);
                 }
-
-                self.reactive_name_to_vals = original_context;
-
-                *expr = Expr::Table {     // return table with the records which passed the check
-                    schema,
-                    records: selected_records,
-                };
-
-                info!("Select result: {}", *expr);
-
-                }            
                 Ok(())
 
             }
+            Expr::Table { .. } => Ok(()),
+            Expr::Rows { val } => {
+                //let mut schema = Vec::new();
+                let mut vals = Vec::new();
+
+                for row in val {
+                    //schema.push(entry.name);
+                    vals.push(Record{val: row.val.iter().map(|entry| entry.val.clone()).collect()});
+                }
+                *expr = Expr::Table {
+                    schema: Vec::new(),
+                    records: vals
+                };
+                Ok(())
+            },
+
             Expr::TableColumn { table_name, column_name } => {
                 info!("Eval tablecolumn");
                 if let Some(val) = self.reactive_name_to_vals.get(column_name) {   // get the value from the column name in the context which was added in the select eval
@@ -236,8 +279,7 @@ impl Evaluator {
                     return Ok(());
                 } 
                 Err(format!("TableColumn {}.{} cannot be evaluated outside of a row context", table_name, column_name))
-            },
-            Expr::Table { .. } => Ok(()),
+            }            // will remove tablecolumn if no use 
         }
     }
 }

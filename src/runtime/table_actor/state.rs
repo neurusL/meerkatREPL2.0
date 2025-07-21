@@ -12,12 +12,15 @@ impl TableValueState {
 
     pub fn update(&mut self, insert: &Insert) {
         // will only occur for insert queries
-        let record = Record {
-            val: insert.row.val
-                .iter()
-                .map(|entry| entry.val.clone())
-                .collect(),
-        };
+        let mut found_records = Vec::new();
+        if let Expr::Rows { val: rows } = &insert.row {
+            for row in rows {
+                for entry in &row.val {
+                    found_records.push(entry.val.clone());
+                }
+            }
+        }
+        let record = Record {val: found_records};
         if let TableValueState::Val(Expr::Table { schema: _, records }) = self {
             records.push(record);
         } else {

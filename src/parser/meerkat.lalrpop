@@ -62,6 +62,8 @@ extern {
         "num" => Token::Number(<i32>),
         "{" => Token::LBrace,
         "}" => Token::RBrace,
+        "[" => Token::LSquare,
+        "]" => Token::RSquare,
         "(" => Token::LParen,
         ")" => Token::RParen,
         "," => Token::Comma,
@@ -155,18 +157,26 @@ DataType: DataType = {
 }
 
 Entry: Entry = {
-    <c: Ident> ":" <e: Expr> "," => {
+    <c: Ident> ":" <e: Expr>  => {
         Entry {name: c, val: e }
     }
 }
 
 Row: Row = {
-    <entries: Entry*> => Row {val: entries}
+     "{" <mut entries:(<Entry>",")*> <e:Entry?> "}" => Row {
+        val: {
+            let mut v = entries;
+            if let Some(entry) = e {
+                v.push(entry);
+            }
+            v
+        }
+    }
 }
 
 Insert: Insert = {
-    "insert" "{" <r: Row> "}" "into" <t: Ident> => {
-        Insert {row: r, table_name: t}
+    "insert"  <e: Expr> "into" <t: Ident> => {
+        Insert {row: e, table_name: t}
     }
 }
 
@@ -214,6 +224,13 @@ SubExpr: Expr = {
     <s: "strlit"> => Expr::String {val: s.to_owned()},
     <i:Ident> => Expr::Variable { ident: i },
     "(" <Expr> ")" => <>,
+    "[" <mut rows: (<Row> ",")*> <r: Row?> "]" => {
+        if let Some(row) = r {
+            rows.push(row);
+        }
+        Expr::Rows { val: rows }
+    },
+    <r: Row> => Expr::Rows {val: vec![r]},
     
     <expr:SubExpr> "(" <args:Args> ")" => 
         Expr::FuncApply { func: Box::new(expr), args },
@@ -335,7 +352,16 @@ Expr: Expr = {
     Expr::Func {
         params, body: Box::new(e)
     },
-    "select" "from" <t: Ident> "where" <cond: Expr> => Expr::Select { table_name: t, where_clause: Box::new(cond) },
+    "select" <mut cols: (<Ident> ",")*> <c: Ident?> "from" <t: Ident> "where" <cond: Expr> => Expr::Select {
+        table_name: t,
+        column_names: {
+            let mut v = cols;
+            if let Some(col) = c { 
+                v.push(col); }
+            v
+        },
+        where_clause: Box::new(cond)
+    },
 }
 
 Bool: bool = {

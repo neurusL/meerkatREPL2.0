@@ -71,10 +71,14 @@ impl Evaluator {
                     // dest should not be substituted, only src should
                     self.subst(&mut assn.src, var_to_expr);
                 }
+                for insert in inserts {
+                    self.subst(&mut insert.row, var_to_expr);
+                }
             }
-            Expr::Select { table_name, where_clause } => todo!(),
+            Expr::Select { table_name, column_names, where_clause } => todo!(),
             Expr::TableColumn { table_name, column_name } => todo!(),
-            Expr::Table { .. } => todo!()
+            Expr::Table { .. } => todo!(),
+            Expr::Rows { val } => {}
         }
     }
 }

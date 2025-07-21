@@ -44,25 +44,23 @@ impl Evaluator {
         Ok(())
     }
     pub fn eval_insert(&mut self, insert: &mut Insert) -> Result<(), String> {
-
-        let record_data = insert.row.val.iter().map(|entry| entry.val.clone()).collect();
-        
-        let record = Record { val: record_data };
-
-
-        let found_table = self
-            .reactive_name_to_vals
-            .get_mut(&insert.table_name)
-            .expect("Table not declared");
-
-        if let Expr::Table { records, ..} = found_table {
-            records.push(record);
-        } else {
-            panic!("Not a table");
+        self.eval_expr(&mut insert.row)?;
+        if let Expr::Rows { val: rows } = &insert.row {
+            let found_table = self
+                .reactive_name_to_vals
+                .get_mut(&insert.table_name)
+                .expect("Table not declared");
+            if let Expr::Table { records, .. } = found_table {
+                for row in rows {
+                    let record_data = row.val.iter().map(|entry| entry.val.clone()).collect();
+                    let record = Record { val: record_data };
+                    records.push(record);
+                }
+            } else {
+                panic!("Not a table");
+            }
+            println!("Inserted row(s), {} : {}", insert.table_name, found_table);
         }
-
-        println!("Inserted row, {} : {}", insert.table_name, found_table);
-
         Ok(())
     }
 

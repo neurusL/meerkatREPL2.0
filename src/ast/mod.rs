@@ -28,20 +28,20 @@ pub struct Assn {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Insert {
-    pub row: Row,
+pub struct Insert {                    // insert {id: 1, ..}
+    pub row: Expr,
     pub table_name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Row {
-    pub val: Vec<Entry>,
+    pub val: Vec<Entry>,        // id: 1 is one entry
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Entry {
-    pub name: String, // column name
-    pub val: Expr, // value to be inserted
+    pub name: String, // column name         id
+    pub val: Expr, // value to be inserted    1
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -103,13 +103,21 @@ pub enum Expr {
 
     Select {
         table_name: String,
+        column_names: Vec<String>,
         where_clause: Box<Expr>,
     },
 
     Table {
         schema: Vec<Field>,
         records: Vec<Record>,
+        /*How do records differ from rows?
+          Records only consist of data contained within tables: {1, "A", 18}
+          Rows are what are written inside insert statements, insert {id: 1, name: "A", age: 18};
+         */
     },
+    Rows {
+        val: Vec<Row>
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -232,7 +240,7 @@ impl Display for Expr {
                 ),
             Expr::TableColumn { table_name, column_name } =>
                 write!(f, "{}.{}", table_name, column_name),
-            Expr::Select { table_name, where_clause } => write!(f, "{}", where_clause),
+            Expr::Select { table_name, column_names, where_clause } => write!(f, "{}", where_clause),
             Expr::Table {records , ..} => {
                 write!(f, "[",)?;
                 for (i, record) in records.iter().enumerate() {
@@ -249,7 +257,8 @@ impl Display for Expr {
                     write!(f, "}}")?;
                 }
                 write!(f, "]")
-            }
+            },
+            Expr::Rows { val } => write!(f, "rows")
         }
     }
 }

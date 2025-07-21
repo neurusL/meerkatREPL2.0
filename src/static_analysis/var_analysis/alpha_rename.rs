@@ -51,10 +51,11 @@ impl Expr {
                     assn.src.alpha_rename(var_binded, renames);
                 }
             }
-            Expr::Select { table_name, where_clause } => {
+            Expr::Select { table_name, column_names,  where_clause } => {
                 where_clause.alpha_rename(var_binded, renames);
             }
-            Expr::TableColumn { table_name, column_name } => {}
+            Expr::TableColumn { table_name, column_name } => {},
+            Expr::Rows {..} => {}
         
         }
     }

@@ -56,7 +56,7 @@ impl Expr {
                 }
                 free_vars
             }
-            Expr::Select { table_name, where_clause } => {
+            Expr::Select { table_name, where_clause, .. } => {
                 let mut free_vars = where_clause.free_var(var_binded);
                 free_vars.insert(table_name.clone());
                 free_vars
@@ -64,6 +64,7 @@ impl Expr {
             Expr::TableColumn { .. } => {
                 HashSet::new()
             }
+            Expr::Rows {..} => HashSet::new()
         }
     }
 }

@@ -129,6 +129,10 @@ pub enum Token<'a> {
   LBrace,
   #[token("}")]
   RBrace,
+  #[token("[")]
+  LSquare,
+  #[token("]")]
+  RSquare,
   #[token(";")]
   Semicolon,
   #[token(",")]
