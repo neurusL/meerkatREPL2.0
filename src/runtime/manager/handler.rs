@@ -58,10 +58,9 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                         inserts: inserts.clone()
                     };
                     for insert in inserts {
-                        info!("Inserts found");
                         if let Ok(true) = self.eval_insert(&insert) {
                             info!("Sending user write request to table actor ");
-
+                            
                             if let Some(actor) = self.tablename_to_actors.get(&insert.table_name) {
                                 let mgr_addr = self.address
                                     .as_ref()
@@ -70,7 +69,6 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                                     .tell(Msg::UserWriteTableRequest {
                                         from_mgr_addr: mgr_addr.clone(),
                                         txn: curr_txn.clone(),
-                                        insert: insert.clone(),
                                     }).await
                                     .unwrap();
                             } else {

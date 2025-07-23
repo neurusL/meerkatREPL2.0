@@ -50,10 +50,13 @@ impl kameo::prelude::Message<Msg> for TableActor {
                 pred: self.latest_write_txn.clone(),
             },
 
-            Msg::UserWriteTableRequest { from_mgr_addr, txn, insert } => {
+            Msg::UserWriteTableRequest { from_mgr_addr, txn} => {
                 info!("Table Actor {} inserting row", self.name);
 
-                self.value.update(&insert); 
+                for insert in &txn.inserts {
+                    self.value.update(insert); 
+                }
+                
 
                 self.pubsub
                     .publish(Msg::PropChange {
