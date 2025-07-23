@@ -224,7 +224,32 @@ impl TypecheckEnv {
                 }
             }
             Expr::Table {schema, records } => Table(schema.to_vec()),
-            Expr::Rows { .. } => Table(vec![])            // todo
+            Expr::Rows { .. } => Table(vec![]),            // todo
+            Expr::Fold { args } => {
+                if args.len()!=3 {
+                    panic!("Fold expects 3 arguments, got {} arguments", args.len());
+                }
+
+                let func_type = self.infer_expr(&args[1]);
+                let accum_type = self.infer_expr(&args[2]);
+
+                if let Expr::TableColumn { .. } = &args[0] {     // Maybe later we can have a tablecolumn type for typechecking here
+                    self.infer_expr(&args[0]);
+                } else {         
+                    panic!("First argument should be iterator (column)");
+                }
+
+                match func_type {
+                    Type::Fun(_, ret_type) => {
+                        if !self.unify(&accum_type, &*ret_type) {
+                            panic!("Accumulator type should be the same as function return type, expected {}, got {}", &*ret_type, &accum_type);
+                        }
+                    },
+                    _ => panic!("Second argument must be function type")
+                }
+                self.find(&accum_type)
+                
+            },
             
         }
 }
@@ -234,3 +259,4 @@ impl TypecheckEnv {
 // (priority) implement statics for actions
 // 1. more efficient implementation of var context
 // 2. add language feature: let binding
+// 3. Extend fold to a more general iterator instead of just table column right now

@@ -73,7 +73,17 @@ impl Expr {
             Expr::TableColumn { .. } => {
                 HashSet::new()
             }
-            Expr::Rows {..} => HashSet::new()
+            Expr::Rows {..} => HashSet::new(),
+            Expr::Fold { args } => {
+                let mut free_vars = HashSet::new();
+                if let Expr::TableColumn { table_name, .. } = &args[0] {
+                    free_vars.insert(table_name.clone());
+                }
+                if let Expr::Variable { ident } = &args[1] {
+                    free_vars.insert(ident.clone());
+                }
+                free_vars
+            }
         }
     }
 }

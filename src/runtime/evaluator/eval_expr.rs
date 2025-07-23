@@ -188,10 +188,8 @@ impl Evaluator {
                 where_clause,
             } => {
                 
-                let Some(table) = self.reactive_name_to_vals.get(table_name).cloned() else {
-                    return Err(format!("Table {} data not found", table_name));
-                };
-                info!("Table found is: {}", table);
+                let table = self.search_table(table_name)?;
+                //info!("Table found is: {}", table);
 
                 let original_context = self.reactive_name_to_vals.clone();
 
@@ -278,6 +276,30 @@ impl Evaluator {
                 } 
                 Err(format!("TableColumn {}.{} cannot be evaluated outside of a row context", table_name, column_name))
             }            // will remove tablecolumn if no use 
+            Expr::Fold { args } => {
+                if let Expr::TableColumn { table_name, column_name } = &args[0] {
+                    let table = self.search_table(table_name)?;
+                    if let Expr::Table { schema, records } = table {
+                        let column_id = schema.iter().position(|f| &f.name == column_name).ok_or_else(|| format!("Column not found"))?;
+                        let mut accum = args[2].clone();
+                            for record in records {
+                                let val = record.val[column_id].clone();
+                                let mut result = self.fold(val, accum, args[1].clone());
+                                self.eval_expr(&mut result)?;
+                                accum = result;     // recursive since this accum with result value is used in the next iteration as identity var
+                                
+                            }
+                            // println!("Evaled result: {}",  accum);
+                            *expr = accum;
+                            
+                            Ok(())
+                    } else {
+                        Err(format!("{} table not found", table_name))
+                    }
+                } else {
+                    Err(format!("First arg should be a iterator (column for now)"))
+                }
+            }
         }
     }
 }

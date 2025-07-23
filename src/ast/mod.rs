@@ -117,6 +117,9 @@ pub enum Expr {
     },
     Rows {
         val: Vec<Row>
+    },
+    Fold {
+        args: Vec<Expr>
     }
 }
 
@@ -258,7 +261,8 @@ impl Display for Expr {
                 }
                 write!(f, "]")
             },
-            Expr::Rows { val } => write!(f, "rows")
+            Expr::Rows { val } => write!(f, "rows"),
+            Expr::Fold { .. } => write!(f, "fold")
         }
     }
 }

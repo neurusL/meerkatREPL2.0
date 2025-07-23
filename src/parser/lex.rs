@@ -171,6 +171,8 @@ pub enum Token<'a> {
   WHERE_KW,
   #[token("into")]
   INTO_KW,
+  #[token("fold")]
+  FOLD_KW,
   #[token("action")]
   ACTION_KW,
   #[token("fn")]

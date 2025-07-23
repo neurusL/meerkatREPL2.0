@@ -32,6 +32,7 @@ extern {
         "from" => Token::FROM_KW,
         "where" => Token::WHERE_KW,
         "into" => Token::INTO_KW,
+        "fold" => Token::FOLD_KW,
         "action" => Token::ACTION_KW,
         "fn" => Token::FN_KW,
         "then" => Token::THEN_KW,
@@ -362,6 +363,10 @@ Expr: Expr = {
         },
         where_clause: Box::new(cond)
     },
+    "fold" "(" <args: Args> ")" => 
+    Expr::Fold {
+        args
+    }
 }
 
 Bool: bool = {

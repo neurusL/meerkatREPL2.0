@@ -11,6 +11,20 @@ impl Evaluator {
         var
     }
 
+    pub fn fold(&mut self, val: Expr, identity: Expr, operation: Expr) -> Expr {
+        let func_apply = Expr::FuncApply { func: Box::new(operation), args: vec![identity, val] };
+        self.eval_expr(&mut func_apply.clone());
+        func_apply
+    }
+
+    pub fn search_table(&mut self, name: &String) -> Result<Expr, String> {
+        if let Some(table) = self.reactive_name_to_vals.get(name).cloned() {
+            Ok(table)
+        }else {
+            return Err(format!("Table {} not found", name));
+        }
+    }
+
     /// subst all variables in expr if exists in var_to_expr
     pub fn subst(&mut self, expr: &mut Expr, var_to_expr: &HashMap<String, Expr>) {
         match expr {
@@ -85,7 +99,8 @@ impl Evaluator {
                         self.subst( &mut entry.val, var_to_expr);
                     }
                 }
-            }
+            },
+            Expr::Fold { args } => todo!()
         }
     }
 }
