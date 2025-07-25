@@ -5,7 +5,11 @@ use tokio::sync::mpsc::Sender;
 
 use crate::{
     ast::{Assn, Expr, Prog, Service, Test},
-    runtime::{lock::Lock, transaction::TxnId, TestId},
+    runtime::{
+        lock::Lock,
+        transaction::{TxnId, TxnPred},
+        TestId,
+    },
 };
 
 use super::{def_actor::DefActor, manager::Manager, transaction::Txn, var_actor::VarActor};
@@ -133,6 +137,7 @@ pub enum CmdMsg {
     },
     TransactionCommitted {
         txn_id: TxnId,
+        writes: Vec<String>,
     },
 
     TryAssert {

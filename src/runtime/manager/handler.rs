@@ -171,7 +171,17 @@ impl kameo::prelude::Message<Msg> for Manager {
                     info!("release all locks, send commit transaction");
                     let client_sender = self.get_client_sender(&txn_id);
                     client_sender
-                        .send(CmdMsg::TransactionCommitted { txn_id })
+                        .send(CmdMsg::TransactionCommitted {
+                            txn_id: txn_id.clone(),
+                            writes: self
+                                .txn_mgrs
+                                .get(&txn_id)
+                                .unwrap()
+                                .writes
+                                .keys()
+                                .cloned()
+                                .collect(),
+                        })
                         .await
                         .unwrap();
                 }
@@ -201,7 +211,7 @@ impl kameo::prelude::Message<Msg> for Manager {
 impl Actor for Manager {
     type Error = Infallible;
 
-    /// customized on_start impl of Actor trait    
+    /// customized on_start impl of Actor trait
     /// to allow manager self reference to its addr
     async fn on_start(&mut self, actor_ref: ActorRef<Self>) -> Result<(), Self::Error> {
         info!("MANAGER on_start got ActorRef with id {}", actor_ref.id());

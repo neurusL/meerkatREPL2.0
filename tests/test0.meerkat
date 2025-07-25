@@ -28,15 +28,21 @@ service foo_service {
 
 }
 
+/*
 @test(foo_service) {
     /* test for action consider all previous actions full effect */
-    assert(action { x = 1; } == action { x = 0 + 1; });
     assert(x == 1 && y == 2);
     do inc_x;
     assert(x == 2 && y == 2);
 
     assert(f == 4 && g == 4);
     assert(h == 0);
+    assert(x == 2 && y == 2);
+    // notice running these asserts have side effect of the system
+    // they artificially wait for f, g, h become to desired values
+    // in some way avoid incomplete value propagation
+    assert(f == 4 && g == 4);
+    assert(h == 2); // should fail
     do square_x;
 
     do square_x;
@@ -44,9 +50,10 @@ service foo_service {
     do square_x;
 
 }
+*/
 
 
-/*
+
 @test(foo_service) {
     
     do inc_x;  // txn 1
@@ -82,4 +89,3 @@ service foo_service {
     assert(x == 12 && y == 4);
 
 }
-*/

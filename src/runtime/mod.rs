@@ -19,20 +19,16 @@
 //!  4. test_manager will wait for bool_expr to be true before processing next
 //!     action, on the other hand, timeout means assertion failed
 use core::panic;
-use std::{
-    collections::{HashMap, HashSet},
-    thread::sleep,
-};
+use std::collections::HashMap;
 
 use crate::{
-    ast::{Expr, Prog, ReplCmd, Service, Test},
-    runtime::{message::CmdMsg, transaction::TxnId},
+    ast::{Prog, ReplCmd, Service, Test},
+    runtime::{
+        message::CmdMsg,
+        transaction::{TxnId, TxnPred},
+    },
 };
-use kameo::{
-    actor::ActorRef,
-    prelude::{Context, Message},
-    spawn, Actor,
-};
+use kameo::{actor::ActorRef, spawn};
 use log::info;
 use manager::Manager;
 use tokio::sync::mpsc::{self, Receiver, Sender};
@@ -135,6 +131,7 @@ pub async fn run_test(
 
     while process_cmd_idx < test.commands.len() {
         let cmd = &test.commands[process_cmd_idx];
+
         match cmd {
             ReplCmd::Do(action) => {
                 let txn_id = TxnId::new();
@@ -149,25 +146,25 @@ pub async fn run_test(
 
                 loop {
                     tokio::select! {
-                            maybe_msg = cli_rx.recv() => {
+                        maybe_msg = cli_rx.recv() => {
                             if let Some(msg) = maybe_msg {
                                 match msg {
-                                CmdMsg::TransactionAborted { txn_id } => {
-                                    // process_cmd_idx = *txn_to_cmd_idx.get(&txn_id)
-                                    // .expect("txn_id not found");
-                                    // break;
+                                    CmdMsg::TransactionAborted { txn_id } => {
+                                        // process_cmd_idx = *txn_to_cmd_idx.get(&txn_id)
+                                        // .expect("txn_id not found");
+                                        // break;
 
-                                    todo!("rollback")
-                                }
-                                CmdMsg::TransactionCommitted { txn_id } => {
-                                    info!("Transaction {:?} committed", txn_id);
-                                    process_cmd_idx += 1;
-                                    break;
-                                }
-                                _ => panic!("unexpected message")
+                                        todo!("rollback")
+                                    }
+                                    CmdMsg::TransactionCommitted { txn_id, writes } => {
+                                        info!("Transaction {:?} committed", txn_id);
+                                        process_cmd_idx += 1;
+                                        break;
+                                    }
+                                    _ => panic!("unexpected message")
                                 }
                             }
-                            }
+                        }
                     }
                 }
             }
