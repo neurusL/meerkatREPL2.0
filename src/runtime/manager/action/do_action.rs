@@ -43,17 +43,17 @@ use crate::{
 
 impl Manager {
     /// 1. initialize a new transaction manager
-    pub fn new_txn(
+    pub fn add_new_txn(
         &mut self,
         txn_id: TxnId,
         assns: Vec<Assn>,
         from_client: Sender<CmdMsg>,
-    ) -> TxnManager {
+    ) {
         // static info of txn, the read and write set, which may overlap
         let direct_read_set = calc_read_set(&assns, &self.evaluator.reactive_names);
         let write_set = calc_write_set(&assns);
 
-        let txn = Txn::new(txn_id, assns);
+        let txn = Txn::new(txn_id.clone(), assns);
 
         // set up txn manager
         let txn_mgr = TxnManager::new(
@@ -64,7 +64,7 @@ impl Manager {
             write_set,
         );
 
-        txn_mgr
+        self.txn_mgrs.insert(txn_id, txn_mgr);
     }
 
     /// 2. request trans read and write lock
@@ -144,7 +144,7 @@ impl Manager {
                     from_mgr_addr: self.address.clone().unwrap(),
                 },
                 Msg::UsrReadDefRequest {
-                    txn: txn_mgr.txn.id.clone(),
+                    txn_id: txn_mgr.txn.id.clone(),
                     from_mgr_addr: self.address.clone().unwrap(),
                     pred,
                 },

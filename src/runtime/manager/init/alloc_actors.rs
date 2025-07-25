@@ -27,7 +27,6 @@ impl Manager {
         &mut self,
         name: &String,
         expr: Expr,
-        testid_and_its_manager_and_txns: Option<(TestId, ActorRef<Manager>, Vec<TxnPred>)>,
     ) -> Result<ActorRef<DefActor>, Box<dyn Error>> {
         // calculate all information for def actor, default is used for non-source code part, like assertions
         let def_args = self.dep_graph.get(name).map_or_else(
@@ -77,7 +76,6 @@ impl Manager {
             val,
             def_arg_to_vals,
             def_arg_to_vars,
-            testid_and_its_manager_and_txns,
         ));
         self.defname_to_actors
             .insert(name.clone(), actor_ref.clone());

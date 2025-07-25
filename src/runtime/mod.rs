@@ -61,7 +61,7 @@ pub async fn run(prog: &Prog) -> Result<(), Box<dyn std::error::Error>> {
     let test = &prog.tests[0];
 
     let srv_actor_ref = run_srv(srv, dev_tx.clone()).await?;
-    run_test(test, srv_actor_ref, cli_tx.clone(), cli_rx, dev_rx).await?;
+    run_test(test, srv_actor_ref, cli_tx.clone(), dev_tx, cli_rx, dev_rx).await?;
 
     Ok(())
 }
@@ -113,6 +113,7 @@ pub async fn run_test(
     test: &Test,
     srv_actor_ref: ActorRef<Manager>,
     cli_tx: Sender<CmdMsg>,
+    dev_tx: Sender<CmdMsg>,
     mut cli_rx: Receiver<CmdMsg>,
     mut dev_rx: Receiver<CmdMsg>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -130,8 +131,6 @@ pub async fn run_test(
 
     while process_cmd_idx < test.commands.len() {
         let cmd = &test.commands[process_cmd_idx];
-
-        let mut committed = Vec::<TxnPred>::new();
 
         match cmd {
             ReplCmd::Do(action) => {
@@ -160,7 +159,6 @@ pub async fn run_test(
                                     CmdMsg::TransactionCommitted { txn_id, writes } => {
                                         info!("Transaction {:?} committed", txn_id);
                                         process_cmd_idx += 1;
-                                        committed.push(TxnPred { id: txn_id, writes });
                                         break;
                                     }
                                     _ => panic!("unexpected message")
@@ -175,10 +173,10 @@ pub async fn run_test(
 
                 srv_actor_ref
                     .tell(CmdMsg::TryAssert {
+                        from_developer: dev_tx.clone(),
                         name: test.name.clone(),
                         test: expr.clone(),
                         test_id: test_id,
-                        preds: committed.clone(),
                     })
                     .await?;
 
@@ -196,15 +194,15 @@ pub async fn run_test(
                     let maybe_msg = dev_rx.recv().await;
                     if let Some(CmdMsg::AssertCompleted {
                         test_id: recv_id,
-                        result,
+                        result: test_result,
                     }) = maybe_msg
                     {
                         info!(
                             "Manager received Assertion {} {}",
                             recv_id,
-                            if result { "passed" } else { "failed" }
+                            if test_result { "passed" } else { "failed" }
                         );
-                        received_passed_tests.insert(recv_id, result);
+                        received_passed_tests.insert(recv_id, test_result);
 
                         if let Some(result) = received_passed_tests.get(&test_id) {
                             if *result {
@@ -212,6 +210,7 @@ pub async fn run_test(
                             } else {
                                 println!("fail test {}", expr);
                             }
+                 
                             process_cmd_idx += 1;
                             break;
                         }

@@ -31,16 +31,27 @@ pub enum Msg {
 
     UsrReadDefRequest {
         from_mgr_addr: ActorRef<Manager>,
-        txn: TxnId,
+        txn_id: TxnId,
 
         pred: Vec<TxnId>, // to obtain read result, def has to see pred in its applied txns
     },
     UsrReadDefResult {
-        txn: TxnId,
+        txn_id: TxnId,
         name: String,
         result: Expr,
         preds: HashSet<Txn>,
     },
+
+    TestReadDefRequest {
+        from_mgr_addr: ActorRef<Manager>,
+        test_id: TestId,
+        preds: Vec<TxnId>,
+    },
+    TestReadDefResult {
+        test_id: TestId,
+        result: Expr,
+    },
+    
 
     UsrWriteVarRequest {
         from_mgr_addr: ActorRef<Manager>,
@@ -53,10 +64,16 @@ pub enum Msg {
         name: String,
     },
 
-    // UnsafeRead, // for test only
-    // UnsafeReadResult {
-    //     result: Expr,
-    // },
+    TestRequestPred { 
+        from_mgr_addr: ActorRef<Manager>,
+        test_id: TestId
+    }, // for test only
+    TestRequestPredGranted {
+        from_name: String,
+        test_id: TestId,
+        pred_id: Option<TxnId>
+    },
+
     LockRequest {
         // for notifying var/def that a lock is requested
         from_mgr_addr: ActorRef<Manager>,
@@ -124,10 +141,10 @@ pub enum CmdMsg {
     },
 
     TryAssert {
+        from_developer: Sender<CmdMsg>,
         name: String,
         test: Expr,
         test_id: TestId,
-        preds: Vec<TxnPred>,
     },
     AssertCompleted {
         test_id: TestId,
