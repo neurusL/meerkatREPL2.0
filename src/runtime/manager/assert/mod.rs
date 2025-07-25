@@ -1,39 +1,42 @@
+//! assertion implementation
+//! Motivation:
+//! - provide assert for developer testing the meerkat source code
+//! 
+//! Design:
+//! - each assertion spawns a def actor, subscribing to all free reactive names in the assertion
+//! - once all transactions required by the assertion are committed and applied by the actor
+//!   we decide if the assertions succeeds or not
+//! - (todo) if some required transactions never arrives, assertion timeout
+//! 
+//! We treat each assertion as a weaker form of transaction + 2 phase process
+//! - no explicit transaction id
+//! - since assertion is read only, (Phase 1)
+//!   trans_read requests are sended to relevant var actors
+//!   who send back pred txn immediately (no acquisition for read lock)
+//! - (Phase 2) send UsrReadDefRequest to assertion def actor
+//!   when hearing back from the def actor, send back AssertComplete
+//! 
+use std::collections::HashMap;
+
 use kameo::actor::ActorRef;
+use tokio::sync::mpsc::Sender;
 
-use crate::{
-    ast::Expr,
-    runtime::{manager::Manager, message::CmdMsg, TestId},
-};
 
-impl Manager {
-    pub async fn new_test(&mut self, name: String, bool_expr: Expr, test_id: TestId) {
-        let mgr_ref = self.address.clone().unwrap();
-        let actor_ref = self
-            .alloc_def_actor(
-                &format!("{}_assert_{}_${}", name, bool_expr, test_id),
-                bool_expr,
-                Some((test_id, mgr_ref)),
-            )
-            .await
-            .unwrap();
+use crate::runtime::{def_actor::DefActor,message::CmdMsg, transaction::TxnId, TestId};
 
-        self.test_mgrs.insert(test_id, actor_ref);
-    }
+mod do_test;
+mod test_manager;
 
-    pub async fn on_test_finish(&mut self, test_id: TestId) {
-        // send AssertSucceeded back to developer channel
-        self.from_developer
-            .send(CmdMsg::AssertSucceeded { test_id })
-            .await
-            .unwrap();
+#[derive(Debug)]
+pub struct TestManager {
+    pub test_id: TestId,
+    pub assert_actor: ActorRef<DefActor>,
+    pub from_developer: Sender<CmdMsg>,
+    pub trans_reads: HashMap<String, TestTransReadState>,
+}
 
-        // deallocate actor
-        let actor_ref = self
-            .test_mgrs
-            .remove(&test_id)
-            .expect(&format!("Test {} not found", test_id));
-
-        // todo!(): remove subscriptions
-        // let _ = actor_ref.stop_gracefully().await;
-    }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestTransReadState {
+    Requested,
+    Depend(Option<TxnId>),
 }

@@ -54,7 +54,7 @@ impl Expr {
                since we handle actions separately rather than propagating values of
                y, z to  f
             2. def f = fn y, z => action { x = y + z } to correctly evaluate say,
-               f(1,2) to action { x = 5 }.
+               f(1,2) to action { x = 3 }.
             */
             Expr::Action { assns } => {
                 let mut free_vars = HashSet::new();

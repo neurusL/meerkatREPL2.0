@@ -24,17 +24,12 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                 name,
                 test: bool_expr,
                 test_id,
+                from_developer,
             } => {
                 info!("Try Test");
-                self.new_test(name, bool_expr, test_id).await;
-
-                None
-            }
-
-            AssertSucceeded { test_id } => {
-                info!("Assert Succeeded");
-                self.on_test_finish(test_id).await;
-
+                self.add_new_test(test_id, name, bool_expr, from_developer).await;
+                
+                let _ = self.request_assertion_preds(test_id).await;
                 None
             }
 
@@ -46,8 +41,7 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                 info!("Do Action");
                 let assns = self.eval_action(action).unwrap();
 
-                let txn_mgr = self.new_txn(txn_id.clone(), assns, from_client_addr);
-                self.txn_mgrs.insert(txn_id.clone(), txn_mgr);
+                self.add_new_txn(txn_id.clone(), assns, from_client_addr);
 
                 // request locks
                 let _ = self.request_locks(&txn_id).await;
@@ -105,6 +99,16 @@ impl kameo::prelude::Message<Msg> for Manager {
                 Msg::Unit
             }
 
+            Msg::TestRequestPredGranted { from_name, test_id, pred_id } => {
+                self.add_grant_pred(test_id, from_name, pred_id);
+
+                if self.all_pred_granted(test_id) {
+                    let _ = self.request_assertion_result(test_id).await;
+                }
+
+                Msg::Unit
+            },
+
             Msg::UsrReadVarResult {
                 txn: txn_id,
                 name,
@@ -132,7 +136,7 @@ impl kameo::prelude::Message<Msg> for Manager {
             }
 
             Msg::UsrReadDefResult {
-                txn: txn_id,
+                txn_id,
                 name,
                 result,
                 preds,
@@ -150,6 +154,12 @@ impl kameo::prelude::Message<Msg> for Manager {
                 }
                 Msg::Unit
             }
+
+            Msg::TestReadDefResult { test_id, result } => {
+                let _ = self.on_test_finish(test_id, result).await;
+
+                Msg::Unit
+            },
 
             Msg::UsrWriteVarFinish { txn: txn_id, name } => {
                 info!("UsrWriteVarFinish");

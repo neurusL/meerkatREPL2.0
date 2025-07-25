@@ -65,7 +65,7 @@ impl kameo::prelude::Message<Msg> for DefActor {
             // }
             Msg::UsrReadDefRequest {
                 from_mgr_addr,
-                txn,
+                txn_id,
                 pred,
             } => {
                 // assert!(self.lock_state.has_granted(&txn));
@@ -75,15 +75,25 @@ impl kameo::prelude::Message<Msg> for DefActor {
                 if pred.len() == 0 {
                     let _ = from_mgr_addr
                         .tell(Msg::UsrReadDefResult {
-                            txn,
+                            txn_id: txn_id.clone(),
                             name: self.name.clone(),
                             result: self.value.clone().into(),
                             preds: self.state.get_all_applied_txns(), // todo!("switch to undropped txns later")
                         })
                         .await;
                 } else {
-                    self.read_requests.insert(txn, (from_mgr_addr, pred));
+                    self.read_requests.insert(txn_id, (from_mgr_addr, pred));
                 }
+
+                Msg::Unit
+            }
+
+            Msg::TestReadDefRequest { 
+                from_mgr_addr, 
+                test_id, 
+                preds 
+            } => {
+                self.test_read_request = Some((test_id, (from_mgr_addr, preds)));
 
                 Msg::Unit
             }
@@ -163,7 +173,7 @@ impl DefActor {
             if self.state.has_applied_txns(pred) {
                 let _ = from_mgr_addr
                     .tell(Msg::UsrReadDefResult {
-                        txn: txn.clone(),
+                        txn_id: txn.clone(),
                         name: self.name.clone(),
                         result: self.value.clone().into(),
                         preds: self.state.get_all_applied_txns(), // todo!("switch to undropped txns later")
@@ -176,17 +186,31 @@ impl DefActor {
             self.read_requests.remove(&txn); // removed processed read request
         }
 
-        if let Some((test_id, manager)) = &self.is_assert_actor_of {
-            info!("{} has value {}", self.name, self.value);
-            if let Expr::Bool { val: true } = self.value {
-                info!("Def {} says Assert Succeeded: {}", self.state.expr, test_id);
-                manager
-                    .tell(CmdMsg::AssertSucceeded { test_id: *test_id })
-                    .await?;
+        // if let Some((test_id, manager)) = &self.is_assert_actor_of {
+        //     info!("{} has value {}", self.name, self.value);
+        //     if let Expr::Bool { val: true } = self.value {
+        //         info!("Def {} says Assert Succeeded: {}", self.state.expr, test_id);
+        //         manager
+        //             .tell(CmdMsg::AssertSucceeded { test_id: *test_id })
+        //             .await?;
 
-                // todo!("this is a hack, we should use a better way to get the actor ref
-                // and kill/stop_gracefully the actor")
-                self.is_assert_actor_of = None;
+        //         // todo!("this is a hack, we should use a better way to get the actor ref
+        //         // and kill/stop_gracefully the actor")
+        //         self.is_assert_actor_of = None;
+        //     }
+        // }
+
+        // if we have test read request and applied its preds
+        if let Some((test_id, (from_mgr_addr, preds))) = &self.test_read_request {
+            if self.state.has_applied_txns(preds) {
+                let _ = from_mgr_addr
+                    .tell(Msg::TestReadDefResult {
+                        test_id: test_id.clone(),
+                        result: self.value.clone().into(),
+                    })
+                    .await;
+                self.test_read_request = None;
+                // todo!("at this point we should kill/stop_gracefully the actor")
             }
         }
 

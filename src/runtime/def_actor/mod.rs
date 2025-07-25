@@ -1,3 +1,4 @@
+use futures::future::Either;
 use kameo::actor::ActorRef;
 use kameo::Actor;
 use std::collections::HashMap;
@@ -29,11 +30,15 @@ pub mod state;
 pub struct DefActor {
     pub name: String,
     pub value: Expr, // expr of def
-    pub is_assert_actor_of: Option<(TestId, ActorRef<Manager>)>,
+    // pub is_assert_actor_of: Option<(TestId, ActorRef<Manager>)>,
 
     pub pubsub: PubSub,
     // pub lock_state: LockState,
+
+    // read request is for transactions reading this def
     pub read_requests: HashMap<TxnId, (ActorRef<Manager>, Vec<TxnId>)>,
+    // test read request is for assertion def actor, one shot request
+    pub test_read_request: Option<(TestId, (ActorRef<Manager>, Vec<TxnId>))>,
 
     pub state: ChangeState,
 }
@@ -46,15 +51,15 @@ impl DefActor {
         arg_to_values: HashMap<String, Expr>,          // def's args to their initialized values
         arg_to_vars: HashMap<String, HashSet<String>>, // args to their transitively dependent vars
         // if arg itself is var, then arg_to_vars[arg] = {arg}
-        testid_and_manager: Option<(TestId, ActorRef<Manager>)>,
     ) -> DefActor {
         DefActor {
             name,
             value,
-            is_assert_actor_of: testid_and_manager,
+            // is_assert_actor_of: testid_and_manager,
             pubsub: PubSub::new(),
             // lock_state: LockState::new(),
             read_requests: HashMap::new(),
+            test_read_request: None,
             state: ChangeState::new(expr, arg_to_values, arg_to_vars),
         }
     }
