@@ -70,18 +70,16 @@ impl Expr {
                 free_vars.insert(table_name.clone());
                 free_vars
             }
-            Expr::TableColumn { .. } => {
-                HashSet::new()
+            Expr::TableColumn { table_name, .. } => {
+                HashSet::from([table_name.to_string()])
             }
             Expr::Rows {..} => HashSet::new(),
-            Expr::Fold { args } => {
+            Expr::Fold { args } => { 
                 let mut free_vars = HashSet::new();
-                if let Expr::TableColumn { table_name, .. } = &args[0] {
-                    free_vars.insert(table_name.clone());
-                }
-                if let Expr::Variable { ident } = &args[1] {
-                    free_vars.insert(ident.clone());
-                }
+                free_vars.extend(args[0].free_var(reactive_names, var_binded));
+                free_vars.extend(args[1].free_var(reactive_names, var_binded));
+                free_vars.extend(args[2].free_var(reactive_names, var_binded));
+                
                 free_vars
             }
         }

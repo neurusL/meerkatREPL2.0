@@ -229,7 +229,8 @@ impl TypecheckEnv {
                 if args.len()!=3 {
                     panic!("Fold expects 3 arguments, got {} arguments", args.len());
                 }
-
+                
+                let column_type = self.infer_expr(&args[0]);
                 let func_type = self.infer_expr(&args[1]);
                 let accum_type = self.infer_expr(&args[2]);
 
@@ -240,9 +241,14 @@ impl TypecheckEnv {
                 }
 
                 match func_type {
-                    Type::Fun(_, ret_type) => {
+                    Type::Fun(params, ret_type) => {
                         if !self.unify(&accum_type, &*ret_type) {
                             panic!("Accumulator type should be the same as function return type, expected {}, got {}", &*ret_type, &accum_type);
+                        }
+                        for param in params {
+                            if !self.unify(&param, &column_type) {
+                                panic!("Column type should be the same as function argument type, expected {}, got {}", &param, &column_type);
+                            }
                         }
                     },
                     _ => panic!("Second argument must be function type")
