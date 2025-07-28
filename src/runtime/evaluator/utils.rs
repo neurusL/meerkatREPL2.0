@@ -31,10 +31,18 @@ impl Evaluator {
             Expr::Number { val } => {}
             Expr::Bool { val } => {}
             Expr::String {val} => {}
+            Expr::Vector { val } => {
+                for expr in val {
+                    self.subst(expr, var_to_expr);
+                }
+            }
             Expr::Variable { ident } => {
                 if let Some(e) = var_to_expr.get(ident) {
                     *expr = e.clone();
                 }
+            }
+            Expr::KeyVal { key, value } => {
+                self.subst(value, var_to_expr);
             }
             Expr::Unop { op, expr } => {
                 self.subst(expr, var_to_expr);
@@ -95,9 +103,7 @@ impl Evaluator {
             Expr::Table { .. } => todo!(),
             Expr::Rows { val } => {
                 for row in val {
-                    for entry in &mut row.val {   // substituting every entry with argument
-                        self.subst( &mut entry.val, var_to_expr);
-                    }
+                    self.subst(row, var_to_expr);
                 }
             },
             Expr::Fold { args } => todo!()

@@ -52,24 +52,27 @@ impl TypecheckEnv {
                 match &table_type {
                     Type::Table(schema) => {
                         match &insert.row {
-                            Expr::Rows { val: rows } => {
-                                for row in rows {
-                                    if row.val.len() != schema.len() {
-                                        panic!("Entries in the row do not match the table {} schema", insert.table_name);
-                                    }
-                                    for entry in &row.val {
-                                        // Find matching field in schema
-                                        let field_type = schema.iter().find(|f| f.name == entry.name)
-                                            .unwrap_or_else(|| panic!("Field '{}' not found in table '{}' schema", entry.name, insert.table_name));
-                                        let expected_type = match field_type.type_ {
-                                            DataType::Bool => Type::Bool,
-                                            DataType::Number => Type::Int,
-                                            DataType::String => Type::String,
-                                        };
-                                        let inferred_type = self.infer_expr(&entry.val);
-                                        if !self.unify(&inferred_type, &expected_type) {
-                                            panic!("Data type of entry '{}' does not match the schema, expected {:?}, got {:?}", entry.name, expected_type, inferred_type);
+                            Expr::Vector { val: keyvals } => {
+                                if keyvals.len()!= schema.len() {
+                                    panic!("Entries in the row do not match the table {} schema", insert.table_name);
+                                }
+                                for keyval in keyvals {
+                                    match keyval {
+                                        Expr::KeyVal { key, value} => {
+                                            
+                                            let field_type = schema.iter().find(|f| f.name == *key)
+                                                .unwrap_or_else(|| panic!("Field '{}' not found in table '{}' schema", key, insert.table_name));
+                                            let expected_type = match field_type.type_ {
+                                                DataType::Bool => Type::Bool,
+                                                DataType::Number => Type::Int,
+                                                DataType::String => Type::String,
+                                            };
+                                            let inferred_type = self.infer_expr(&*value);
+                                            if !self.unify(&inferred_type, &expected_type) {
+                                                panic!("Data type of entry '{}' does not match the schema, expected {:?}, got {:?}", key, expected_type, inferred_type);
+                                            }
                                         }
+                                        _ => panic!("Non keyval found")
                                     }
                                 }
                             }

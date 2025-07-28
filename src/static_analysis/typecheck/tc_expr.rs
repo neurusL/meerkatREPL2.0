@@ -10,6 +10,14 @@ impl TypecheckEnv {
             Expr::Number { val: _ } => Int,
             Expr::Bool { val: _ } => Bool,
             Expr::String {val: _} => String,
+            Expr::KeyVal { key, value } => self.infer_expr(&value),
+            Expr::Vector { val } => {
+                let mut type_vec = Vec::new();
+                for el in val {
+                    type_vec.push(self.infer_expr(el));
+                }
+                Type::Vector(type_vec)
+            }
             Expr::Variable { ident } => self
                 .var_context
                 .get(ident)

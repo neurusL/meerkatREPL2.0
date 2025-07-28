@@ -19,6 +19,7 @@ pub enum Type {
     Int,
     Bool,
     String,
+    Vector(Vec<Type>),
     Unit,
     Action,
 
@@ -48,6 +49,7 @@ impl Display for Type {
             Type::Int => write!(f, "int"),
             Type::Bool => write!(f, "bool"),
             Type::String => write!(f, "string"),
+            Type::Vector( .. ) => write!(f, "vector"),
             Type::Unit => write!(f, "unit"),
             Type::Action => write!(f, "action"),
             Type::Fun(args, ret) => {

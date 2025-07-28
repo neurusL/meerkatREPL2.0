@@ -1,7 +1,7 @@
 use log::info;
 
 use crate::ast::{Assn, BinOp, Expr, Record, UnOp};
-use std::{collections::HashMap, iter::zip, ops::Deref, vec};
+use std::{collections::{HashMap, HashSet}, iter::zip, ops::Deref, vec};
 
 use super::{Evaluator, Val};
 
@@ -56,7 +56,11 @@ impl Evaluator {
             // println!("First table: {:?}", records1);
             // println!("Second table: {:?}", records2);
             match op {
-                BinOp::Eq => Ok(Expr::Bool { val: records1 == records2 }),
+                BinOp::Eq => {
+                    let set1: HashSet<_> = records1.iter().collect();        // using sets to ignore order for equality of records
+                    let set2: HashSet<_> = records2.iter().collect();
+                    Ok(Expr::Bool { val: set1 == set2 })
+                },
                 _ => panic!(),
             }
         } else {
@@ -77,6 +81,12 @@ impl Evaluator {
             Expr::Number { val } => Ok(()),
             Expr::Bool { val } => Ok(()),
             Expr::String {val} => Ok(()),
+            Expr::Vector { val } => {
+                for expr in val {
+                    self.eval_expr(expr)?;
+                }
+                Ok(())
+            }
             Expr::Variable { ident } => {
                 let val = self
                     .reactive_name_to_vals
@@ -85,6 +95,10 @@ impl Evaluator {
                     .ok_or_else(|| format!("variable '{}' not found", ident));
 
                 val.map(|val| *expr = val)
+            }
+            Expr::KeyVal { key, value } => {
+                self.eval_expr(value)?;
+                Ok(())
             }
 
             Expr::Unop { op, expr: expr1 } => {
@@ -207,7 +221,11 @@ impl Evaluator {
                     let mut selected_records = Vec::new();
 
                     for record in records {
-                        for(field, value) in schema.iter().zip(record.val.iter()) {
+                        let record_vals = match record {
+                            Expr::Vector { val } => val.clone(),
+                            _ => panic!("Record is not a vector")
+                        };
+                        for(field, value) in schema.iter().zip(record_vals.iter()) {
                             self.reactive_name_to_vals.insert(field.name.clone(), value.clone());
                         }
                         let mut evaluated_where = where_clause.deref().clone();
@@ -224,17 +242,17 @@ impl Evaluator {
                                 // Build new record with only selected columns
                                 let mut new_vals = Vec::new();
                                 if column_names.len()==0 {       // if no columns mentioned, add all
-                                    selected_records.push(record.clone());
+                                    selected_records.push(Expr::Vector { val: record_vals });
                                 }
                                 else {
                                     for col in &mut *column_names {
                                     if let Some((i, _)) = schema.iter().enumerate().find(|(_, f)| &f.name == col) {
-                                        new_vals.push(record.val[i].clone());
+                                        new_vals.push(record_vals[i].clone());
                                     } else {
                                         return Err(format!("Column '{}' not found in schema", col));
                                     }
                                 }
-                                selected_records.push(Record { val: new_vals });
+                                selected_records.push(Expr::Vector { val: new_vals });
                             }
                             }
                         } else {
@@ -254,14 +272,38 @@ impl Evaluator {
             }
             Expr::Table { .. } => Ok(()),
             Expr::Rows { val } => {
-                let mut vals = Vec::new();
-
-                for row in val {
-                    vals.push(Record{val: row.val.iter().map(|entry| entry.val.clone()).collect()});
+                for row_expr in val.iter_mut() {
+                    self.eval_expr(row_expr)?;
                 }
+
+                let mut records = Vec::new();
+
+                for row_expr in val {
+                    match row_expr {
+                        Expr::Vector { val } => {
+                            let mut record_vals = Vec::new();
+
+                            for item in val {
+                                match item {
+                                    Expr::KeyVal { key:_ , value } => {
+                                        record_vals.push((**value).clone());
+                                    },
+                                    other => {
+                                        record_vals.push(other.clone())
+                                    }
+                                }
+                            }
+                            records.push(Expr::Vector {val: record_vals});
+                        },
+                        other => {
+                            records.push(Expr::Vector {val: vec![other.clone()]});
+                        }
+                    }
+                }
+
                 *expr = Expr::Table {                 // return a table expression with empty schema and extracted records, may just pass it as rows and handle equality above
-                    schema: Vec::new(),
-                    records: vals
+                    schema: Vec::new(),               // potentially change it to return vector type, and update equality to allow for table and vector eq
+                    records: records,
                 };
                 Ok(())
             },
@@ -283,7 +325,12 @@ impl Evaluator {
                         let column_id = schema.iter().position(|f| &f.name == column_name).ok_or_else(|| format!("Column not found"))?;
                         let mut accum = args[2].clone();
                             for record in records {
-                                let val = record.val[column_id].clone();
+                                let val = match record {
+                                    Expr::Vector { val } => {
+                                        val[column_id].clone() 
+                                    }
+                                    _ => panic!("{} is not a vector", record)
+                                };
                                 let mut result = self.fold(val, accum, args[1].clone());
                                 self.eval_expr(&mut result)?;
                                 accum = result;     // recursive since this accum with result value is used in the next iteration as identity var
