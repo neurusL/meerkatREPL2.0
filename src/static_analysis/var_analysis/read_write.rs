@@ -12,13 +12,20 @@ impl Expr {
         var_binded: &HashSet<String>, // should be initialized by all reactive name declared in the service
     ) -> HashSet<String> {
         match self {
-            Expr::Number { .. } | Expr::Bool { .. } | Expr::String { .. } | Expr::Table { .. }=> HashSet::new(),
+            Expr::Number { .. } | Expr::Bool { .. } | Expr::String { .. } | Expr::KeyVal{ .. } | Expr::Table { .. }=> HashSet::new(),
             Expr::Variable { ident } => {
                 if var_binded.contains(ident) {
                     HashSet::new()
                 } else {
                     HashSet::from([ident.clone()])
                 }
+            }
+            Expr::Vector { val } => {
+                let mut free_vars = HashSet::new();
+                for item in val {
+                    free_vars.extend(item.free_var(reactive_names, var_binded));
+                }
+                free_vars
             }
             Expr::Unop { op, expr } => expr.free_var(reactive_names, var_binded),
             Expr::Binop { op, expr1, expr2 } => {

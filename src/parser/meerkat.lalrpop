@@ -7,7 +7,7 @@
 // Grammar 
 grammar<'input>;
 
-use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test, DataType, Field, Insert, Entry, Row};
+use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test, DataType, Field, Insert};
 use lalrpop_util::ParseError;
 use crate::parser::lex::Token;
 
@@ -157,23 +157,6 @@ DataType: DataType = {
     "bool" => DataType::Bool,
 }
 
-Entry: Entry = {
-    <c: Ident> ":" <e: Expr>  => {
-        Entry {name: c, val: e }
-    }
-}
-
-Row: Row = {
-     "{" <mut entries:(<Entry>",")*> <e:Entry?> "}" => Row {
-        val: {
-            let mut v = entries;
-            if let Some(entry) = e {
-                v.push(entry);
-            }
-            v
-        }
-    }
-}
 
 Insert: Insert = {
     "insert"  <e: Expr> "into" <t: Ident> => {
@@ -224,14 +207,9 @@ SubExpr: Expr = {
     <b:Bool> => Expr::Bool { val: b },
     <s: "strlit"> => Expr::String {val: s.to_owned()},
     <i:Ident> => Expr::Variable { ident: i },
+    "{" <args: Args> "}" => Expr::Vector {val: args},
     "(" <Expr> ")" => <>,
-    "[" <mut rows: (<Row> ",")*> <r: Row?> "]" => {
-        if let Some(row) = r {
-            rows.push(row);
-        }
-        Expr::Rows { val: rows }
-    },
-    <r: Row> => Expr::Rows {val: vec![r]},
+    "[" <args: Args> "]" => Expr::Rows {val: args},
     
     <expr:SubExpr> "(" <args:Args> ")" => 
         Expr::FuncApply { func: Box::new(expr), args },
@@ -260,6 +238,7 @@ Expr: Expr = {
     "!" <e:Expr> => {
         Expr::Unop { expr: Box::new(e), op: UnOp::Not }
     },
+    <i: Ident> ":" <e: Expr> => Expr::KeyVal {key: i, value: Box::new(e)},
     
     
 

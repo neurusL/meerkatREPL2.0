@@ -35,7 +35,7 @@ pub struct Insert {                    // insert {id: 1, ..}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Row {
-    pub val: Vec<Entry>,        // id: 1 is one entry
+    pub val: Vec<Expr>,        // id: 1 is one entry
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -64,7 +64,13 @@ pub enum Expr {
     Variable {
         ident: String,
     },
-
+    Vector {
+        val: Vec<Expr>
+    },
+    KeyVal {
+        key: String,
+        value: Box<Expr>,
+    },
     Unop {
         op: UnOp,
         expr: Box<Expr>,
@@ -109,14 +115,14 @@ pub enum Expr {
 
     Table {
         schema: Vec<Field>,
-        records: Vec<Record>,
+        records: Vec<Expr>,
         /*How do records differ from rows?
           Records only consist of data contained within tables: {1, "A", 18}
           Rows are what are written inside insert statements, insert {id: 1, name: "A", age: 18};
          */
     },
     Rows {
-        val: Vec<Row>
+        val: Vec<Expr>
     },
     Fold {
         args: Vec<Expr>
@@ -221,6 +227,8 @@ impl Display for Expr {
             Expr::Number { val } => write!(f, "{}", val),
             Expr::Bool { val } => write!(f, "{}", val),
             Expr::String { val } => write!(f, "{}", val),
+            Expr::Vector { val } => write!(f, "vector"),
+            Expr::KeyVal { .. } => write!(f, "keyval"),
             Expr::Variable { ident } => write!(f, "{}", ident),
             Expr::Unop { op, expr } => write!(f, "{}{}", op, expr),
             Expr::Binop { op, expr1, expr2 } => write!(f, "{} {} {}", expr1, op, expr2),
@@ -251,15 +259,22 @@ impl Display for Expr {
                         write!(f, ", ")?;
                     }
                     write!(f, "{{")?;
-                    for (j, entry) in record.val.iter().enumerate() {
-                        if j > 0 {
-                            write!(f, ", ")?;
+                    match record {
+                        Expr::Vector { val } => {
+                            for (j, entry) in val.iter().enumerate() {
+                                if j > 0 {
+                                write!(f, ", ")?;
+                                }
+                                write!(f, "{}", entry)?;
+                            }
+                        },
+                        other => {
+                            write!(f, "{}", other)?;
                         }
-                        write!(f, "{}", entry)?;
                     }
-                    write!(f, "}}")?;
-                }
-                write!(f, "]")
+                write!(f, "}}")?;
+            }
+            write!(f, "]")
             },
             Expr::Rows { val } => write!(f, "rows"),
             Expr::Fold { .. } => write!(f, "fold")
