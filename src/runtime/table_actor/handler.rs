@@ -51,23 +51,19 @@ impl kameo::prelude::Message<Msg> for TableActor {
             },
 
             Msg::UserWriteTableRequest { from_mgr_addr, txn} => {
-                info!("Table Actor {} inserting row", self.name);
+                info!("Table Actor {} inserting row {:?}", self.name, txn.inserts);
 
                 for insert in &txn.inserts {
-                    self.value.update(insert); 
-                }
-                
-
-                self.pubsub
+                    let res = self.value.update(insert); 
+                    self.pubsub
                     .publish(Msg::PropChange {
-                        from_name: self.name.clone(),
-                        val: self.value.clone().into(),
+                        from_name: self.name.clone() + "record",       // default name for single record?
+                        val: res,                  // only send new record
                         preds: HashSet::from([txn.clone()]),
                     })
                     .await;
                 info!("Prop change message sent to subscribers");
-                
-                
+                }
     
                 from_mgr_addr
                     .tell(Msg::UserWriteTableFinish { txn: txn.id, name: self.name.clone() }).await

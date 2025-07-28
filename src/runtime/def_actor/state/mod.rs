@@ -87,6 +87,16 @@ impl ChangeState {
             let change = &self.id_to_change[change_id];
             info!("change being applied: {}", &change.from_name);
 
+            if change.from_name.ends_with("record") {           // default record name    eg. "samplerecord"
+                let table_name = change.from_name.strip_suffix("record").unwrap().to_string();        // extract table from record -> "sample"
+
+                if let Some(Expr::Table { schema,records }) = self.arg_to_values.clone().get_mut(&table_name) {
+                        info!("inserting new record ");
+                        records.push(change.new_val.clone());
+                        self.arg_to_values.insert(table_name, Expr::Table { schema: schema.to_vec() , records: records.to_vec() });  // update the table val in arg_to_vals (since select re-eval required updated table)
+                    }
+                }
+
             self.arg_to_values
                 .insert(change.from_name.clone(), change.new_val.clone());
             self.applied_changes.add_change(change);
