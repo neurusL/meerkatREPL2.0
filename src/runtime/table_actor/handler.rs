@@ -57,7 +57,7 @@ impl kameo::prelude::Message<Msg> for TableActor {
                     let res = self.value.update(insert); 
                     self.pubsub
                     .publish(Msg::PropChange {
-                        from_name: self.name.clone() + "record",       // default name for single record?
+                        from_name: self.name.clone(), 
                         val: res,                  // only send new record
                         preds: HashSet::from([txn.clone()]),
                     })
