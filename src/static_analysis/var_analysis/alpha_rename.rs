@@ -11,11 +11,14 @@ impl Expr {
         renames: &HashMap<String, String>,
     ) {
         match self {
-            Expr::Number { .. } | Expr::Bool { .. } | Expr::String { .. } | Expr::KeyVal { .. } | Expr::Table { .. } => {}
+            Expr::Number { .. } | Expr::Bool { .. } | Expr::String { .. } | Expr::Table { .. } => {}
             Expr::Variable { ident } => {
                 if !var_binded.contains(ident) && renames.contains_key(ident) {
                     *ident = renames.get(ident).unwrap().clone();
                 }
+            }
+            Expr::KeyVal { value , .. } => {
+                value.alpha_rename(var_binded, renames);
             }
             Expr::Vector { val } => {
                 for item in val {
