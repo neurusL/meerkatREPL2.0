@@ -4,17 +4,24 @@ use std::collections::{HashMap, HashSet};
 use kameo::actor::ActorRef;
 use tokio::sync::mpsc::Sender;
 
-
 use crate::{
     ast::Expr,
-    runtime::{def_actor::DefActor, manager::{assert::{TestManager, TestTransReadState}, Manager}, message::CmdMsg, transaction::TxnId, TestId},
+    runtime::{
+        def_actor::DefActor,
+        manager::{
+            assert::{TestManager, TestTransReadState},
+            Manager,
+        },
+        message::CmdMsg,
+        transaction::TxnId,
+        TestId,
+    },
 };
 
 impl TestManager {
     pub fn new(
         test_id: TestId,
         assert_actor: ActorRef<DefActor>,
-        from_developer: Sender<CmdMsg>,
         direct_reads: &HashSet<String>,
         dep_tran_vars: &HashMap<String, HashSet<String>>,
     ) -> Self {
@@ -34,7 +41,6 @@ impl TestManager {
         TestManager {
             test_id,
             assert_actor,
-            from_developer,
             trans_reads: trans_read_states,
         }
     }
@@ -51,43 +57,30 @@ impl TestManager {
     }
 }
 
-
 impl Manager {
-    pub async fn add_new_test(
-        &mut self, 
-        test_id: TestId,
-        test_name: String, 
-        bool_expr: Expr,
-        from_developer: Sender<CmdMsg>,
-    ) {
+    pub async fn add_new_test(&mut self, test_id: TestId, test_name: String, bool_expr: Expr) {
         // allocate def actor for assert
         let actor_ref = self
             .alloc_def_actor(
-                &format!("{}_assert_{}_${}", test_name, bool_expr, test_id),
+                &format!(
+                    "{}_assert_{}_${}-{}",
+                    test_name, bool_expr, test_id.0, test_id.1
+                ),
                 bool_expr.clone(),
             )
             .await
-            .expect(&format!("alloc def actor failed for test {}", test_id));
-    
-        // direct reads are used for acquiring pred of assert
-        let direct_reads = bool_expr.free_var(
-            &self.evaluator.reactive_names, 
-            &HashSet::new()
-        );
+            .expect(&format!("alloc def actor failed for test {:?}", test_id));
 
-        let test_mgr = TestManager::new(
-            test_id, 
-            actor_ref,
-            from_developer, 
-            &direct_reads, 
-            &self.dep_tran_vars
-        );
-        
+        // direct reads are used for acquiring pred of assert
+        let direct_reads = bool_expr.free_var(&self.evaluator.reactive_names, &HashSet::new());
+
+        let test_mgr = TestManager::new(test_id, actor_ref, &direct_reads, &self.dep_tran_vars);
+
         self.test_mgrs.insert(test_id, test_mgr);
     }
 
-    pub async fn on_test_finish(&mut self, test_id: TestId, test_result: Expr) {     
-        // unwrap test result to bool value   
+    pub async fn on_test_finish(&mut self, test_id: TestId, test_result: Expr) {
+        // unwrap test result to bool value
         let result = match test_result {
             Expr::Bool { val } => val,
             _ => panic!("test result should be bool"),
@@ -95,7 +88,10 @@ impl Manager {
 
         // send AssertSucceeded back to developer channel
         self.from_developer
-            .send(CmdMsg::AssertCompleted { test_id, result: result })
+            .send(CmdMsg::AssertCompleted {
+                test_id,
+                result: result,
+            })
             .await
             .unwrap();
 
@@ -103,7 +99,7 @@ impl Manager {
         let _ = self
             .test_mgrs
             .remove(&test_id)
-            .expect(&format!("Test {} not found", test_id));
+            .expect(&format!("Test {:?} not found", test_id));
 
         // todo!(): remove subscriptions
         // let _ = actor_ref.stop_gracefully().await;

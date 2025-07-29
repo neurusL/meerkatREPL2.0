@@ -1,0 +1,17 @@
+service s {
+    var x = 0;
+
+    pub def inc_x = action { x = x + 1; };
+}
+
+@test(s) {
+    assert(x > -1);
+    do inc_x;
+    assert(x > 0);
+}
+
+@test(s) {
+    assert(x > -1);
+    do inc_x;
+    assert(x > 0);
+}
