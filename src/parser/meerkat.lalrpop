@@ -209,7 +209,6 @@ SubExpr: Expr = {
     <i:Ident> => Expr::Variable { ident: i },
     "{" <args: Args> "}" => Expr::Vector {val: args},
     "(" <Expr> ")" => <>,
-    "[" <args: Args> "]" => Expr::Rows {val: args},
     
     <expr:SubExpr> "(" <args:Args> ")" => 
         Expr::FuncApply { func: Box::new(expr), args },

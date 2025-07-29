@@ -121,9 +121,6 @@ pub enum Expr {
           Rows are what are written inside insert statements, insert {id: 1, name: "A", age: 18};
          */
     },
-    Rows {
-        val: Vec<Expr>
-    },
     Fold {
         args: Vec<Expr>
     }
@@ -276,7 +273,6 @@ impl Display for Expr {
             }
             write!(f, "]")
             },
-            Expr::Rows { val } => write!(f, "rows"),
             Expr::Fold { .. } => write!(f, "fold")
         }
     }

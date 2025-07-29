@@ -1,6 +1,7 @@
 use log::info;
 
 use crate::ast::{Assn, BinOp, Expr, Record, UnOp};
+use core::panic;
 use std::{collections::{HashMap, HashSet}, iter::zip, ops::Deref, vec};
 
 use super::{Evaluator, Val};
@@ -63,6 +64,17 @@ impl Evaluator {
                 },
                 _ => panic!(),
             }
+        } else if let (Expr::Table {records: records1,.. }, Expr::Vector { val: records2, .. }) = (expr1, expr2) {       // manually listing records will be of vector type
+            // println!("First table: {:?}", records1);
+            // println!("Second vector: {:?}", records2);
+            match op {
+                BinOp::Eq => {
+                    let set1: HashSet<_> = records1.iter().collect();
+                    let set2: HashSet<_> = records2.iter().collect();
+                    Ok(Expr::Bool { val: set1 == set2 })
+                },
+                _ => panic!()
+            }
         } else {
             Err(format!(
                 "calculate binop expression cannot be applied 
@@ -122,7 +134,7 @@ impl Evaluator {
                 self.eval_expr(expr2)?;
                 use Expr::*;
                 match (expr1.as_mut(), expr2.as_mut()) {
-                    (Number { .. }, Number { .. }) | (Bool { .. }, Bool { .. }) | (String { .. }, String { .. }) | (Table {..},Table{..}) => {
+                    (Number { .. }, Number { .. }) | (Bool { .. }, Bool { .. }) | (String { .. }, String { .. }) | (Table {..},Table{..}) | (Table{..}, Vector { .. }) => {
                         *expr = Self::calc_binop(*op, expr1, expr2)?;
                         Ok(())
                     }
@@ -271,42 +283,6 @@ impl Evaluator {
 
             }
             Expr::Table { .. } => Ok(()),
-            Expr::Rows { val } => {
-                for row_expr in val.iter_mut() {
-                    self.eval_expr(row_expr)?;
-                }
-
-                let mut records = Vec::new();
-
-                for row_expr in val {
-                    match row_expr {
-                        Expr::Vector { val } => {
-                            let mut record_vals = Vec::new();
-
-                            for item in val {
-                                match item {
-                                    Expr::KeyVal { key:_ , value } => {
-                                        record_vals.push((**value).clone());
-                                    },
-                                    other => {
-                                        record_vals.push(other.clone())
-                                    }
-                                }
-                            }
-                            records.push(Expr::Vector {val: record_vals});
-                        },
-                        other => {
-                            records.push(Expr::Vector {val: vec![other.clone()]});
-                        }
-                    }
-                }
-
-                *expr = Expr::Table {                 // return a table expression with empty schema and extracted records, may just pass it as rows and handle equality above
-                    schema: Vec::new(),               // potentially change it to return vector type, and update equality to allow for table and vector eq
-                    records: records,
-                };
-                Ok(())
-            },
 
             Expr::TableColumn { table_name, column_name } => {
                 info!("Eval tablecolumn");

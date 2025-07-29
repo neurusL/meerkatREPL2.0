@@ -101,11 +101,6 @@ impl Evaluator {
             Expr::Select { table_name, column_names, where_clause } => todo!(),
             Expr::TableColumn { table_name, column_name } => todo!(),
             Expr::Table { .. } => todo!(),
-            Expr::Rows { val } => {
-                for row in val {
-                    self.subst(row, var_to_expr);
-                }
-            },
             Expr::Fold { args } => todo!()
         }
     }

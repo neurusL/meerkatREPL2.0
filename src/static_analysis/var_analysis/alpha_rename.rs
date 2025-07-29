@@ -63,7 +63,6 @@ impl Expr {
                 where_clause.alpha_rename(var_binded, renames);
             }
             Expr::TableColumn { table_name, column_name } => {},
-            Expr::Rows {..} => {},
             Expr::Fold { args } => todo!(),
         
         }

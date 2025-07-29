@@ -232,7 +232,6 @@ impl TypecheckEnv {
                 }
             }
             Expr::Table {schema, records } => Table(schema.to_vec()),
-            Expr::Rows { .. } => Table(vec![]),            // todo
             Expr::Fold { args } => {
                 if args.len()!=3 {
                     panic!("Fold expects 3 arguments, got {} arguments", args.len());

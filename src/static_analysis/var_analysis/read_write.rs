@@ -83,7 +83,6 @@ impl Expr {
             Expr::TableColumn { table_name, .. } => {
                 HashSet::from([table_name.to_string()])
             }
-            Expr::Rows {..} => HashSet::new(),
             Expr::Fold { args } => { 
                 let mut free_vars = HashSet::new();
                 free_vars.extend(args[0].free_var(reactive_names, var_binded));
