@@ -3,7 +3,106 @@ use std::{collections::HashMap, iter::zip, ops::Deref};
 
 use super::{Evaluator, Val};
 
+fn is_versioned(name: &str) -> bool {
+    name.chars().last().map_or(false, |c| c.is_ascii_digit())
+}
+
+
+/// Keeps track of the version history of all variables/definitions
+#[derive(Debug, Default, Clone)]
+pub struct VersionMap {
+    map: HashMap<String, usize>,
+}
+
+impl VersionMap {
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::new(),
+        }
+    }
+
+    pub fn get_base(&self, versioned: &str) -> String {
+        versioned.chars()
+            .take_while(|c| !c.is_numeric())
+            .collect()
+    }
+
+
+    pub fn get_latest(&self, base: &str) -> String {
+        if self.map.contains_key(base) {
+            format!("{base}{}", self.map[base])
+        } else {
+        // Check if the name is already versioned like "x0"
+        // If so, return it as-is
+            if base.chars().last().unwrap_or('a').is_numeric() {
+                return base.to_string();
+            }
+
+            format!("{base}0")
+        }
+    }
+
+
+    /// Increment version and return new name
+    pub fn next_version(&mut self, base: &str) -> String {
+        let entry = self.map.entry(base.to_string()).or_insert(0);
+        *entry += 1;
+        format!("{base}{entry}")
+    }
+
+    /// Reset all versions
+    pub fn reset(&mut self) {
+        self.map.clear();
+    }
+
+    pub fn declare(&mut self, base: &str) -> String {
+        self.map.entry(base.to_string()).or_insert(0);
+        self.get_latest(base)
+    }
+
+}
+
+pub fn rewrite_expr(expr: &mut Expr, version_map: &VersionMap) {
+    match expr {
+        Expr::Variable { ident } => {
+            if !is_versioned(ident) {
+                *ident = version_map.get_latest(ident);
+            }
+        }
+        Expr::Binop { expr1, expr2, .. } => {
+            rewrite_expr(expr1, version_map);
+            rewrite_expr(expr2, version_map);
+        }
+        Expr::Unop { expr, .. } => {
+            rewrite_expr(expr, version_map);
+        }
+        Expr::Func { body, .. } => {
+            rewrite_expr(body, version_map);
+        }
+        Expr::FuncApply { func, args } => {
+            rewrite_expr(func, version_map);
+            for arg in args {
+                rewrite_expr(arg, version_map);
+            }
+        }
+        Expr::Action { assns } => {
+            for assn in assns {
+                rewrite_expr(&mut assn.src, version_map);
+
+                if !is_versioned(&assn.dest) {
+                    assn.dest = version_map.get_latest(&assn.dest);
+                }
+
+                println!("After rewrite: dest = {}", assn.dest);
+            }
+        }
+        _ => {}
+    }
+}
+
+
 impl Evaluator {
+
     pub fn calc_unop(op: UnOp, expr: &Expr) -> Result<Expr, String> {
         if let Expr::Number { val } = expr {
             match op {
@@ -161,9 +260,6 @@ impl Evaluator {
             }
 
             Expr::Action { assns } => {
-                // for assn in assns.iter_mut() {
-                //     self.eval_assn(assn)?;
-                // }
                 Ok(())
             }
         }

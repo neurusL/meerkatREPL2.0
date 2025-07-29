@@ -4,28 +4,51 @@ use crate::ast::{Assn, Decl, Expr};
 
 use super::{Evaluator, Val};
 
+use super::eval_expr::rewrite_expr;
+
+
+
 impl Evaluator {
     pub fn eval_decl(&mut self, decl: &mut Decl) -> Result<(), String> {
         match decl {
-            Decl::Import { srv_name } => todo!(),
+            Decl::Import { srv_name: _ } => todo!(),
+
             Decl::VarDecl { name, val } => {
-                self.reactive_names.insert(name.clone());
+                // Generate new versioned name
+                let new_name = self.version_map.declare(name);
 
-                // var should have no depend
-                assert!(val.free_var(&HashSet::new()).is_empty());
+                // Rewrite all variable references using latest versioned names
+                let mut rewritten_val = val.clone();
+                rewrite_expr(&mut rewritten_val, &self.version_map);
 
-                self.eval_expr(val)?;
-                self.reactive_name_to_vals.insert(name.clone(), val.clone());
+
+                // Substitute variable name with versioned name in its own definition
+                rewritten_val.substitute(name, &Expr::Variable { ident: new_name.clone() });
+
+               
+                // Evaluate expression and store
+                self.reactive_names.insert(new_name.clone());
+                self.eval_expr(&mut rewritten_val)?;
+                self.reactive_name_to_vals.insert(new_name.clone(), rewritten_val);
+                
+                
             }
-            Decl::DefDecl { name, val, is_pub } => {
-                self.reactive_names.insert(name.clone());
 
-                // unevaled expr of def should be stored
-                self.def_name_to_exprs.insert(name.clone(), val.clone());
+            Decl::DefDecl { name, val, is_pub: _ } => {
+                // Generate new versioned name
+                let new_name = self.version_map.next_version(name);
 
-                // then eval def
-                self.eval_expr(val)?;
-                self.reactive_name_to_vals.insert(name.clone(), val.clone());
+                // Rewrite references inside the definition
+                let mut rewritten_val = val.clone();
+                rewrite_expr(&mut rewritten_val, &self.version_map);
+
+                self.reactive_names.insert(new_name.clone());
+                self.eval_expr(&mut rewritten_val)?;
+                self.def_name_to_exprs.insert(new_name.clone(), rewritten_val.clone());
+
+                
+                self.reactive_name_to_vals.insert(new_name.clone(), rewritten_val);
+                
             }
         }
 
@@ -35,15 +58,21 @@ impl Evaluator {
     pub fn eval_assn(&mut self, assn: &mut Assn) -> Result<(), String> {
         self.eval_expr(&mut assn.src)?;
 
-        // since assn only appears in action,
-        // their effect should not protrude to the expression level language's env
-        // self.env.insert(assn.dest.clone(), assn.src.clone());
+        // Generate new version name for the destination variable
+        let new_name = self.version_map.next_version(&assn.dest);
+        assn.dest = new_name.clone();
+
+        // Store the result in the evaluator's environment
+        self.reactive_names.insert(new_name.clone());
+        self.reactive_name_to_vals.insert(new_name, assn.src.clone());
+
+
         Ok(())
     }
 
     pub fn eval_assert(&mut self, expr: &mut Expr) -> Result<(), String> {
         self.eval_expr(expr)?;
-
         Ok(())
     }
 }
+

@@ -34,23 +34,33 @@ impl Manager {
         testid_and_its_manager: Option<(TestId, ActorRef<Manager>)>,
     ) -> Result<ActorRef<DefActor>, Box<dyn Error>> {
         // calculate all information for def actor
+        let latest_name = self.evaluator.version_map.get_latest(name);
+
         let def_args = self.dep_graph.get(name).map_or_else(
             || expr.free_var(&HashSet::new()), // incrementally calculated
-            |def_args| def_args.clone(),       // precalculated by centralized manager
+            |deps| deps.clone(),       // precalculated by centralized manager
         );
+
+        // let def_args_versioned: HashSet<String> = def_args_unversioned
+        //     .iter()
+        //     .map(|arg| self.evaluator.version_map.get_latest(name))
+        //     .collect();
 
         let def_arg_to_vals = def_args
             .iter()
-            .map(|name| {
+            .map(|dep_name| {
+                let latest_dep = self.evaluator.version_map.get_latest(dep_name);
                 (
-                    name.clone(),
+                    latest_dep.clone(),
                     self.evaluator
                         .reactive_name_to_vals
-                        .get(name)
-                        .expect(&format!(
-                            "DefActor alloc: var/def is not initialized: {}",
-                            name
-                        ))
+                        .get(&latest_dep)
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "DefActor alloc: var/def '{}' (versioned: '{}') not found in reactive_name_to_vals",
+                                dep_name, latest_dep
+                            )
+                        })
                         .clone(),
                 )
             })
@@ -58,15 +68,20 @@ impl Manager {
 
         let def_arg_to_vars = def_args
             .iter()
-            .map(|name| {
+            .map(|dep_name| {
+                let latest_dep = self.evaluator.version_map.get_latest(dep_name);
+                let base_name = self.evaluator.version_map.get_base(dep_name);
                 (
-                    name.clone(),
+                    latest_dep.clone(),
                     self.dep_tran_vars
-                        .get(name)
-                        .expect(&format!(
-                            "DefActor alloc: var/def is not initialized: {}",
-                            name
-                        ))
+                        .get(&base_name)
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "DefActor alloc: var/def is not initialized in dep_tran_vars: {}",
+                                latest_dep
+                            )
+                            
+                        })
                         .clone(),
                 )
             })
@@ -76,7 +91,7 @@ impl Manager {
         let _ = self.evaluator.eval_expr(&mut val);
 
         let actor_ref = spawn(DefActor::new(
-            name.clone(),
+            latest_name.clone(),
             expr,
             val,
             def_arg_to_vals,
@@ -84,18 +99,19 @@ impl Manager {
             testid_and_its_manager,
         ));
         self.defname_to_actors
-            .insert(name.clone(), actor_ref.clone());
+            .insert(latest_name.clone(), actor_ref.clone());
 
         // subscribe to its dependencies
         // println!("{} subscribe to {:?}", name, def_args);
-        for name in def_args.iter() {
+        for dep_name in def_args.iter() {
+            let latest_dep = self.evaluator.version_map.get_latest(dep_name);
             // println!("{}", name);
             // synchronously wait for response
             let back_msg = self
                 .ask_to_name(
-                    name,
+                    &latest_dep,
                     Msg::Subscribe {
-                        from_name: name.clone(),
+                        from_name: latest_name.clone(),
                         from_addr: actor_ref.clone(),
                     },
                 )

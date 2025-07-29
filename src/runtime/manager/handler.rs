@@ -5,6 +5,8 @@ use std::time::Duration;
 use std::{collections::HashSet, error::Error};
 
 use crate::runtime::message::{CmdMsg, Msg};
+use crate::ast::Expr;
+
 use kameo::mailbox::Signal;
 use kameo::{error::Infallible, prelude::*};
 
@@ -32,8 +34,12 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
             }
 
             AssertSucceeded { test_id } => {
-                info!("Assert Succeeded");
+                info!("Test assertion passed: {:?}", test_id);
                 self.on_test_finish(test_id).await;
+
+                // Optional - exit process after last test succeeds
+                #[cfg(test)]
+                std::process::exit(0); // will only run when compiled for tests
 
                 None
             }
@@ -44,6 +50,7 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                 action,
             } => {
                 info!("Do Action");
+            
                 let assns = self.eval_action(action).unwrap();
 
                 let txn_mgr = self.new_txn(txn_id.clone(), assns, from_client_addr);
@@ -258,5 +265,9 @@ impl Manager {
         }
 
         Ok(())
+    }
+
+    pub fn get_latest_def_name(&self, name: &str) -> String {
+        self.evaluator.version_map.get_latest(name)
     }
 }

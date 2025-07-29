@@ -19,18 +19,29 @@ impl TxnManager {
     /// when receive a granted lock from name,
     /// update transaction manager's read/write state
     pub fn add_grant_lock(&mut self, name: String, kind: LockKind) {
-        if kind == LockKind::Read {
-            assert!(self.reads.get(&name) == Some(ReadState::Requested).as_ref());
-            self.reads.insert(name, ReadState::Granted);
-        } else {
-            // notice in the case the transaction requires both read and write
-            // lock on the name, we only send and receive the write lock request
-            // and grant, but need additionally update the read lock also granted
-            if self.reads.contains_key(&name) {
-                self.reads.insert(name.clone(), ReadState::Granted);
+        
+        match kind {
+            // if the lock is read, then the state should be requested
+            LockKind::Read => {
+                assert!(self.reads.get(&name) == Some(ReadState::Requested).as_ref());
+                self.reads.insert(name, ReadState::Granted);
             }
-            self.writes.insert(name, WriteState::Granted);
+            LockKind::Write => {
+                // if the lock is write, then the state should be requested
+                if self.reads.contains_key(&name) {
+                    self.reads.insert(name.clone(), ReadState::Granted);
+                }
+                self.writes.insert(name, WriteState::Granted);
+            }
+            LockKind::Upgrade => {
+                // if the lock is upgraded, it means the transaction
+                // already has a read lock on the name, so we treat it as both
+                // a read and write lock being granted
+                self.reads.insert(name.clone(), ReadState::Granted);
+                self.writes.insert(name, WriteState::Granted);
+            }
         }
+
     }
 
     /// when receive a finished read from name ..

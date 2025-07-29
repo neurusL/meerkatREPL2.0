@@ -27,24 +27,29 @@ impl Manager {
         self.dep_tran_vars = srv_info.dep_vars;
 
         for name in srv_info.topo_order.iter() {
+            // Get the latest versioned name
+            let latest_name = self.evaluator.version_map.get_latest(name);
+
             let val = self
                 .evaluator
                 .reactive_name_to_vals
-                .get(name)
-                .expect(&format!(
-                    "Service alloc: var/def is not initialized: {}",
-                    name
-                ));
+                .get(&latest_name)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Service alloc: var/def is not initialized: original name = {}, latest = {}",
+                        name, latest_name
+                    )
+                });
 
             if srv_info.vars.contains(name) {
-                self.alloc_var_actor(name, val.clone()).await;
+                self.alloc_var_actor(&latest_name, val.clone()).await;
             } else if srv_info.defs.contains(name) {
-                let def_expr = self.evaluator.def_name_to_exprs.get(name).expect(&format!(
-                    "Service alloc: def expr is not initialized: {}",
-                    name
+                let def_expr = self.evaluator.def_name_to_exprs.get(&latest_name).expect(&format!(
+                    "Service alloc: def expr is not initialized: original name = {}, latest = {}",
+                    name, latest_name
                 ));
 
-                self.alloc_def_actor(name, def_expr.clone(), None)
+                self.alloc_def_actor(&latest_name, def_expr.clone(), None)
                     .await
                     .unwrap();
             }
