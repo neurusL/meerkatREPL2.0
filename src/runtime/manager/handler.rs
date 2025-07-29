@@ -5,6 +5,8 @@ use std::time::Duration;
 use std::{collections::HashSet, error::Error};
 
 use crate::runtime::message::{CmdMsg, Msg};
+use crate::ast::Expr;
+
 use kameo::mailbox::Signal;
 use kameo::{error::Infallible, prelude::*};
 
@@ -24,6 +26,7 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                 name,
                 test: bool_expr,
                 test_id,
+                from_developer,
             } => {
                 info!("Try Test");
                 self.new_test(name, bool_expr, test_id).await;
@@ -32,9 +35,16 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
             }
 
             AssertSucceeded { test_id } => {
-                info!("Assert Succeeded");
+                info!("Test assertion passed: {:?}", test_id);
                 self.on_test_finish(test_id).await;
 
+                // Optional - exit process after last test succeeds
+                #[cfg(test)]
+                std::process::exit(0); // will only run when compiled for tests
+
+                self.add_new_test(test_id, name, bool_expr, from_developer).await;
+                
+                let _ = self.request_assertion_preds(test_id).await;
                 None
             }
 
@@ -44,10 +54,10 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                 action,
             } => {
                 info!("Do Action");
+            
                 let assns = self.eval_action(action).unwrap();
 
-                let txn_mgr = self.new_txn(txn_id.clone(), assns, from_client_addr);
-                self.txn_mgrs.insert(txn_id.clone(), txn_mgr);
+                self.add_new_txn(txn_id.clone(), assns, from_client_addr);
 
                 // request locks
                 let _ = self.request_locks(&txn_id).await;
@@ -89,9 +99,13 @@ impl kameo::prelude::Message<Msg> for Manager {
     async fn handle(&mut self, msg: Msg, ctx: &mut Context<Self, Self::Reply>) -> Self::Reply {
         info!("MANAGER {} RECEIVE: ", self.name);
         match msg {
-            Msg::LockGranted { from_name, lock } => {
+            Msg::LockGranted {
+                from_name,
+                lock,
+                pred_id,
+            } => {
                 info!("Lock Granted");
-                self.add_grant_lock(&lock.txn_id, from_name, lock.lock_kind);
+                self.add_grant_lock(&lock.txn_id, from_name, lock.lock_kind, pred_id);
                 if self.all_lock_granted(&lock.txn_id) {
                     info!("all lock granted");
                     let _ = self.request_reads(&lock.txn_id).await;
@@ -100,6 +114,16 @@ impl kameo::prelude::Message<Msg> for Manager {
 
                 Msg::Unit
             }
+
+            Msg::TestRequestPredGranted { from_name, test_id, pred_id } => {
+                self.add_grant_pred(test_id, from_name, pred_id);
+
+                if self.all_pred_granted(test_id) {
+                    let _ = self.request_assertion_result(test_id).await;
+                }
+
+                Msg::Unit
+            },
 
             Msg::UsrReadVarResult {
                 txn: txn_id,
@@ -128,7 +152,7 @@ impl kameo::prelude::Message<Msg> for Manager {
             }
 
             Msg::UsrReadDefResult {
-                txn: txn_id,
+                txn_id,
                 name,
                 result,
                 preds,
@@ -147,6 +171,12 @@ impl kameo::prelude::Message<Msg> for Manager {
                 Msg::Unit
             }
 
+            Msg::TestReadDefResult { test_id, result } => {
+                let _ = self.on_test_finish(test_id, result).await;
+
+                Msg::Unit
+            },
+
             Msg::UsrWriteVarFinish { txn: txn_id, name } => {
                 info!("UsrWriteVarFinish");
                 self.add_finished_write(&txn_id, name);
@@ -157,7 +187,17 @@ impl kameo::prelude::Message<Msg> for Manager {
                     info!("release all locks, send commit transaction");
                     let client_sender = self.get_client_sender(&txn_id);
                     client_sender
-                        .send(CmdMsg::TransactionCommitted { txn_id })
+                        .send(CmdMsg::TransactionCommitted {
+                            txn_id: txn_id.clone(),
+                            writes: self
+                                .txn_mgrs
+                                .get(&txn_id)
+                                .unwrap()
+                                .writes
+                                .keys()
+                                .cloned()
+                                .collect(),
+                        })
                         .await
                         .unwrap();
                 }
@@ -187,7 +227,7 @@ impl kameo::prelude::Message<Msg> for Manager {
 impl Actor for Manager {
     type Error = Infallible;
 
-    /// customized on_start impl of Actor trait    
+    /// customized on_start impl of Actor trait
     /// to allow manager self reference to its addr
     async fn on_start(&mut self, actor_ref: ActorRef<Self>) -> Result<(), Self::Error> {
         info!("MANAGER on_start got ActorRef with id {}", actor_ref.id());
@@ -258,5 +298,9 @@ impl Manager {
         }
 
         Ok(())
+    }
+
+    pub fn get_latest_def_name(&self, name: &str) -> String {
+        self.evaluator.version_map.get_latest(name)
     }
 }

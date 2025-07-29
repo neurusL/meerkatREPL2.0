@@ -1,0 +1,102 @@
+service update_service {
+    var x = 1;
+    var y = 5;
+
+    def a = x + 1;
+
+    pub def inc_x = action { x = x + 1; };
+
+    pub def inc_y = action { y = y + 2; };
+}
+
+// test1: Simple increment using inc_x
+@test(update_service) {
+    do inc_x;
+    assert(a == 2); // 1 + 1 = 2
+}
+
+// test2: Multiple increments of x
+@test(update_service) {
+    do inc_x;
+    do inc_x;
+    assert(a == 4); // x is now 3 → a = 4
+}
+
+// test3: Using another action to update y
+@test(update_service) {
+    do inc_x;   // x = 2
+    do inc_y;   // y = 7
+    def a = x + y + 1; // Redefining a
+    assert(a == 10);
+}
+
+// test4 - Definition shadowing during runtime: Redefining a to be a different computation
+@test(update_service) {
+    do inc_x;
+    def a = x * 2; // Redefine a
+    assert(a == 4);
+}
+
+// test5 - Code update to a public def: Redefining inc_x to increment by 10 instead
+@test(update_service) {
+    do inc_x; // Original: x = 2
+    pub def inc_x = action { x = x + 10; }; // Overwrite inc_x
+    do inc_x;
+    assert(x == 12);
+}
+
+// test6: Redefining 'a' based on updated x and y after action
+@test(update_service) {
+    do inc_x;
+    pub def a = x + y + 1;
+    assert(a == 13); // x = 2, y = 10, +1
+}
+
+// test7 - Rebinding same public action name: Confirming the old inc_x is replaced
+@test(update_service) {
+    do inc_x;
+    pub def inc_x = action { x = x + 100; };
+    do inc_x;
+    assert(x == 102);
+}
+
+// test8: Redefining x while locked (should simulate upgrade lock hold)
+@test(update_service) {
+    do inc_x;
+    var x = 99; // redefining an already locked variable
+    assert(x == 99); // expected to pass if redefinition takes effect
+}
+
+// test9: inc_x affects y, and a depends on x + y
+@test(update_service) {
+    pub def inc_x = action {
+        x = x + 1;
+        y = y + 5;
+    };
+    def a = x + y;
+
+    do inc_x; // x = 2, y = 15
+    assert(a == 17); // x + y = 17
+}
+
+// test10: Mid-execution update of dependent def 'a'
+@test(update_service) {
+    do inc_x; // x = 2
+    def a = x + 2; // a = 4
+    def a = x * 3; // redefined again mid-logic
+    assert(a == 6); // expected new definition
+}
+
+// test11: Deep override of chained action logic
+@test(update_service) {
+    pub def inc_x = action {
+        x = x + 1;
+        pub def inc_x = action {
+            x = x + 5;
+        };
+    };
+
+    do inc_x; // first one runs, defines new inc_x
+    do inc_x; // second one runs, adds 5
+    assert(x == 7); // 1 + 1 + 5
+}

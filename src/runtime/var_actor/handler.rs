@@ -55,6 +55,20 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 Msg::Unit
             }
 
+            Msg::TestRequestPred { from_mgr_addr, test_id } => {
+                info!("Only for asserts: Pred Request from {:?}", from_mgr_addr);
+
+                // will immediately send back latest pred id
+                let _ = from_mgr_addr.tell(
+                    Msg::TestRequestPredGranted { 
+                        from_name: self.name.clone(),
+                        test_id,
+                        pred_id: self.latest_write_txn.clone().map(|t| t.id) 
+                }).await;
+
+                Msg::Unit
+            }
+
             Msg::LockAbort { lock, .. } => {
                 info!("Lock Aborted for {:?}", lock.txn_id);
                 self.lock_state.remove_granted_or_wait(&lock.txn_id);
@@ -110,8 +124,7 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 info!("UsrReadVarRequest");
                 assert!(self.lock_state.has_granted(&txn));
 
-                // // remove read lock immediately
-                // self.lock_state.remove_granted_if_read(&txn);
+                
 
                 info!("sending UsrReadVarResult to {:?}", from_mgr_addr);
                 let _ = from_mgr_addr
@@ -132,7 +145,17 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 write_val,
             } => {
                 info!("UsrWriteVarRequest");
-                assert!(self.lock_state.has_granted_write(&txn));
+                info!(
+                    "Checking if write lock granted for txn {:?}. Current granted locks: {:?}",
+                    txn,
+                    self.lock_state.granted_locks
+                );
+
+                assert!(
+                    self.lock_state.has_granted_write(&txn),
+                    "Write lock not granted for txn {:?}",
+                    txn
+                );
 
                 self.value.update(write_val, txn.clone());
 
@@ -191,6 +214,7 @@ impl VarActor {
             let msg = Msg::LockGranted {
                 from_name: self.name.clone(),
                 lock,
+                pred_id: self.latest_write_txn.clone().map(|t| t.id),
             };
 
             let _ = mgr.ask(msg).await?;

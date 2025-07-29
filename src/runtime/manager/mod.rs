@@ -6,6 +6,7 @@ use kameo::prelude::*;
 use tokio::sync::mpsc::Sender;
 
 use crate::runtime::manager::action::TxnManager;
+use crate::runtime::manager::assert::TestManager;
 use crate::runtime::message::CmdMsg;
 use crate::runtime::TestId;
 
@@ -35,12 +36,13 @@ pub struct Manager {
     /// might be benefitial
     pub evaluator: Evaluator,
 
-    pub dep_graph: HashMap<String, HashSet<String>>,
-    pub dep_tran_vars: HashMap<String, HashSet<String>>,
+    /// dependency graph
+    pub dep_graph: HashMap<String, HashSet<String>>, // name to all its deps
+    pub dep_tran_vars: HashMap<String, HashSet<String>>, // name to transitively dep `var`
 
     /// manager transactions and tests submitted to manager from client/developer
     pub txn_mgrs: HashMap<TxnId, TxnManager>,
-    pub test_mgrs: HashMap<TestId, ActorRef<DefActor>>,
+    pub test_mgrs: HashMap<TestId, TestManager>,
 }
 
 impl Manager {

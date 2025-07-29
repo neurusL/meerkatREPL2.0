@@ -7,7 +7,7 @@ use crate::{
     runtime::{
         lock::LockKind,
         manager::{
-            action::{ReadState, TxnManager, WriteState},
+            action::{DirectReadState, TransReadState, TxnManager, WriteState},
             Manager,
         },
         message::CmdMsg,
@@ -19,24 +19,55 @@ impl TxnManager {
     /// when receive a granted lock from name,
     /// update transaction manager's read/write state
     pub fn add_grant_lock(&mut self, name: String, kind: LockKind) {
+        
+        match kind {
+            // if the lock is read, then the state should be requested
+            LockKind::Read => {
+                assert!(self.reads.get(&name) == Some(ReadState::Requested).as_ref());
+                self.reads.insert(name, ReadState::Granted);
+            }
+            LockKind::Write => {
+                // if the lock is write, then the state should be requested
+                if self.reads.contains_key(&name) {
+                    self.reads.insert(name.clone(), ReadState::Granted);
+                }
+                self.writes.insert(name, WriteState::Granted);
+            }
+            LockKind::Upgrade => {
+                // if the lock is upgraded, it means the transaction
+                // already has a read lock on the name, so we treat it as both
+                // a read and write lock being granted
+                self.reads.insert(name.clone(), ReadState::Granted);
+                self.writes.insert(name, WriteState::Granted);
+    pub fn add_grant_lock(&mut self, name: String, kind: LockKind, pred_id: Option<TxnId>) {
         if kind == LockKind::Read {
-            assert!(self.reads.get(&name) == Some(ReadState::Requested).as_ref());
-            self.reads.insert(name, ReadState::Granted);
+            assert!(self.trans_reads.get(&name) == Some(TransReadState::Requested).as_ref());
+            self.trans_reads
+                .insert(name, TransReadState::Granted(pred_id));
         } else {
             // notice in the case the transaction requires both read and write
             // lock on the name, we only send and receive the write lock request
             // and grant, but need additionally update the read lock also granted
-            if self.reads.contains_key(&name) {
-                self.reads.insert(name.clone(), ReadState::Granted);
+            if self.trans_reads.contains_key(&name) {
+                self.trans_reads
+                    .insert(name.clone(), TransReadState::Granted(pred_id));
             }
-            self.writes.insert(name, WriteState::Granted);
         }
+
     }
 
     /// when receive a finished read from name ..
     pub fn add_finished_read(&mut self, name: String, result: Expr, pred: HashSet<Txn>) {
-        assert!(self.reads.get(&name) == Some(ReadState::Granted).as_ref());
-        self.reads.insert(name, ReadState::Read(result));
+        assert!(
+            matches!(
+                self.direct_reads.get(&name),
+                Some(DirectReadState::RequestedAndDepend(_))
+            ),
+            "assertion fail on {:?}",
+            self.direct_reads.get(&name)
+        );
+        self.direct_reads
+            .insert(name, DirectReadState::Read(result));
 
         self.preds.extend(pred);
     }
@@ -49,23 +80,25 @@ impl TxnManager {
 
     /// check if all locks are granted
     pub fn all_lock_granted(&self) -> bool {
-        self.reads.iter().all(|(_, v)| *v == ReadState::Granted)
+        self.trans_reads
+            .iter()
+            .all(|(_, v)| matches!(v, TransReadState::Granted(_)))
             && self.writes.iter().all(|(_, v)| *v == WriteState::Granted)
     }
 
     /// check if all reads are finished
     pub fn all_read_finished(&self) -> bool {
-        self.reads
+        self.direct_reads
             .iter()
-            .all(|(_, v)| matches!(v, ReadState::Read(_)))
+            .all(|(_, v)| matches!(v, DirectReadState::Read(_)))
     }
 
     /// get all read results
     pub fn get_read_results(&self) -> HashMap<String, Expr> {
-        self.reads
+        self.direct_reads
             .iter()
             .filter_map(|(name, state)| match state {
-                ReadState::Read(result) => Some((name.clone(), result.clone())),
+                DirectReadState::Read(result) => Some((name.clone(), result.clone())),
                 _ => panic!("read not finished"),
             })
             .collect()
@@ -78,8 +111,8 @@ impl TxnManager {
 
     /// record that the transaction is aborted due to lock aborted
     pub fn abort_lock(&mut self) {
-        for (_, state) in self.reads.iter_mut() {
-            *state = ReadState::Aborted;
+        for (_, state) in self.trans_reads.iter_mut() {
+            *state = TransReadState::Aborted;
         }
         for (_, state) in self.writes.iter_mut() {
             *state = WriteState::Aborted;
@@ -88,7 +121,9 @@ impl TxnManager {
 
     /// check if any lock of thetransaction is aborted
     pub fn is_aborted(&self) -> bool {
-        self.reads.iter().any(|(_, v)| *v == ReadState::Aborted)
+        self.trans_reads
+            .iter()
+            .any(|(_, v)| *v == TransReadState::Aborted)
             || self.writes.iter().any(|(_, v)| *v == WriteState::Aborted)
     }
 
@@ -121,31 +156,31 @@ macro_rules! delegate_to_txn {
 }
 
 impl Manager {
-    pub fn new_txn_mgr(
-        &mut self,
-        txn: &Txn,
-        from_client: Sender<CmdMsg>,
-        read_set: HashSet<String>,
-        write_set: HashSet<String>,
-    ) {
-        let new_mgr = TxnManager::new(txn.clone(), from_client, read_set, write_set);
-        self.txn_mgrs.insert(txn.id.clone(), new_mgr);
-    }
+    // pub fn new_txn_mgr(
+    //     &mut self,
+    //     txn: &Txn,
+    //     from_client: Sender<CmdMsg>,
+    //     read_set: HashSet<String>,
+    //     write_set: HashSet<String>,
+    // ) {
+    //     let new_mgr = TxnManager::new(txn.clone(), from_client, read_set, write_set);
+    //     self.txn_mgrs.insert(txn.id.clone(), new_mgr);
+    // }
 
-    pub fn get_mut_txn_mgr(&mut self, txn_id: &TxnId) -> &mut TxnManager {
-        self.txn_mgrs
-            .get_mut(txn_id)
-            .expect("txn manager not found")
-    }
+    // pub fn get_mut_txn_mgr(&mut self, txn_id: &TxnId) -> &mut TxnManager {
+    //     self.txn_mgrs
+    //         .get_mut(txn_id)
+    //         .expect("txn manager not found")
+    // }
 
     pub fn get_read_results(&self, txn_id: &TxnId) -> HashMap<String, Expr> {
         self.txn_mgrs
             .get(txn_id)
             .expect(&format!("txn manager not found"))
-            .reads
+            .direct_reads
             .iter()
             .filter_map(|(name, state)| match state {
-                ReadState::Read(result) => Some((name.clone(), result.clone())),
+                DirectReadState::Read(result) => Some((name.clone(), result.clone())),
                 _ => None,
             })
             .collect()
@@ -160,7 +195,7 @@ impl Manager {
     }
 
     // invoke the macro to generate one‐line wrappers:
-    delegate_to_txn!(mut add_grant_lock(name: String, kind: LockKind));
+    delegate_to_txn!(mut add_grant_lock(name: String, kind: LockKind, pred_id: Option<TxnId>));
     delegate_to_txn!(mut add_finished_read(name: String, result: Expr, pred: HashSet<Txn>));
     delegate_to_txn!(mut add_finished_write(name: String));
     delegate_to_txn!(mut abort_lock());

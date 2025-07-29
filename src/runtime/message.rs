@@ -5,7 +5,11 @@ use tokio::sync::mpsc::Sender;
 
 use crate::{
     ast::{Assn, Expr, Prog, Service, Test},
-    runtime::{lock::Lock, transaction::TxnId, TestId},
+    runtime::{
+        lock::Lock,
+        transaction::{TxnId, TxnPred},
+        TestId,
+    },
 };
 
 use super::{def_actor::DefActor, manager::Manager, transaction::Txn, var_actor::VarActor};
@@ -27,15 +31,27 @@ pub enum Msg {
 
     UsrReadDefRequest {
         from_mgr_addr: ActorRef<Manager>,
-        txn: TxnId,
-        // requires: HashSet<Txn>, // ?? Why we need this
+        txn_id: TxnId,
+
+        pred: Vec<TxnId>, // to obtain read result, def has to see pred in its applied txns
     },
     UsrReadDefResult {
-        txn: TxnId,
+        txn_id: TxnId,
         name: String,
         result: Expr,
         preds: HashSet<Txn>,
     },
+
+    TestReadDefRequest {
+        from_mgr_addr: ActorRef<Manager>,
+        test_id: TestId,
+        preds: Vec<TxnId>,
+    },
+    TestReadDefResult {
+        test_id: TestId,
+        result: Expr,
+    },
+    
 
     UsrWriteVarRequest {
         from_mgr_addr: ActorRef<Manager>,
@@ -48,10 +64,16 @@ pub enum Msg {
         name: String,
     },
 
-    // UnsafeRead, // for test only
-    // UnsafeReadResult {
-    //     result: Expr,
-    // },
+    TestRequestPred { 
+        from_mgr_addr: ActorRef<Manager>,
+        test_id: TestId
+    }, // for test only
+    TestRequestPredGranted {
+        from_name: String,
+        test_id: TestId,
+        pred_id: Option<TxnId>
+    },
+
     LockRequest {
         // for notifying var/def that a lock is requested
         from_mgr_addr: ActorRef<Manager>,
@@ -66,6 +88,7 @@ pub enum Msg {
         // for notifying manager that a lock request is granted
         from_name: String,
         lock: Lock,
+        pred_id: Option<TxnId>, // txn id that has been appied by the var actor
     },
     LockAbort {
         // for notifying manager that a lock request is aborted
@@ -114,14 +137,17 @@ pub enum CmdMsg {
     },
     TransactionCommitted {
         txn_id: TxnId,
+        writes: Vec<String>,
     },
 
     TryAssert {
+        from_developer: Sender<CmdMsg>,
         name: String,
         test: Expr,
         test_id: TestId,
     },
-    AssertSucceeded {
+    AssertCompleted {
         test_id: TestId,
+        result: bool,
     },
 }

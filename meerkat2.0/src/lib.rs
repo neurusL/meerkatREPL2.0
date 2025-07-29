@@ -1,15 +1,32 @@
+#[cfg(test)]
+mod tests;
 use core::panic;
 use std::collections::{BTreeMap, HashMap};
 
-use kameo::actor::ActorRef;
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct TxnId(pub u64); // Fake (random) transaction ID type
 
-use super::{manager::Manager, transaction::TxnId};
+#[derive(Clone)]
+pub struct Manager; // Placeholder for the Manager type
+
+#[derive(Clone)]
+pub struct ActorRef<T> {
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<T> ActorRef<T> {
+    pub fn dead() -> Self {
+        ActorRef {
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum LockKind {
     Read,
     Write,
-    Upgrade, // adding the upgrade lock
+    Upgrade, // Adding the Upgrade Lock
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -45,14 +62,15 @@ impl Lock {
             txn_id,
         }
     }
-    /// create an upgrade lock, which is a special case where the transaction
-    /// already has a read lock on the name, and now wants to upgrade it to a write lock
+
+/// Adding the function to build an Upgrade Lock
     pub fn new_upgrade(txn_id: TxnId) -> Self {
         Lock {
             lock_kind: LockKind::Upgrade,
             txn_id,
         }
     }
+
 
     pub fn is_read(&self) -> bool {
         self.lock_kind == LockKind::Read
@@ -61,7 +79,8 @@ impl Lock {
     pub fn is_write(&self) -> bool {
         self.lock_kind == LockKind::Write
     }
-    /// check if the lock is an upgrade lock
+
+/// Add code for checking if a lock is an upgrade
     pub fn is_upgrade(&self) -> bool {
         self.lock_kind == LockKind::Upgrade
     }
@@ -107,51 +126,49 @@ impl LockState {
     pub fn grant_oldest_wait(&mut self) -> Option<(Lock, ActorRef<Manager>)> {
         assert!(self.check_granted_isvalid());
 
-        if let Some((txn_id, (lock, mgr))) = self
-            .waiting_locks
-            .first_key_value()
-            .map(|(id, (l, m))| (id.clone(), (l.clone(), m.clone())))
-        {
+        // Checking if the requested lock is of type Upgrade
+        if let Some((txn_id, (lock, mgr))) = self.waiting_locks.first_key_value() {
             if lock.is_upgrade() {
-                // Clear all granted and waiting locks (abort them permanently)
+
+                // Cloning data to avoid borrowing issues
+                let txn_id = txn_id.clone();
+                let lock = lock.clone();
+                let mgr = mgr.clone();
+
+
+                // Removing all granted locks
+                // This is necessary to ensure that the Upgrade lock can take precedence
                 self.granted_locks.clear();
+
+                // Aborting all other waiting locks, except the Upgrade lock
                 self.waiting_locks.clear();
 
-                // Grant the upgrade lock
+                // Giving the Upgrade lock access
                 self.granted_locks.insert(txn_id.clone(), lock.clone());
 
-                return Some((lock.clone(), mgr));
-            }
-
-            if lock.is_write() && self.granted_locks.is_empty() {
-                self.waiting_locks.remove(&txn_id);
-                self.granted_locks.insert(txn_id.clone(), lock.clone());
                 return Some((lock, mgr));
             }
-
-            if lock.is_read()
-                && self
-                    .granted_locks
-                    .values()
-                    .all(|granted| granted.lock_kind == LockKind::Read)
-            {
-                self.waiting_locks.remove(&txn_id);
-                self.granted_locks.insert(txn_id.clone(), lock.clone());
-                return Some((lock, mgr));
-            }
-
-        
-            None
-        
-        } else {
-            // if there is no waiting lock, return None
-            None
         }
 
-        
-    }
 
-        
+        // In case if it's not an upgrade lock, then proceed like normal
+
+        if let Some((_, lock)) = self.granted_locks.first_key_value() {
+            if lock.is_write() {
+                // if current granted lock is write lock
+                return None; // cannot grant another lock
+            }
+        }
+
+        // if current granted lock are read locks
+        if let Some((lock, mgr)) = self.pop_oldest_wait() {
+            self.granted_locks.insert(lock.txn_id.clone(), lock.clone());
+
+            assert!(self.check_granted_isvalid());
+            return Some((lock, mgr));
+        }
+        None
+    }
 
     pub fn remove_granted(&mut self, txn_id: &TxnId) -> Option<Lock> {
         self.granted_locks.remove(txn_id)
@@ -195,16 +212,15 @@ impl LockState {
     }
 
     pub fn has_granted_write(&self, txn_id: &TxnId) -> bool {
-        if let Some(lock) = self.granted_locks.get(txn_id) {
-            matches!(lock.lock_kind, LockKind::Write | LockKind::Upgrade)
-        } else {
-            false
-    }
+        self.granted_locks.contains_key(txn_id)
+            && self.granted_locks.get(txn_id).unwrap().lock_kind == LockKind::Write
     }
 
     pub fn check_granted_isvalid(&self) -> bool {
-        self.granted_locks.iter().all(|(_, lock)| {
-            lock.lock_kind == LockKind::Read
-        }) || self.granted_locks.len() == 1
+        //either all Read or unique Write lock
+        self.granted_locks
+            .iter()
+            .all(|(_, lock)| lock.lock_kind == LockKind::Read)
+            || self.granted_locks.len() == 1
     }
 }

@@ -12,12 +12,12 @@ pub mod handler;
 pub mod state;
 
 /**
- * 
- * var x := 1 
- *  intialized 
+ *
+ * var x := 1
+ *  intialized
  *  -> receive lock request
- *  -> managing lock 
- * -> grant lock 
+ *  -> managing lock
+ * -> grant lock
  * -> send back lock granted
  * -> receive write request
  * -> temporarily change value

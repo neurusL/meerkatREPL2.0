@@ -19,20 +19,16 @@
 //!  4. test_manager will wait for bool_expr to be true before processing next
 //!     action, on the other hand, timeout means assertion failed
 use core::panic;
-use std::{
-    collections::{HashMap, HashSet},
-    thread::sleep,
-};
+use std::collections::HashMap;
 
 use crate::{
-    ast::{Expr, Prog, ReplCmd, Service, Test},
-    runtime::{message::CmdMsg, transaction::TxnId},
+    ast::{Prog, ReplCmd, Service, Test},
+    runtime::{
+        message::CmdMsg,
+        transaction::{TxnId, TxnPred},
+    },
 };
-use kameo::{
-    actor::ActorRef,
-    prelude::{Context, Message},
-    spawn, Actor,
-};
+use kameo::{actor::ActorRef, spawn};
 use log::info;
 use manager::Manager;
 use tokio::sync::mpsc::{self, Receiver, Sender};
@@ -65,7 +61,7 @@ pub async fn run(prog: &Prog) -> Result<(), Box<dyn std::error::Error>> {
     let test = &prog.tests[0];
 
     let srv_actor_ref = run_srv(srv, dev_tx.clone()).await?;
-    run_test(test, srv_actor_ref, cli_tx.clone(), cli_rx, dev_rx).await?;
+    run_test(test, srv_actor_ref, cli_tx.clone(), dev_tx, cli_rx, dev_rx).await?;
 
     Ok(())
 }
@@ -91,17 +87,40 @@ pub async fn run_srv(
     Ok(srv_actor_ref)
 }
 
+/// Executes a test on a specified service by processing a sequence of commands.
+///
+/// # Arguments
+///
+/// * `test` - A reference to the `Test` structure containing the test commands.
+/// * `srv_actor_ref` - An `ActorRef` to the service manager responsible for handling the test.
+/// * `cli_tx` - A sender channel for sending `CmdMsg` commands to the client.
+/// * `cli_rx` - A receiver channel for receiving `CmdMsg` responses from the client.
+/// * `dev_rx` - A receiver channel for receiving `CmdMsg` responses from the manager.
+///
+/// # Returns
+///
+/// A `Result` that is `Ok` if the test completes successfully, or an error if something goes wrong.
+///
+/// # Description
+///
+/// The function iterates over a list of commands in the test. It handles `Do` commands by
+/// initiating a transaction and waiting for commit or abort messages. It handles `Assert`
+/// commands by sending assertions to the manager and waiting for a success message or a timeout.
+/// The test proceeds to the next command only if assertions are successful or transactions
+/// are committed. The function concludes when all commands have been processed.
+
 pub async fn run_test(
     test: &Test,
     srv_actor_ref: ActorRef<Manager>,
     cli_tx: Sender<CmdMsg>,
+    dev_tx: Sender<CmdMsg>,
     mut cli_rx: Receiver<CmdMsg>,
     mut dev_rx: Receiver<CmdMsg>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // start testing on the service
     println!("testing {}", test.name);
     let mut test_id = 0_u64;
-    let mut received_passed_tests = HashSet::new();
+    let mut received_passed_tests = HashMap::<u64, bool>::new();
 
     // one handler loop keep listening to incoming messages from manager
     // the main thread keep processing actions and asserts
@@ -112,6 +131,7 @@ pub async fn run_test(
 
     while process_cmd_idx < test.commands.len() {
         let cmd = &test.commands[process_cmd_idx];
+
         match cmd {
             ReplCmd::Do(action) => {
                 let txn_id = TxnId::new();
@@ -126,25 +146,25 @@ pub async fn run_test(
 
                 loop {
                     tokio::select! {
-                            maybe_msg = cli_rx.recv() => {
+                        maybe_msg = cli_rx.recv() => {
                             if let Some(msg) = maybe_msg {
                                 match msg {
-                                CmdMsg::TransactionAborted { txn_id } => {
-                                    // process_cmd_idx = *txn_to_cmd_idx.get(&txn_id)
-                                    // .expect("txn_id not found");
-                                    // break;
+                                    CmdMsg::TransactionAborted { txn_id } => {
+                                        // process_cmd_idx = *txn_to_cmd_idx.get(&txn_id)
+                                        // .expect("txn_id not found");
+                                        // break;
 
-                                    todo!("rollback")
-                                }
-                                CmdMsg::TransactionCommitted { txn_id } => {
-                                    info!("Transaction {:?} committed", txn_id);
-                                    process_cmd_idx += 1;
-                                    break;
-                                }
-                                _ => panic!("unexpected message")
+                                        todo!("rollback")
+                                    }
+                                    CmdMsg::TransactionCommitted { txn_id, writes } => {
+                                        info!("Transaction {:?} committed", txn_id);
+                                        process_cmd_idx += 1;
+                                        break;
+                                    }
+                                    _ => panic!("unexpected message")
                                 }
                             }
-                            }
+                        }
                     }
                 }
             }
@@ -153,6 +173,7 @@ pub async fn run_test(
 
                 srv_actor_ref
                     .tell(CmdMsg::TryAssert {
+                        from_developer: dev_tx.clone(),
                         name: test.name.clone(),
                         test: expr.clone(),
                         test_id: test_id,
@@ -160,27 +181,36 @@ pub async fn run_test(
                     .await?;
 
                 loop {
-                    if received_passed_tests.contains(&test_id) {
-                        println!("pass test {}", expr);
+                    if let Some(result) = received_passed_tests.get(&test_id) {
+                        if *result {
+                            println!("pass test {}", expr);
+                        } else {
+                            println!("fail test {}", expr);
+                        }
                         process_cmd_idx += 1;
                         break;
                     }
 
-                    tokio::select! {
-                        maybe_msg = dev_rx.recv() => {
-                            if let Some(CmdMsg::AssertSucceeded { test_id: recv_id }) = maybe_msg {
-                            info!("Manager received Assertion {} passed", recv_id);
-                            received_passed_tests.insert(recv_id);
+                    let maybe_msg = dev_rx.recv().await;
+                    if let Some(CmdMsg::AssertCompleted {
+                        test_id: recv_id,
+                        result: test_result,
+                    }) = maybe_msg
+                    {
+                        info!(
+                            "Manager received Assertion {} {}",
+                            recv_id,
+                            if test_result { "passed" } else { "failed" }
+                        );
+                        received_passed_tests.insert(recv_id, test_result);
 
-                            if received_passed_tests.contains(&test_id) {
+                        if let Some(result) = received_passed_tests.get(&test_id) {
+                            if *result {
                                 println!("pass test {}", expr);
-                                process_cmd_idx += 1;
-                                break;
+                            } else {
+                                println!("fail test {}", expr);
                             }
-                            }
-                        }
-                        _ = tokio::time::sleep(std::time::Duration::from_millis(TIMEOUT_INTERVAL)) => {
-                            println!("timeout on test {}", expr);
+                 
                             process_cmd_idx += 1;
                             break;
                         }

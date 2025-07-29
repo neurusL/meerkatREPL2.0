@@ -12,6 +12,7 @@ impl TypecheckEnv {
             Expr::Variable { ident } => self
                 .var_context
                 .get(ident)
+                .or(self.name_context.get(ident))
                 .cloned()
                 .expect(&format!("cannot find var {:?} in context", ident)),
 
