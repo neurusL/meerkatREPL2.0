@@ -11,10 +11,15 @@ impl Evaluator {
         var
     }
 
-    pub fn fold(&mut self, val: Expr, identity: Expr, operation: Expr) -> Expr {
-        let func_apply = Expr::FuncApply { func: Box::new(operation), args: vec![identity, val] };
-        self.eval_expr(&mut func_apply.clone());
-        func_apply
+    pub fn fold(&mut self, vals: &Vec<Expr>, identity: Expr, operation: &Expr) -> Expr {
+        let mut accum = identity;
+        for val in vals {
+            let func_apply = Expr::FuncApply { func: Box::new(operation.clone()), args: vec![accum, val.clone()] };
+            let mut result = func_apply;
+            self.eval_expr(&mut result);
+            accum = result;
+        }
+        accum
     }
 
     pub fn search_table(&mut self, name: &String) -> Result<Expr, String> {
@@ -98,10 +103,20 @@ impl Evaluator {
                     self.subst(&mut insert.row, var_to_expr);
                 }
             }
-            Expr::Select { table_name, column_names, where_clause } => todo!(),
-            Expr::TableColumn { table_name, column_name } => todo!(),
-            Expr::Table { .. } => todo!(),
-            Expr::Fold { args } => todo!()
+            Expr::Select { where_clause, .. } => {
+                self.subst(where_clause, var_to_expr);
+            },
+            Expr::TableColumn { .. } => {},        // since table and column names are typically string literals
+            Expr::Table { records, .. } => {
+                for record in records {
+                    self.subst(record, var_to_expr);
+                }
+            },
+            Expr::Fold { args } => {
+                for arg in args {
+                    self.subst(arg, var_to_expr);
+                }
+            }
         }
     }
 }

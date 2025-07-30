@@ -299,23 +299,19 @@ impl Evaluator {
                     let table = self.search_table(table_name)?;
                     if let Expr::Table { schema, records } = table {
                         let column_id = schema.iter().position(|f| &f.name == column_name).ok_or_else(|| format!("Column not found"))?;
-                        let mut accum = args[2].clone();
-                            for record in records {
-                                let val = match record {
-                                    Expr::Vector { val } => {
-                                        val[column_id].clone() 
-                                    }
-                                    _ => panic!("{} is not a vector", record)
-                                };
-                                let mut result = self.fold(val, accum, args[1].clone());
-                                self.eval_expr(&mut result)?;
-                                accum = result;     // recursive since this accum with result value is used in the next iteration as identity var
-                                
-                            }
-                            // println!("Evaled result: {}",  accum);
-                            *expr = accum;
-                            
-                            Ok(())
+                        let mut column_vals = Vec::new();
+                        for record in records {
+                            let val = match record {
+                                Expr::Vector { val } => {
+                                    val[column_id].clone()
+                                }
+                                _ => panic!("Not a vector")
+                            };
+                            column_vals.push(val);
+                        }
+                        *expr = self.fold(&column_vals, args[2].clone(), &args[1]);
+                        
+                        Ok(())
                     } else {
                         Err(format!("{} table not found", table_name))
                     }

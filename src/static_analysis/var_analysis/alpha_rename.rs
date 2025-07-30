@@ -11,7 +11,7 @@ impl Expr {
         renames: &HashMap<String, String>,
     ) {
         match self {
-            Expr::Number { .. } | Expr::Bool { .. } | Expr::String { .. } | Expr::Table { .. } => {}
+            Expr::Number { .. } | Expr::Bool { .. } | Expr::String { .. } => {}
             Expr::Variable { ident } => {
                 if !var_binded.contains(ident) && renames.contains_key(ident) {
                     *ident = renames.get(ident).unwrap().clone();
@@ -58,12 +58,24 @@ impl Expr {
                     // }
                     assn.src.alpha_rename(var_binded, renames);
                 }
+                for insert in inserts {
+                    insert.row.alpha_rename(var_binded, renames);       // since rows can contain variables
+                }
             }
-            Expr::Select { table_name, column_names,  where_clause } => {
+            Expr::Select { where_clause, .. } => {
                 where_clause.alpha_rename(var_binded, renames);
             }
-            Expr::TableColumn { table_name, column_name } => {},
-            Expr::Fold { args } => todo!(),
+            Expr::Table { records, .. } => {
+                for record in records {
+                    record.alpha_rename(var_binded, renames);
+                }
+            }
+            Expr::TableColumn { .. } => {},
+            Expr::Fold { args } => {
+                for arg in args {
+                    arg.alpha_rename(var_binded, renames);
+                }
+            },
         
         }
     }

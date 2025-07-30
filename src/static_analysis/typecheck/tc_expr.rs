@@ -272,4 +272,3 @@ impl TypecheckEnv {
 // (priority) implement statics for actions
 // 1. more efficient implementation of var context
 // 2. add language feature: let binding
-// 3. Extend fold to a more general iterator instead of just table column right now

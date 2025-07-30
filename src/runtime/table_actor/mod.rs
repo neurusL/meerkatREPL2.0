@@ -19,7 +19,6 @@ pub struct TableActor {
     pub pubsub: PubSub,
 
     pub latest_write_txn: Option<Txn>,
-    //pub preds: HashSet<Txn>,
 }
 
 impl TableActor {
@@ -29,7 +28,6 @@ impl TableActor {
             value: state::TableValueState::new(val),
             pubsub: PubSub::new(),
             latest_write_txn: None,
-            //preds: HashSet::new(),
         }
     }
 }
