@@ -170,12 +170,13 @@ pub async fn run_test(
     let mut txn_to_cmd_idx = HashMap::new();
     let mut process_cmd_idx = 0;
 
+    let mut retry_txid: Option<TxnId> = None;
     while process_cmd_idx < test.commands.len() {
         let cmd = &test.commands[process_cmd_idx];
 
         match cmd {
             ReplCmd::Do(action) => {
-                let txn_id = TxnId::new();
+                let txn_id = retry_txid.take().unwrap_or_else(TxnId::new);
                 txn_to_cmd_idx.insert(txn_id.clone(), process_cmd_idx);
                 srv_actor_ref
                     .tell(CmdMsg::DoAction {
@@ -191,11 +192,9 @@ pub async fn run_test(
                             if let Some(msg) = maybe_msg {
                                 match msg {
                                     CmdMsg::TransactionAborted { txn_id } => {
-                                        // process_cmd_idx = *txn_to_cmd_idx.get(&txn_id)
-                                        // .expect("txn_id not found");
-                                        // break;
-
-                                        todo!("rollback")
+                                        info!("Transaction {txn_id:?} aborted. Retrying");
+                                        retry_txid = Some(txn_id.retry_id());
+                                        break;
                                     }
                                     CmdMsg::TransactionCommitted { txn_id, writes } => {
                                         info!("Transaction {:?} committed", txn_id);

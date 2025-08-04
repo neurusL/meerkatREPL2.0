@@ -6,6 +6,7 @@ use crate::ast::{Assn, Expr};
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Hash)]
 pub struct TxnId {
     pub time: Instant,
+    pub iteration: u8,
     // address or uuid to break tie
 }
 
@@ -13,6 +14,14 @@ impl TxnId {
     pub fn new() -> TxnId {
         TxnId {
             time: Instant::now(),
+            iteration: 0,
+        }
+    }
+
+    pub fn retry_id(&self) -> TxnId {
+        TxnId {
+            time: self.time,
+            iteration: self.iteration + 1,
         }
     }
 }
