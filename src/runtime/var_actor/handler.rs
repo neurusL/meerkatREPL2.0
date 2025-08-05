@@ -212,7 +212,7 @@ impl VarActor {
                 pred_id: self.latest_write_txn.clone().map(|t| t.id),
             };
 
-            let _ = mgr.ask(msg).await?;
+            let _ = mgr.tell(msg).await?;
         }
         Ok(())
     }
