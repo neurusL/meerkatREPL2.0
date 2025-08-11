@@ -44,12 +44,16 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 lock,
                 from_mgr_addr: from_name,
             } => {
-                info!("Lock Request from {:?}", from_name);
-                if !self.lock_state.add_wait(lock.clone(), from_name) {
-                    return Msg::LockAbort {
-                        from_name: self.name.clone(),
-                        lock,
-                    };
+                info!("Lock Request from {:?} {:?}", from_name, lock);
+                if !self.lock_state.add_wait(lock.clone(), from_name.clone()) {
+                    info!("Aborted {:?}", lock);
+
+                    let _ = from_name
+                        .tell(Msg::LockAbort {
+                            from_name: self.name.clone(),
+                            lock,
+                        })
+                        .await;
                 }
 
                 Msg::Unit
@@ -208,7 +212,7 @@ impl VarActor {
                 pred_id: self.latest_write_txn.clone().map(|t| t.id),
             };
 
-            let _ = mgr.ask(msg).await?;
+            let _ = mgr.tell(msg).await?;
         }
         Ok(())
     }

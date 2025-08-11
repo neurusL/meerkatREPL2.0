@@ -24,11 +24,10 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                 name,
                 test: bool_expr,
                 test_id,
-                from_developer,
             } => {
                 info!("Try Test");
-                self.add_new_test(test_id, name, bool_expr, from_developer).await;
-                
+                self.add_new_test(test_id, name, bool_expr).await;
+
                 let _ = self.request_assertion_preds(test_id).await;
                 None
             }
@@ -99,7 +98,11 @@ impl kameo::prelude::Message<Msg> for Manager {
                 Msg::Unit
             }
 
-            Msg::TestRequestPredGranted { from_name, test_id, pred_id } => {
+            Msg::TestRequestPredGranted {
+                from_name,
+                test_id,
+                pred_id,
+            } => {
                 self.add_grant_pred(test_id, from_name, pred_id);
 
                 if self.all_pred_granted(test_id) {
@@ -107,7 +110,7 @@ impl kameo::prelude::Message<Msg> for Manager {
                 }
 
                 Msg::Unit
-            },
+            }
 
             Msg::UsrReadVarResult {
                 txn: txn_id,
@@ -159,7 +162,7 @@ impl kameo::prelude::Message<Msg> for Manager {
                 let _ = self.on_test_finish(test_id, result).await;
 
                 Msg::Unit
-            },
+            }
 
             Msg::UsrWriteVarFinish { txn: txn_id, name } => {
                 info!("UsrWriteVarFinish");

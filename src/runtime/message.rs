@@ -51,7 +51,6 @@ pub enum Msg {
         test_id: TestId,
         result: Expr,
     },
-    
 
     UsrWriteVarRequest {
         from_mgr_addr: ActorRef<Manager>,
@@ -64,14 +63,14 @@ pub enum Msg {
         name: String,
     },
 
-    TestRequestPred { 
+    TestRequestPred {
         from_mgr_addr: ActorRef<Manager>,
-        test_id: TestId
+        test_id: TestId,
     }, // for test only
     TestRequestPredGranted {
         from_name: String,
         test_id: TestId,
-        pred_id: Option<TxnId>
+        pred_id: Option<TxnId>,
     },
 
     LockRequest {
@@ -141,7 +140,6 @@ pub enum CmdMsg {
     },
 
     TryAssert {
-        from_developer: Sender<CmdMsg>,
         name: String,
         test: Expr,
         test_id: TestId,
