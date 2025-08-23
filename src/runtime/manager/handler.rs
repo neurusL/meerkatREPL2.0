@@ -128,6 +128,7 @@ impl kameo::prelude::Message<Msg> for Manager {
                 self.add_finished_read(&txn_id, name, result, pred);
                 info!("add finished read");
                 if self.all_read_finished(&txn_id) {
+                    print!("{:?}", self.txn_mgrs[&txn_id].direct_reads);
                     let _ = self.reeval_and_request_writes(&txn_id).await;
                     // todo!() current impl isn't optimized for best concurrency
                     // if re-eval block for too long

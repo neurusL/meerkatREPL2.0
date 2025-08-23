@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, hash::Hash};
 
 use crate::ast::Expr;
 
@@ -34,7 +34,7 @@ impl Evaluator {
                 self.subst(expr2, var_to_expr);
             }
             Expr::Func { params, body } => {
-                // assume we want to subst x with m
+                // assume we want to subst x with M
                 let param_set: HashSet<String> = params.clone().into_iter().collect();
                 for (x, m) in var_to_expr.iter() {
                     // - if x in params, do nothing since its binded by function
@@ -55,9 +55,12 @@ impl Evaluator {
                         }
                     }
                     body.alpha_rename(&self.reactive_names, &renames);
+                    
+                    // now it's safe to substitute x with M
+                    let single_subst: HashMap<String, Expr> = HashMap::from([(x.clone(), m.clone())]); 
+                    self.subst(body, &single_subst);
                 }
-                // now it's safe to substitute
-                self.subst(body, var_to_expr);
+                
             }
 
             Expr::FuncApply { func, args } => {

@@ -122,6 +122,7 @@ impl Evaluator {
 
             Expr::Func { params, body } => {
                 // functions are values
+                self.subst(expr, &self.reactive_name_to_vals.clone());
                 Ok(())
             }
 
