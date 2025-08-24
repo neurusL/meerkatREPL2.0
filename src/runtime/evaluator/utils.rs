@@ -12,14 +12,13 @@ impl Evaluator {
     }
 
     pub fn fold(&mut self, vals: &Vec<Expr>, identity: Expr, operation: &Expr) -> Expr {
-        let mut accum = identity;
+        let mut result = identity;
         for val in vals {
-            let func_apply = Expr::FuncApply { func: Box::new(operation.clone()), args: vec![accum, val.clone()] };
-            let mut result = func_apply;
-            self.eval_expr(&mut result);
-            accum = result;
+            let mut func_apply = Expr::FuncApply { func: Box::new(operation.clone()), args: vec![result, val.clone()] };
+            self.eval_expr(&mut func_apply);
+            result = func_apply;
         }
-        accum
+        result
     }
 
     pub fn search_table(&mut self, name: &String) -> Result<Expr, String> {
