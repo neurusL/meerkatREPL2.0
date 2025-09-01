@@ -65,6 +65,11 @@ pub enum Expr {
         args: Vec<Expr>,
     },
 
+    Project {
+        expr: Box<Expr>,
+        ident: String,
+    },
+
     /// Action
     Action {
         assns: Vec<Assn>,
@@ -167,6 +172,7 @@ impl Display for Expr {
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
+            Expr::Project { expr, ident } => write!(f, "{}.{}", expr, ident),
             Expr::Action { assns } => write!(
                 f,
                 "Action({:?})",

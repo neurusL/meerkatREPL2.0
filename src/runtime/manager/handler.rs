@@ -4,7 +4,7 @@ use log::info;
 use std::time::Duration;
 use std::{collections::HashSet, error::Error};
 
-use crate::runtime::message::{CmdMsg, Msg};
+use crate::runtime::message::{CmdMsg, MgrMsg, Msg};
 use kameo::mailbox::Signal;
 use kameo::{error::Infallible, prelude::*};
 
@@ -71,6 +71,37 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
             _ => {
                 panic!("Manager should not receive message from REPL");
             }
+        }
+    }
+}
+
+impl kameo::prelude::Message<MgrMsg> for Manager {
+    type Reply = Option<MgrMsg>;
+
+    async fn handle(&mut self, msg: MgrMsg, ctx: &mut Context<Self, Self::Reply>) -> Self::Reply {
+        match msg {
+            MgrMsg::Subscribe { name, from_addr } => {
+                if let Some(a) = self.varname_to_actors.get(&name) {
+                    let Msg::SubscribeGranted { name, value, preds } =
+                        a.ask(Msg::Subscribe { from_addr }).await.unwrap()
+                    else {
+                        panic!("unexpected reply from subscribe");
+                    };
+
+                    Some(MgrMsg::SubscriptionGranted { name, value, preds })
+                } else if let Some(a) = self.defname_to_actors.get(&name) {
+                    let Msg::SubscribeGranted { name, value, preds } =
+                        a.ask(Msg::Subscribe { from_addr }).await.unwrap()
+                    else {
+                        panic!("unexpected reply from subscribe");
+                    };
+
+                    Some(MgrMsg::SubscriptionGranted { name, value, preds })
+                } else {
+                    panic!("could not locate reactive for cross-mgr subscribe: {name:?}");
+                }
+            }
+            _ => panic!("Unrecognized message {msg:?}"),
         }
     }
 }

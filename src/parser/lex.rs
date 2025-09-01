@@ -10,7 +10,7 @@
 #![allow(clippy::upper_case_acronyms)]
 use enum_as_inner::EnumAsInner;
 use logos::{Lexer, Logos, Skip};
-use std::{fmt, num::ParseIntError};
+use std::fmt;
 use strum_macros::AsRefStr;
 
 fn from_num<'b>(lex: &mut Lexer<'b, Token<'b>>) -> Result<i32, String> {
@@ -128,6 +128,8 @@ pub enum Token<'a> {
     Semicolon,
     #[token(",")]
     Comma,
+    #[token(".")]
+    Dot,
 
     // Reserved Keywords
     #[token("service")]

@@ -97,7 +97,6 @@ pub enum Msg {
     },
 
     Subscribe {
-        from_name: String,
         from_addr: ActorRef<DefActor>,
     },
 
@@ -147,5 +146,19 @@ pub enum CmdMsg {
     AssertCompleted {
         test_id: TestId,
         result: bool,
+    },
+}
+
+/// Messages sent between managers
+#[derive(Debug, Clone, Reply)]
+pub enum MgrMsg {
+    Subscribe {
+        name: String,
+        from_addr: ActorRef<DefActor>,
+    },
+    SubscriptionGranted {
+        name: String,
+        value: Expr,
+        preds: HashSet<Txn>,
     },
 }

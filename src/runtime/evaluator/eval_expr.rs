@@ -166,6 +166,8 @@ impl Evaluator {
                 // }
                 Ok(())
             }
+
+            Expr::Project { expr, ident } => todo!("eval Project({expr:?}, {ident:?})"),
         }
     }
 }

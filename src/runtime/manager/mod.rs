@@ -43,12 +43,18 @@ pub struct Manager {
     /// manager transactions and tests submitted to manager from client/developer
     pub txn_mgrs: HashMap<TxnId, TxnManager>,
     pub test_mgrs: HashMap<TestId, TestManager>,
+
+    pub other_services: HashMap<String, ActorRef<Manager>>,
 }
 
 impl Manager {
     /// to spawn a manager:
     /// let mgr = Manager::new(); spawn(mgr);
-    pub fn new(name: String, from_developer: Sender<CmdMsg>) -> Self {
+    pub fn new(
+        name: String,
+        other_services: HashMap<String, ActorRef<Manager>>,
+        from_developer: Sender<CmdMsg>,
+    ) -> Self {
         Manager {
             name,
             address: None,
@@ -63,6 +69,8 @@ impl Manager {
 
             txn_mgrs: HashMap::new(),
             test_mgrs: HashMap::new(),
+
+            other_services,
         }
     }
 }

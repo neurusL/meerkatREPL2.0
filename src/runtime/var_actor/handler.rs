@@ -23,10 +23,7 @@ impl kameo::prelude::Message<Msg> for VarActor {
     ) -> Self::Reply {
         info!("VAR ACTOR {} RECEIVE: ", self.name);
         match msg {
-            Msg::Subscribe {
-                from_name: _,
-                from_addr,
-            } => {
+            Msg::Subscribe { from_addr } => {
                 info!("Subscribe from {:?}", from_addr);
                 self.pubsub.subscribe(from_addr);
 
@@ -59,16 +56,20 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 Msg::Unit
             }
 
-            Msg::TestRequestPred { from_mgr_addr, test_id } => {
+            Msg::TestRequestPred {
+                from_mgr_addr,
+                test_id,
+            } => {
                 info!("Only for asserts: Pred Request from {:?}", from_mgr_addr);
 
                 // will immediately send back latest pred id
-                let _ = from_mgr_addr.tell(
-                    Msg::TestRequestPredGranted { 
+                let _ = from_mgr_addr
+                    .tell(Msg::TestRequestPredGranted {
                         from_name: self.name.clone(),
                         test_id,
-                        pred_id: self.latest_write_txn.clone().map(|t| t.id) 
-                }).await;
+                        pred_id: self.latest_write_txn.clone().map(|t| t.id),
+                    })
+                    .await;
 
                 Msg::Unit
             }

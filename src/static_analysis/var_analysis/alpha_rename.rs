@@ -51,6 +51,8 @@ impl Expr {
                     assn.src.alpha_rename(var_binded, renames);
                 }
             }
+
+            Expr::Project { expr, ident } => todo!("alpha_rename Project({expr:?}, {ident:?})"),
         }
     }
 }

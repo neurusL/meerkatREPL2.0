@@ -10,7 +10,10 @@ mod tc_stmt;
 mod tc_test;
 mod utils;
 
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
 
 use crate::ast::Prog;
 
@@ -64,9 +67,11 @@ impl Display for Type {
 }
 
 pub struct TypecheckEnv {
-    pub var_context: HashMap<String, Type>, // Expr::Var to type, todo: change this to more efficient stack of hashmap
-    pub name_context: HashMap<String, Type>, // reactive name to type
-    // pub var_to_typ_scheme: HashMap<String, TypeScheme>,
+    // Expr::Var to type, todo: change this to more efficient stack of hashmap
+    pub var_context: HashMap<String, Type>,
+
+    pub open_service_name: Option<String>,
+    pub services: HashMap<String, ServiceEnv>,
 
     // counter to generate new type var
     pub typevar_id: u64,
@@ -74,35 +79,41 @@ pub struct TypecheckEnv {
     pub acc_subst: HashMap<String, Type>,
 }
 
+pub struct ServiceEnv {
+    // reactive name to type
+    pub name_context: HashMap<String, Type>,
+    //pub var_to_typ_scheme: HashMap<String, TypeScheme>,
+    pub imports: HashSet<String>,
+}
+
 impl Display for TypecheckEnv {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "------------------\n")?;
-        for (var_name, var_typ) in self.var_context.iter() {
-            write!(f, "{}: {}\n", var_name, var_typ)?;
+        for (i, (name, s)) in self.services.iter().enumerate() {
+            if i != 0 {
+                writeln!(f)?;
+            }
+
+            writeln!(f, "service: {name}")?;
+            writeln!(f, "------------------")?;
+            for (name, typ) in s.name_context.iter() {
+                write!(f, "{}: {}\n", name, typ)?;
+            }
+            write!(f, "------------------")?;
         }
-        write!(f, "------------------\n")
+
+        Ok(())
     }
 }
 
 pub fn typecheck_prog(prog: &Prog) {
-    // each service has its own type environment
-    let mut srv_to_type_env = HashMap::new();
-
+    let mut typ_env = TypecheckEnv::new();
     for srvs in prog.services.iter() {
-        let mut typ_env = TypecheckEnv::new();
         typ_env.typecheck_service(srvs);
-        print!("service: {:?}\n {}", srvs.name, typ_env);
-
-        srv_to_type_env.insert(srvs.name.clone(), typ_env);
     }
 
+    println!("{}", typ_env);
+
     for test in prog.tests.iter() {
-        srv_to_type_env
-            .get_mut(&test.name)
-            .expect(&format!(
-                "Test: test instantiate a non-existing service {:?}",
-                test.name
-            ))
-            .typecheck_test(test);
+        typ_env.typecheck_test(test);
     }
 }

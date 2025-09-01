@@ -54,6 +54,7 @@ extern {
         "(" => Token::LParen,
         ")" => Token::RParen,
         "," => Token::Comma,
+        "." => Token::Dot,
         "true" => Token::TRUE,
         "false" => Token::FALSE,
     }
@@ -142,6 +143,8 @@ SubExpr: Expr = {
     
     <expr:SubExpr> "(" <args:Args> ")" => 
         Expr::FuncApply { func: Box::new(expr), args },
+        
+    <expr:SubExpr> "." <i:Ident> => Expr::Project { expr: Box::new(expr), ident: i },
 
     "action" "{" <assns: Assns> "}" => Expr::Action { assns },
     

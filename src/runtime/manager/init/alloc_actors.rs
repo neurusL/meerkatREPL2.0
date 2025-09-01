@@ -89,7 +89,6 @@ impl Manager {
                 .ask_to_name(
                     name,
                     Msg::Subscribe {
-                        from_name: name.clone(),
                         from_addr: actor_ref.clone(),
                     },
                 )

@@ -1,0 +1,12 @@
+service a {
+    var x = 0;
+    pub def y = x;
+}
+
+service b {
+    import a;
+    def z = a.y;
+}
+
+
+@test(a) {}

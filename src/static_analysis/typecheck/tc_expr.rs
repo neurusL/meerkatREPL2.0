@@ -12,7 +12,7 @@ impl TypecheckEnv {
             Expr::Variable { ident } => self
                 .var_context
                 .get(ident)
-                .or(self.name_context.get(ident))
+                .or_else(|| self.open_service().unwrap().name_context.get(ident))
                 .cloned()
                 .expect(&format!("cannot find var {:?} in context", ident)),
 
@@ -143,7 +143,7 @@ impl TypecheckEnv {
                             let typ_i_actual = self.infer_expr(arg);
                             if !self.unify(typ_i, &typ_i_actual) {
                                 panic!(
-                                    "cannot unify {:?}th argument, 
+                                    "cannot unify {:?}th argument,
                                     expect {:?} got {:?}",
                                     i, typ_i, typ_i_actual
                                 )
@@ -172,6 +172,25 @@ impl TypecheckEnv {
             Expr::Action { assns } => {
                 assns.iter().for_each(|assn| self.typecheck_assn(assn));
                 Action
+            }
+
+            Expr::Project { expr, ident } => {
+                let Expr::Variable {
+                    ident: service_name,
+                } = &**expr
+                else {
+                    panic!("the dot operator can currently only be used to reference names from other services, got {expr:?}");
+                };
+
+                if !self.open_service().unwrap().imports.contains(service_name) {
+                    panic!("attempted to reference unimported service {ident:?}");
+                }
+
+                let service = self.services.get(service_name).unwrap();
+
+                service.name_context.get(ident).cloned().expect(&format!(
+                    "cannot find var {ident:?} in service context {service_name:?}"
+                ))
             }
         }
     }

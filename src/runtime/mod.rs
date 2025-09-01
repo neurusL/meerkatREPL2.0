@@ -19,7 +19,7 @@
 //!  4. test_manager will wait for bool_expr to be true before processing next
 //!     action, on the other hand, timeout means assertion failed
 use core::panic;
-use std::collections::HashMap;
+use std::{collections::HashMap, os::unix::raw::dev_t};
 
 use crate::{
     ast::{Prog, ReplCmd, Service, Test},
@@ -62,7 +62,7 @@ pub async fn run(prog: &Prog) -> Result<(), Box<dyn std::error::Error>> {
 
     let mut services = HashMap::new();
     for srv in &prog.services {
-        let srv_actor_ref = run_srv(srv, dev_tx.clone()).await?;
+        let srv_actor_ref = run_srv(srv, &services, dev_tx.clone()).await?;
         services.insert(srv.name.clone(), srv_actor_ref);
     }
 
@@ -109,10 +109,11 @@ pub async fn run(prog: &Prog) -> Result<(), Box<dyn std::error::Error>> {
 
 pub async fn run_srv(
     srv: &Service,
+    other_services: &HashMap<String, ActorRef<Manager>>,
     dev_tx: Sender<CmdMsg>,
 ) -> Result<ActorRef<Manager>, Box<dyn std::error::Error>> {
     // initialize the service's manager
-    let srv_manager = Manager::new(srv.name.clone(), dev_tx);
+    let srv_manager = Manager::new(srv.name.clone(), other_services.clone(), dev_tx);
     let srv_actor_ref = spawn(srv_manager);
 
     // synchronously wait for manager to be initialized

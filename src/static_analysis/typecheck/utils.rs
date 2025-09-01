@@ -1,3 +1,4 @@
+use super::ServiceEnv;
 use super::Type;
 use super::TypecheckEnv;
 use std::{
@@ -43,7 +44,8 @@ impl TypecheckEnv {
         // passing initial context as parameter (useful when tests need service's context)
         TypecheckEnv {
             var_context: HashMap::new(),
-            name_context: HashMap::new(),
+            open_service_name: None,
+            services: HashMap::new(),
             typevar_id: 0,
             acc_subst: HashMap::new(),
         }
@@ -123,6 +125,18 @@ impl TypecheckEnv {
 
             _ => false,
         }
+    }
+
+    pub fn open_service(&self) -> Option<&ServiceEnv> {
+        self.open_service_name
+            .as_ref()
+            .and_then(|s| self.services.get(s))
+    }
+
+    pub fn open_service_mut(&mut self) -> Option<&mut ServiceEnv> {
+        self.open_service_name
+            .as_ref()
+            .and_then(|s| self.services.get_mut(s))
     }
 }
 

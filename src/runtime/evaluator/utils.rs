@@ -72,6 +72,7 @@ impl Evaluator {
                     self.subst(&mut assn.src, var_to_expr);
                 }
             }
+            Expr::Project { expr, ident } => todo!("subst Project({expr:?}, {ident:?})"),
         }
     }
 }

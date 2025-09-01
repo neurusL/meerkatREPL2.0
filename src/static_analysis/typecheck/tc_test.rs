@@ -2,6 +2,7 @@ use super::{Type, TypecheckEnv};
 use crate::ast::*;
 impl TypecheckEnv {
     pub fn typecheck_test(&mut self, test: &Test) {
+        self.open_service_name = Some(test.name.clone());
         for command in test.commands.iter() {
             match command {
                 ReplCmd::Do(expr) => {
@@ -18,5 +19,6 @@ impl TypecheckEnv {
                 }
             }
         }
+        self.open_service_name = None;
     }
 }

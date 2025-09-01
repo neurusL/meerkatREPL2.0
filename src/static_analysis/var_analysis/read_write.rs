@@ -68,6 +68,8 @@ impl Expr {
                 // we exclude reactive names from free_vars in action
                 free_vars.difference(reactive_names).cloned().collect()
             }
+
+            Expr::Project { expr, ident } => todo!("free_var Project({expr:?}, {ident:?})"),
         }
     }
 }
