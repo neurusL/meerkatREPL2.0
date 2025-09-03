@@ -8,7 +8,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
-    ast::Assn,
+    ast::{Assn, Expr},
     runtime::transaction::{Txn, TxnId},
 };
 
@@ -18,6 +18,7 @@ pub struct PendingChanges {
     /// relevant var maps to args of def F's expression
     /// when we see a transaction t writes to a relevant var f,
     /// then all var_to_inputs[f] should see transaction t
+    expr: Expr,
     pub var_to_args: HashMap<String, HashSet<String>>,
 
     /// dependency graph (a hypergraph):
@@ -37,8 +38,9 @@ pub struct PendingChanges {
 }
 
 impl PendingChanges {
-    pub fn new(var_to_args: HashMap<String, HashSet<String>>) -> Self {
+    pub fn new(expr: Expr, var_to_args: HashMap<String, HashSet<String>>) -> Self {
         PendingChanges {
+            expr,
             var_to_args,
             req_to_changes: HashMap::new(),
             change_to_reqs: HashMap::new(),
@@ -52,21 +54,17 @@ impl PendingChanges {
         // then for all arg in var_to_inputs[var] should see t,
         // namely change depends a change on arg, whose preds contains t
         // recorded as (arg, t)
+        // print!("{} adding change: {:#?}\n", self.expr, change);
         for Txn { id: txn_id, assns } in change.preds.iter() {
             for Assn { dest, .. } in assns.iter() {
-                for arg in self
-                    .var_to_args
-                    .get(dest)
-                    .expect(&format!(
-                        "var {} not found in var_to_inputs {:?}",
-                        dest, self.var_to_args
-                    ))
-                    .iter()
-                {
-                    self.change_to_reqs
-                        .entry(change.id)
-                        .or_insert(HashSet::new())
-                        .insert((arg.clone(), txn_id.clone()));
+                if let Some(args) = self.var_to_args.get(dest) {
+                    for arg in args.iter()
+                    {
+                        self.change_to_reqs
+                            .entry(change.id)
+                            .or_insert(HashSet::new())
+                            .insert((arg.clone(), txn_id.clone()));
+                    }
                 }
             }
         }

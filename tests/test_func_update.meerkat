@@ -23,5 +23,5 @@ service foo_service {
     do inc_y;
     do inc_x;
 
-    // assert(x == 3);
+    assert(x == 3);
 }

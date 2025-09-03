@@ -48,9 +48,9 @@ impl ChangeState {
         ChangeState {
             id_cnt: 0,
             id_to_change: HashMap::new(),
-            expr,
+            expr: expr.clone(),
             arg_to_values,
-            pending_changes: PendingChanges::new(var_to_args),
+            pending_changes: PendingChanges::new(expr, var_to_args),
             applied_changes: AppliedChanges::new(),
         }
     }
