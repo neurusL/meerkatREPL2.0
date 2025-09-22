@@ -100,19 +100,6 @@ pub enum Msg {
         pred_id: Option<TxnId>,
     },
 
-<<<<<<< HEAD
-=======
-    TestRequestPred {
-        from_mgr_addr: ActorRef<Manager>,
-        test_id: TestId,
-    }, // for test only
-    TestRequestPredGranted {
-        from_name: String,
-        test_id: TestId,
-        pred_id: Option<TxnId>,
-    },
-
->>>>>>> efac05ae44f3496747f58a229b879ce97cb30f0e
     LockRequest {
         // for notifying var/def that a lock is requested
         from_mgr_addr: ActorRef<Manager>,

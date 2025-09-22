@@ -66,11 +66,7 @@ impl Expr {
             2. def f = fn y, z => action { x = y + z } to correctly evaluate say,
                f(1,2) to action { x = 3 }.
             */
-<<<<<<< HEAD
             Expr::Action { assns, .. } => {
-=======
-            Expr::Action { assns } => {
->>>>>>> efac05ae44f3496747f58a229b879ce97cb30f0e
                 let mut free_vars = HashSet::new();
                 for assn in assns {
                     // dest should never be free, we do not allow such pattern

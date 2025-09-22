@@ -192,10 +192,6 @@ impl kameo::prelude::Message<Msg> for Manager {
 
             Msg::TestReadDefResult { test_id, result } => {
                 let _ = self.on_test_finish(test_id, result).await;
-<<<<<<< HEAD
-=======
-
->>>>>>> efac05ae44f3496747f58a229b879ce97cb30f0e
                 Msg::Unit
             }
 
