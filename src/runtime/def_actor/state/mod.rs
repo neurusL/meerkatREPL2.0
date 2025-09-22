@@ -4,8 +4,11 @@ use std::{
 };
 
 use crate::{
-    ast::{Expr},
-    runtime::{evaluator::eval_def_expr, transaction::Txn},
+    ast::Expr,
+    runtime::{
+        evaluator::eval_def_expr,
+        transaction::{Txn, TxnId},
+    },
 };
 
 use history::AppliedChanges;
@@ -46,9 +49,9 @@ impl ChangeState {
         ChangeState {
             id_cnt: 0,
             id_to_change: HashMap::new(),
-            expr,
+            expr: expr.clone(),
             arg_to_values,
-            pending_changes: PendingChanges::new(var_to_args),
+            pending_changes: PendingChanges::new(expr, var_to_args),
             applied_changes: AppliedChanges::new(),
         }
     }
@@ -79,8 +82,6 @@ impl ChangeState {
     }
 
     pub fn apply_batch(&mut self, changes: &HashSet<ChangeId>) -> Expr {
-        
-        // println!("{} applying changes: {:#?}", self.expr, changes);
         self.pending_changes.remove_batch_from_pending(changes);
 
         for change_id in changes.iter() {
@@ -100,7 +101,7 @@ impl ChangeState {
 
             self.applied_changes.add_change(change);
         }
-        // info!("Printing env before re-evaluating: {:?}", self.arg_to_values);
+        info!("{:?}'s env before re-evaluating: {:#?}", self.expr, self.arg_to_values);
 
         eval_def_expr(&self.expr, &self.arg_to_values)
     }
@@ -112,6 +113,11 @@ impl ChangeState {
             preds.extend(change.preds.clone());
         }
         preds
+    }
+
+    pub fn has_applied_txns(&self, txns: &Vec<TxnId>) -> bool {
+        txns.iter()
+            .all(|id| self.get_all_applied_txns().iter().any(|t| t.id == *id))
     }
 
     pub fn get_all_applied_txns(&self) -> HashSet<Txn> {

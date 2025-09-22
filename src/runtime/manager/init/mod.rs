@@ -55,7 +55,7 @@ impl Manager {
                     name
                 ));
 
-                self.alloc_def_actor(name, def_expr.clone(), None)
+                self.alloc_def_actor(name, def_expr.clone())
                     .await
                     .unwrap();
             }

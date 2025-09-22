@@ -1,13 +1,7 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
-
-use kameo::prelude::*;
 use kameo::Actor;
-
-use super::lock::LockState;
 use super::pubsub::PubSub;
 use super::transaction::Txn;
-use crate::ast::{Expr, Field};
+use crate::ast::Expr;
 
 pub mod handler;
 pub mod state;
@@ -23,11 +17,14 @@ pub struct TableActor {
 
 impl TableActor {
     pub fn new(name: String, val: Expr) -> TableActor {
+        assert!(matches!(val, Expr::Table { .. }));
+
         TableActor {
             name,
             value: state::TableValueState::new(val),
             pubsub: PubSub::new(),
-            latest_write_txn: None,
+
+            latest_write_txn: None
         }
     }
 }

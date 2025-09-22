@@ -9,8 +9,6 @@ use crate::runtime::transaction::Txn;
 use kameo::mailbox::Signal;
 use kameo::{error::Infallible, prelude::*};
 
-use crate::runtime::Expr;
-
 pub const TICK_INTERVAL: Duration = Duration::from_millis(100);
 
 use super::Manager;
@@ -24,16 +22,10 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
         info!("MANAGER {} RECEIVE form Command Line: ", self.name);
         match msg {
             TryAssert { name, test: bool_expr, test_id } => {
-                info!("Try Test");
-                self.new_test(name, bool_expr, test_id).await;
+                info!("Try Test {}: expr {}", name, bool_expr);
+                self.add_new_test(test_id, name, bool_expr).await;
 
-                None
-            }
-
-            AssertSucceeded { test_id } => {
-                info!("Assert Succeeded");
-                self.on_test_finish(test_id).await;
-
+                let _ = self.request_assertion_preds(test_id).await;
                 None
             }
 
@@ -41,13 +33,14 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
                 info!("Do Action");
 
                 if let Ok((assns, inserts)) = self.eval_action(action.clone()) {
-                    let txn_mgr = self.new_txn(
-                        txn_id.clone(),
-                        assns.clone(),
-                        inserts.clone(),
-                        from_client_addr
-                    );
-                    self.txn_mgrs.insert(txn_id.clone(), txn_mgr);
+                    // let txn_mgr = self.new_txn(
+                    //     txn_id.clone(),
+                    //     assns.clone(),
+                    //     inserts.clone(),
+                    //     from_client_addr
+                    // );
+                    // self.txn_mgrs.insert(txn_id.clone(), txn_mgr);
+                    self.add_new_txn(txn_id.clone(), assns.clone(), inserts.clone(),from_client_addr);
 
                     if inserts.is_empty() {
                         info!("No inserts to process");
@@ -117,9 +110,13 @@ impl kameo::prelude::Message<Msg> for Manager {
     async fn handle(&mut self, msg: Msg, ctx: &mut Context<Self, Self::Reply>) -> Self::Reply {
         info!("MANAGER {} RECEIVE: ", self.name);
         match msg {
-            Msg::LockGranted { from_name, lock } => {
+            Msg::LockGranted {
+                from_name,
+                lock,
+                pred_id,
+            } => {
                 info!("Lock Granted");
-                self.add_grant_lock(&lock.txn_id, from_name, lock.lock_kind);
+                self.add_grant_lock(&lock.txn_id, from_name, lock.lock_kind, pred_id);
                 if self.all_lock_granted(&lock.txn_id) {
                     info!("all lock granted");
                     let _ = self.request_reads(&lock.txn_id).await;
@@ -129,7 +126,26 @@ impl kameo::prelude::Message<Msg> for Manager {
                 Msg::Unit
             }
 
-            Msg::UsrReadVarResult { txn: txn_id, name, result, pred } => {
+            Msg::TestRequestPredGranted {
+                from_name,
+                test_id,
+                pred_id,
+            } => {
+                self.add_grant_pred(test_id, from_name, pred_id);
+
+                if self.all_pred_granted(test_id) {
+                    let _ = self.request_assertion_result(test_id).await;
+                }
+
+                Msg::Unit
+            }
+
+            Msg::UsrReadVarResult {
+                txn: txn_id,
+                name,
+                result,
+                pred,
+            } => {
                 info!("UsrReadVarResult");
                 if self.is_aborted(&txn_id) {
                     return Msg::Unit;
@@ -153,7 +169,12 @@ impl kameo::prelude::Message<Msg> for Manager {
                 Msg::Unit
             }
 
-            Msg::UsrReadDefResult { txn: txn_id, name, result, preds } => {
+            Msg::UsrReadDefResult {
+                txn_id,
+                name,
+                result,
+                preds,
+            } => {
                 info!("UsrReadDefResult");
                 if self.is_aborted(&txn_id) {
                     return Msg::Unit;
@@ -168,15 +189,8 @@ impl kameo::prelude::Message<Msg> for Manager {
                 Msg::Unit
             }
 
-            Msg::UserReadTableResult { txn, name, result, pred } => {
-                info!("UserReadTableResult");
-
-                let pred = pred.map_or_else(
-                    || HashSet::new(),
-                    |p| HashSet::from([p])
-                );
-
-                self.add_finished_read(&txn, name, result, pred);
+            Msg::TestReadDefResult { test_id, result } => {
+                let _ = self.on_test_finish(test_id, result).await;
                 Msg::Unit
             }
 
@@ -189,8 +203,29 @@ impl kameo::prelude::Message<Msg> for Manager {
 
                     info!("release all locks, send commit transaction");
                     let client_sender = self.get_client_sender(&txn_id);
-                    client_sender.send(CmdMsg::TransactionCommitted { txn_id }).await.unwrap();
+                    client_sender
+                        .send(CmdMsg::TransactionCommitted {
+                            txn_id: txn_id.clone(),
+                            writes: self
+                                .txn_mgrs
+                                .get(&txn_id)
+                                .unwrap()
+                                .writes
+                                .keys()
+                                .cloned()
+                                .collect(),
+                        })
+                        .await
+                        .unwrap();
                 }
+                Msg::Unit
+            }
+        
+            Msg::UserReadTableResult { txn, name, result } => {
+                info!("UserReadTableResult");
+
+                self.add_finished_read(&txn, name, result, HashSet::new());
+
                 Msg::Unit
             }
 
@@ -198,7 +233,19 @@ impl kameo::prelude::Message<Msg> for Manager {
                 info!("UserWriteTableFinish");
 
                 let client_sender = self.get_client_sender(&txn_id);
-                client_sender.send(CmdMsg::TransactionCommitted { txn_id }).await.unwrap();
+                client_sender
+                    .send(CmdMsg::TransactionCommitted { 
+                        txn_id: txn_id.clone(),
+                        writes: self
+                            .txn_mgrs
+                            .get(&txn_id)
+                            .unwrap()
+                            .writes
+                            .keys()
+                            .cloned()
+                            .collect(),
+                     })
+                    .await.unwrap();
 
                 Msg::Unit
             }
@@ -283,19 +330,21 @@ impl Manager {
         Ok(back_msg)
     }
 
+    /// tell to var / defs 
+    /// message 1 for names without dependent (leaf node in dependency graph), e.g. var/table_var node
+    /// message 2 for names with dependent e.g. def node
     pub async fn tell_to_name2(
         &self,
         name: &String,
         msg_var: Msg,
         msg_def: Msg,
-        msg_tab: Msg
     ) -> Result<(), Box<dyn Error>> {
         if let Some(actor) = self.varname_to_actors.get(name) {
             actor.tell(msg_var).await?;
         } else if let Some(actor) = self.defname_to_actors.get(name) {
             actor.tell(msg_def).await?;
         } else if let Some(actor) = self.tablename_to_actors.get(name) {
-            actor.tell(msg_tab).await?;
+            actor.tell(msg_var).await?;
         } else {
             panic!("Service alloc: no such var or def with name: {}", name);
         }

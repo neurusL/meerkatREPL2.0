@@ -1,4 +1,7 @@
-use std::{collections::{HashMap, HashSet}, hash::Hash};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+};
 
 use crate::ast::{Assn, Expr};
 
@@ -57,19 +60,19 @@ impl Expr {
 
             // x in FV(r) => x in FV(action { ..., l = r, ...}) and x not in reactive_names
             /* it's trying to model:
-             1. def f = action{ x = y + z } has no dependencies in dependency graph, 
-                since we handle actions separately rather than propagating values of 
-                y, z to  f
-             2. def f = fn y, z => action { x = y + z } to correctly evaluate say, 
-                f(1,2) to action { x = 5 }.
-             */
-            Expr::Action { assns , ..} => {
+            1. def f = action{ x = y + z } has no dependencies in dependency graph,
+               since we handle actions separately rather than propagating values of
+               y, z to  f
+            2. def f = fn y, z => action { x = y + z } to correctly evaluate say,
+               f(1,2) to action { x = 3 }.
+            */
+            Expr::Action { assns, .. } => {
                 let mut free_vars = HashSet::new();
                 for assn in assns {
                     // dest should never be free, we do not allow such pattern
                     // fn x => action { x = ... }
                     // since each var action should be declared before in the service
-                    free_vars.extend(assn.src.free_var(reactive_names,var_binded));
+                    free_vars.extend(assn.src.free_var(reactive_names, var_binded));
                 }
 
                 // we exclude reactive names from free_vars in action
@@ -95,26 +98,15 @@ impl Expr {
     }
 }
 
-/// calculate transitively read set (contains var only)
+/// Calculate direct read set
 /// used for lock acquisition
-pub fn calc_read_set(
-    assns: &Vec<Assn>, 
-    reactive_names: &HashSet<String>, 
-    trans_deps: &HashMap<String, HashSet<String>>
-) -> HashSet<String> {
+pub fn calc_read_sets(assns: &Vec<Assn>, reactive_names: &HashSet<String>) -> HashSet<String> {
     let mut direct_reads = HashSet::new();
     for assn in assns {
-        direct_reads.extend(assn.src.free_var(reactive_names,&HashSet::new()));
+        direct_reads.extend(assn.src.free_var(reactive_names, &HashSet::new()));
     }
 
-    let mut trans_reads = HashSet::new();
-    for read in direct_reads {
-        trans_reads.extend(trans_deps.get(&read).expect(
-            &format!("read {} not found in transitive dependency", read),
-        ).clone());
-    }
-    
-    trans_reads
+    direct_reads
 }
 
 /// calculate write set (contains var only, no transitive dependency needed)

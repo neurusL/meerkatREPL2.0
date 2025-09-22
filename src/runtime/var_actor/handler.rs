@@ -44,12 +44,16 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 lock,
                 from_mgr_addr: from_name,
             } => {
-                info!("Lock Request from {:?}", from_name);
-                if !self.lock_state.add_wait(lock.clone(), from_name) {
-                    return Msg::LockAbort {
-                        from_name: self.name.clone(),
-                        lock,
-                    };
+                info!("Lock Request from {:?} {:?}", from_name, lock);
+                if !self.lock_state.add_wait(lock.clone(), from_name.clone()) {
+                    info!("Aborted {:?}", lock);
+
+                    let _ = from_name
+                        .tell(Msg::LockAbort {
+                            from_name: self.name.clone(),
+                            lock,
+                        })
+                        .await;
                 }
 
                 Msg::Unit
@@ -147,6 +151,20 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 Msg::Unit
             }
 
+            Msg::TestRequestPred { from_mgr_addr, test_id } => {
+                info!("Only for asserts: Pred Request from {:?}", from_mgr_addr);
+
+                // will immediately send back latest pred id
+                let _ = from_mgr_addr.tell(
+                    Msg::TestRequestPredGranted { 
+                        from_name: self.name.clone(),
+                        test_id,
+                        pred_id: self.latest_write_txn.clone().map(|t| t.id) 
+                }).await;
+
+                Msg::Unit
+            }
+
             #[allow(unreachable_patterns)]
             _ => panic!("VarActor should not receive message {:?}", msg),
         }
@@ -191,9 +209,10 @@ impl VarActor {
             let msg = Msg::LockGranted {
                 from_name: self.name.clone(),
                 lock,
+                pred_id: self.latest_write_txn.clone().map(|t| t.id),
             };
 
-            let _ = mgr.ask(msg).await?;
+            let _ = mgr.tell(msg).await?;
         }
         Ok(())
     }

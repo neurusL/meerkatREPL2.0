@@ -1,19 +1,9 @@
 use std::collections::HashSet;
-use std::rc::Weak;
 use std::time::Duration;
-
-use std::collections::HashMap;
-use crate::runtime::table_actor::state::TableValueState;
-use crate::runtime::transaction::Txn;
-use crate::runtime::Expr;
-use kameo::mailbox::Signal;
-use kameo::{ error::Infallible, prelude::* };
 use log::info;
 
-use super::{ TableActor };
-use crate::runtime::evaluator;
-use crate::ast::Record;
-use crate::runtime::{ message::Msg, evaluator::Evaluator };
+use super::TableActor;
+use crate::runtime::message::Msg;
 
 pub const TICK_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -34,44 +24,66 @@ impl kameo::prelude::Message<Msg> for TableActor {
                 Msg::SubscribeGranted {
                     name: self.name.clone(),
                     value: self.value.clone().into(),
-                    preds: self
-                        .latest_write_txn
-                        .clone()
-                        .map_or_else(|| HashSet::new(), |txn| HashSet::from([txn])),
+                    preds: HashSet::new(),
                 }
             }
 
             Msg::UserReadTableRequest {
-                txn, table_name, ..
-            } => Msg::UserReadTableResult {
-                txn,
-                name: table_name,
-                result: self.value.clone().into(),
-                pred: self.latest_write_txn.clone(),
+                from_mgr_addr, txn, table_name, ..
+            } => {
+                // we assume tables are insert only
+                // thus no causal consistency is guaranteed
+                // therefore no bookkeeping of last applied txn is needed or returned
+                let _ = from_mgr_addr.tell(Msg::UserReadTableResult {
+                    txn,
+                    name: table_name,
+                    result: self.value.clone().into(),
+                }).await;
+
+                Msg::Unit
             },
 
             Msg::UserWriteTableRequest { from_mgr_addr, txn} => {
                 info!("Table Actor {} inserting row {:?}", self.name, txn.inserts);
 
+                from_mgr_addr
+                    .tell(Msg::UserWriteTableFinish { txn: txn.id.clone(), name: self.name.clone() }).await
+                    .unwrap();
+                info!("Sent UserWriteTableFinish to manager, now propagate changes to subscribers");
+
+                self.latest_write_txn = Some(txn.clone());
+
                 for insert in &txn.inserts {
-                    let res = self.value.update(insert); 
+                    self.value.update(insert); 
                     self.pubsub
                     .publish(Msg::PropChange {
                         from_name: self.name.clone(), 
-                        val: res,                  // only send new record
-                        preds: HashSet::from([txn.clone()]),
+                        val: insert.row.clone(), // only send new record
+                        preds: HashSet::from([txn.clone()]), // the only pred is reflexively itself
                     })
                     .await;
                 info!("Prop change message sent to subscribers");
                 }
     
-                from_mgr_addr
-                    .tell(Msg::UserWriteTableFinish { txn: txn.id, name: self.name.clone() }).await
-                    .unwrap();
-                info!("Sent UserWriteTableFinish to manager");
                 Msg::Unit
             }
-            _ => Msg::Unit,
+
+            Msg::TestRequestPred { from_mgr_addr, test_id } => {
+                info!("Only for asserts: Pred Request from {:?}", from_mgr_addr);
+
+                // will immediately send back latest pred id
+                let _ = from_mgr_addr.tell(
+                    Msg::TestRequestPredGranted { 
+                        from_name: self.name.clone(),
+                        test_id,
+                        pred_id: None,
+                }).await;
+
+                Msg::Unit
+            }
+
+            #[allow(unreachable_patterns)]
+            _ => panic!("VarActor should not receive message {:?}", msg),
         }
     }
 }

@@ -115,13 +115,6 @@ impl TypecheckEnv {
                     }
                 }
 
-                // check params are not reactive names:
-                for param in params.iter() {
-                    if self.name_context.contains_key(param) {
-                        panic!("cannot bind reactive name: {}", param);
-                    }
-                }
-
                 // frozen current context
                 let old_context = self.var_context.clone();
 

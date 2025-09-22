@@ -29,13 +29,8 @@ pub struct Assn {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Insert {                    // insert {id: 1, ..}
-    pub row: Expr,
+    pub row: Expr,                     // each row is a vector
     pub table_name: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Row {
-    pub val: Vec<Expr>,        // id: 1 is one entry
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -225,7 +220,7 @@ impl Display for Expr {
             Expr::Bool { val } => write!(f, "{}", val),
             Expr::String { val } => write!(f, "{}", val),
             Expr::Vector { val } => write!(f, "vector"),
-            Expr::KeyVal { .. } => write!(f, "keyval"),
+            Expr::KeyVal { key, value } => write!(f, "keyval: {}, {}", key, value),
             Expr::Variable { ident } => write!(f, "{}", ident),
             Expr::Unop { op, expr } => write!(f, "{}{}", op, expr),
             Expr::Binop { op, expr1, expr2 } => write!(f, "{} {} {}", expr1, op, expr2),

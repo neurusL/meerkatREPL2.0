@@ -8,7 +8,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
-    ast::Assn,
+    ast::{Assn, Expr},
     runtime::transaction::{Txn, TxnId},
 };
 
@@ -18,6 +18,7 @@ pub struct PendingChanges {
     /// relevant var maps to args of def F's expression
     /// when we see a transaction t writes to a relevant var f,
     /// then all var_to_inputs[f] should see transaction t
+    expr: Expr,
     pub var_to_args: HashMap<String, HashSet<String>>,
 
     /// dependency graph (a hypergraph):
@@ -37,8 +38,9 @@ pub struct PendingChanges {
 }
 
 impl PendingChanges {
-    pub fn new(var_to_args: HashMap<String, HashSet<String>>) -> Self {
+    pub fn new(expr: Expr, var_to_args: HashMap<String, HashSet<String>>) -> Self {
         PendingChanges {
+            expr,
             var_to_args,
             req_to_changes: HashMap::new(),
             change_to_reqs: HashMap::new(),
@@ -53,31 +55,28 @@ impl PendingChanges {
         // namely change depends a change on arg, whose preds contains t
         // recorded as (arg, t)
         for Txn { id: txn_id, assns, inserts} in change.preds.iter() {
+
             for Assn { dest, .. } in assns.iter() {
-                for arg in self
-                    .var_to_args
-                    .get(dest)
-                    .expect(&format!("var {} not found in var_to_inputs {:?}", dest, self.var_to_args))
-                    .iter()
-                {
-                    self.change_to_reqs
-                        .entry(change.id)
-                        .or_insert(HashSet::new())
-                        .insert((arg.clone(), txn_id.clone()));
+                if let Some(args) = self.var_to_args.get(dest) {
+                    for arg in args.iter()
+                    {
+                        self.change_to_reqs
+                            .entry(change.id)
+                            .or_insert(HashSet::new())
+                            .insert((arg.clone(), txn_id.clone()));
+                    }
                 }
             }
 
             for insert in inserts.iter() {
-                for arg in self
-                    .var_to_args
-                    .get(&insert.table_name)
-                    .expect(&format!("table {} not found in var_to_inputs", &insert.table_name))
-                    .iter()
-                {
-                    self.change_to_reqs
-                        .entry(change.id)
-                        .or_insert(HashSet::new())
-                        .insert((arg.clone(), txn_id.clone()));
+                if let Some(args) = self.var_to_args.get(&insert.table_name) {
+                    for arg in args.iter()
+                    {
+                        self.change_to_reqs
+                            .entry(change.id)
+                            .or_insert(HashSet::new())
+                            .insert((arg.clone(), txn_id.clone()));
+                    }
                 }
             }
         }
@@ -155,5 +154,9 @@ impl PendingChanges {
         for change in changes.iter() {
             self.change_to_reqs.remove(change);
         }
+    }
+
+    pub fn has_no_pending_changes(&self) -> bool {
+        self.change_to_reqs.is_empty()
     }
 }

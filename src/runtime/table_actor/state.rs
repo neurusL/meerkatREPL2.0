@@ -1,39 +1,25 @@
-use crate::{ ast::{ Expr, Insert, Record } };
-use log::info;
+use core::panic;
+
+use crate::ast::{ Expr, Insert};
 
 #[derive(Debug, Clone)]
 pub enum TableValueState {
     Val(Expr),
 }
 
+
 impl TableValueState {
     pub fn new(val: Expr) -> TableValueState {
         TableValueState::Val(val)
     }
 
-    pub fn update(&mut self, insert: &Insert) -> Expr {
-        // will only occur for insert queries
-        let mut found_records = Vec::new();
-        if let Expr::Vector { val } = &insert.row {
-            for keyval in val {
-                if let Expr::KeyVal { key, value } = keyval {
-                    found_records.push((**value).clone());
-                } else{
-                    println!("Expected keyval, got {:?}", keyval);
-                }
-            }
+    pub fn update(&mut self, insert: &Insert) {
+        assert!(matches!(insert.row, Expr::Vector { val: _ }));
+        if let TableValueState::Val(Expr::Table { records, .. }) = self {
+            records.push(insert.row.clone());
         } else {
-            println!("Expected rows, got {:?}", &insert.row);
-        }
-        if let TableValueState::Val(Expr::Table { schema: _, records }) = self {
-            records.push(Expr::Vector{val: found_records.clone()});
-            info!("Updated table state!");
-        } else {
-          panic!("TableValueState is not a Table variant");
-        }
-        Expr::Vector{val: found_records}            // return new record when updating
-        
-      
+            panic!("Not a table");
+        };
     }
 }
 

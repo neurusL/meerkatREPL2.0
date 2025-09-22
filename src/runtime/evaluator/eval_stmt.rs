@@ -61,7 +61,6 @@ impl Evaluator {
                 }
                 
                 target_records.push(Expr::Vector { val: curr_record });
-                println!("Inserted record into {}, val is {}", insert.table_name, found_table);
             } else {
                 panic!("Not a table");
             }
