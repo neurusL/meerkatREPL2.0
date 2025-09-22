@@ -76,7 +76,7 @@ impl kameo::prelude::Message<Msg> for TableActor {
                     Msg::TestRequestPredGranted { 
                         from_name: self.name.clone(),
                         test_id,
-                        pred_id: None,
+                        pred_id: self.latest_write_txn.clone().map(|txn| txn.id),
                 }).await;
 
                 Msg::Unit

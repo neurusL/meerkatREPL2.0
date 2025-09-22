@@ -194,19 +194,6 @@ impl DefActor {
             self.read_requests.remove(&txn); // removed processed read request
         }
 
-        // if let Some((test_id, manager)) = &self.is_assert_actor_of {
-        //     info!("{} has value {}", self.name, self.value);
-        //     if let Expr::Bool { val: true } = self.value {
-        //         info!("Def {} says Assert Succeeded: {}", self.state.expr, test_id);
-        //         manager
-        //             .tell(CmdMsg::AssertSucceeded { test_id: *test_id })
-        //             .await?;
-
-        //         // todo!("this is a hack, we should use a better way to get the actor ref
-        //         // and kill/stop_gracefully the actor")
-        //         self.is_assert_actor_of = None;
-        //     }
-        // }
         // if we have test read request and applied its preds
         if let Some((test_id, (from_mgr_addr, preds))) = &self.test_read_request {
             if self.state.has_applied_txns(preds) {

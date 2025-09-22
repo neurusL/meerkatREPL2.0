@@ -279,6 +279,11 @@ impl Evaluator {
                     self.reactive_name_to_vals = original_context.clone(); // ? no more clone please!
                      
                 }
+
+                for selected_record in selected_records.iter_mut() {
+                    self.eval_expr(selected_record)?;
+                }       
+                         
                 *expr = Expr::Table {
                     schema: selected_schema,
                     records: selected_records,
