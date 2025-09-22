@@ -61,7 +61,11 @@ service foo_service {
     assert(f == 4);
 
     do inc_x;  // txn 2
+<<<<<<< HEAD
     // assert(f == 4);
+=======
+    assert(f == 4);
+>>>>>>> efac05ae44f3496747f58a229b879ce97cb30f0e
     /* 
     if we move assert f == 4 here 
     there's a chance of passed test

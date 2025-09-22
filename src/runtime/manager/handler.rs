@@ -31,7 +31,7 @@ impl kameo::prelude::Message<CmdMsg> for Manager {
 
             DoAction { from_client_addr, txn_id, action } => {
                 info!("Do Action");
-
+                // todo better modularity here
                 if let Ok((assns, inserts)) = self.eval_action(action.clone()) {
                     // let txn_mgr = self.new_txn(
                     //     txn_id.clone(),
@@ -159,6 +159,7 @@ impl kameo::prelude::Message<Msg> for Manager {
                 self.add_finished_read(&txn_id, name, result, pred);
                 info!("add finished read");
                 if self.all_read_finished(&txn_id) {
+                    print!("{:?}", self.txn_mgrs[&txn_id].direct_reads);
                     let _ = self.reeval_and_request_writes(&txn_id).await;
                     // todo!() current impl isn't optimized for best concurrency
                     // if re-eval block for too long
@@ -191,6 +192,10 @@ impl kameo::prelude::Message<Msg> for Manager {
 
             Msg::TestReadDefResult { test_id, result } => {
                 let _ = self.on_test_finish(test_id, result).await;
+<<<<<<< HEAD
+=======
+
+>>>>>>> efac05ae44f3496747f58a229b879ce97cb30f0e
                 Msg::Unit
             }
 
