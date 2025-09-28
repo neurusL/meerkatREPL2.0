@@ -14,6 +14,7 @@ use super::def_actor::DefActor;
 use super::evaluator::Evaluator;
 use super::transaction::TxnId;
 use super::var_actor::VarActor;
+use super::table_actor::TableActor;
 
 pub mod action;
 pub mod assert;
@@ -29,6 +30,7 @@ pub struct Manager {
 
     pub varname_to_actors: HashMap<String, ActorRef<VarActor>>,
     pub defname_to_actors: HashMap<String, ActorRef<DefActor>>,
+    pub tablename_to_actors: HashMap<String, ActorRef<TableActor>>,
 
     /// analysis and initial evaluation of program stored at manager
     /// todo!("probably can use for later eval of program")
@@ -56,6 +58,7 @@ impl Manager {
 
             varname_to_actors: HashMap::new(),
             defname_to_actors: HashMap::new(),
+            tablename_to_actors: HashMap::new(),
 
             evaluator: Evaluator::new(HashMap::new()),
             dep_graph: HashMap::new(),
@@ -72,8 +75,8 @@ impl Display for Manager {
         write!(f, "{} and actor ref: {:?}\n", self.name, self.address)?;
         write!(
             f,
-            "varname_to_actors: {:?}\n defname_to_actors: {:?}\n",
-            self.varname_to_actors, self.defname_to_actors
+            "varname_to_actors: {:?}\n defname_to_actors: {:?}\n tablename_to_actors: {:?}\n",
+            self.varname_to_actors, self.defname_to_actors, self.tablename_to_actors
         )?;
         // write!(f, "txn_mgrs: {:?}\n", self.txn_mgrs)?;
         Ok(())

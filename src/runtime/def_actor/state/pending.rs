@@ -54,10 +54,22 @@ impl PendingChanges {
         // then for all arg in var_to_inputs[var] should see t,
         // namely change depends a change on arg, whose preds contains t
         // recorded as (arg, t)
-        // print!("{} adding change: {:#?}\n", self.expr, change);
-        for Txn { id: txn_id, assns } in change.preds.iter() {
+        for Txn { id: txn_id, assns, inserts} in change.preds.iter() {
+
             for Assn { dest, .. } in assns.iter() {
                 if let Some(args) = self.var_to_args.get(dest) {
+                    for arg in args.iter()
+                    {
+                        self.change_to_reqs
+                            .entry(change.id)
+                            .or_insert(HashSet::new())
+                            .insert((arg.clone(), txn_id.clone()));
+                    }
+                }
+            }
+
+            for insert in inserts.iter() {
+                if let Some(args) = self.var_to_args.get(&insert.table_name) {
                     for arg in args.iter()
                     {
                         self.change_to_reqs
@@ -77,6 +89,7 @@ impl PendingChanges {
                 .insert(change.id);
         }
     }
+
 
     /// todo(): try different search strategies
     /// - search for minimal batch of changes (find SCC's):

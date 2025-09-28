@@ -7,7 +7,7 @@
 // Grammar 
 grammar<'input>;
 
-use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test};
+use crate::ast::{ReplCmd, Prog, Service, Decl, Assn, Expr, UnOp, BinOp, Test, DataType, Field, Insert};
 use lalrpop_util::ParseError;
 use crate::parser::lex::Token;
 
@@ -26,12 +26,23 @@ extern {
         "var" => Token::VAR_KW,
         "pub" => Token::PUB_KW,
         "def" => Token::DEF_KW,
+        "table" => Token::TABLE_KW,
+        "insert" => Token::INSERT_KW,
+        "select" => Token::SELECT_KW,
+        "from" => Token::FROM_KW,
+        "where" => Token::WHERE_KW,
+        "into" => Token::INTO_KW,
+        "fold" => Token::FOLD_KW,
         "action" => Token::ACTION_KW,
         "fn" => Token::FN_KW,
         "then" => Token::THEN_KW,
         "if" => Token::IF_KW,
         "else" => Token::ELSE_KW,
+        "number" => Token::NUMBER_KW,
+        "string" => Token::STRING_KW,
+        "bool" => Token::BOOL_KW,
         ";" => Token::Semicolon,
+        "." => Token::Dot,
         "=" => Token::Assgn,
         "=>" => Token::Fn_Assgn,
         "+" => Token::Plus,
@@ -47,13 +58,17 @@ extern {
 
         
         
+        "strlit" => Token::StrLit(<&'input str>),
         "ident" => Token::Ident(<&'input str>),
-        "number" => Token::Number(i64),
+        "num" => Token::Number(<i32>),
         "{" => Token::LBrace,
         "}" => Token::RBrace,
+        "[" => Token::LSquare,
+        "]" => Token::RSquare,
         "(" => Token::LParen,
         ")" => Token::RParen,
         "," => Token::Comma,
+        ":" => Token::Colon,
         "true" => Token::TRUE,
         "false" => Token::FALSE,
     }
@@ -69,14 +84,27 @@ Service: Service = {
     },
 }
 
-Services: Vec<Service> = Service*;
+Services: Vec<Service> = {
+    => vec![],
+    <mut v:Services> <s:Service> => {
+        v.push(s);
+        v
+    }
+}
 
 Test: Test = {
     "@test" "(" <i:Ident> ")" "{" <cms: ReplCmds> "}" => {
         Test { name: i, commands: cms }
     },
 }
-Tests: Vec<Test> = Test*;
+
+Tests: Vec<Test> = {
+    => vec![],
+    <mut v:Tests> <t:Test> => {
+        v.push(t);
+        v
+    }
+}
 
 ReplCmd: ReplCmd = {
     "do" <e: Expr> ";" => {
@@ -87,7 +115,13 @@ ReplCmd: ReplCmd = {
     },
 }
 
-ReplCmds: Vec<ReplCmd> = ReplCmd*;
+ReplCmds: Vec<ReplCmd> = {
+    => vec![],
+    <mut v:ReplCmds> <c:ReplCmd> => {
+        v.push(c);
+        v
+    }
+}
 
 Decl: Decl = {
     "import" <i:Ident> ";" => {
@@ -102,15 +136,47 @@ Decl: Decl = {
     "def" <i:Ident> "=" <e:Expr> ";" => {
         Decl::DefDecl { name: i, val: e, is_pub: false }
     },
+    "table" <i:Ident> "{" <f: Fields> "}" ";" => {
+        Decl::TableDecl {name: i, fields: f }
+    }
 }
 
 Decls: Vec<Decl> = Decl*;
+
+Field: Field = {
+   <i:Ident> ":" <t: DataType> "," => {
+    Field {name: i, type_: t}
+   } 
+}
+
+Fields: Vec<Field> = Field*;
+
+DataType: DataType = {
+    "number" => DataType::Number,
+    "string" => DataType::String,
+    "bool" => DataType::Bool,
+}
+
+
+Insert: Insert = {
+    "insert"  <e: Expr> "into" <t: Ident> => {
+        Insert {row: e, table_name: t}
+    }
+}
+
+Inserts: Vec<Insert> = Insert*;
 
 Assn: Assn = {
     <i:Ident> "=" <e:Expr> ";" => Assn { dest: i, src: e }
 }
 
-Assns: Vec<Assn> = Assn*;
+Assns: Vec<Assn> = {
+    => vec![],
+    <mut v:Assns> <a:Assn> => {
+        v.push(a);
+        v
+    }
+}
 
 Params: Vec<String> = {
     <mut v:(<Ident> ",")*> <e:Ident?> => 
@@ -134,18 +200,30 @@ Args: Vec<Expr> = {
     }
 }
 
+
+
 SubExpr: Expr = {
     <n:Number> => Expr::Number { val: n },
     <b:Bool> => Expr::Bool { val: b },
+    <s: "strlit"> => Expr::String {val: s.to_owned()},
     <i:Ident> => Expr::Variable { ident: i },
+    "{" <args: Args> "}" => Expr::Vector {val: args},
     "(" <Expr> ")" => <>,
     
     <expr:SubExpr> "(" <args:Args> ")" => 
         Expr::FuncApply { func: Box::new(expr), args },
 
-    "action" "{" <assns: Assns> "}" => Expr::Action { assns },
     
 
+    "action" "{" <assns: Assns><inserts: Inserts> "}" => Expr::Action { assns, inserts },
+     <t:Ident> "." <c:Ident> => {
+        Expr::TableColumn {
+            table_name: t,
+            column_name: c
+        }
+    },
+    
+    
 }
 
 Expr: Expr = {
@@ -159,6 +237,9 @@ Expr: Expr = {
     "!" <e:Expr> => {
         Expr::Unop { expr: Box::new(e), op: UnOp::Not }
     },
+    <i: Ident> ":" <e: Expr> => Expr::KeyVal {key: i, value: Box::new(e)},
+    
+    
 
     #[precedence(level="2")] #[assoc(side="left")]
     <e1:Expr> "*" <e2:Expr> => {
@@ -175,6 +256,7 @@ Expr: Expr = {
             op: BinOp::Div 
         }
     },
+    
 
     #[precedence(level="3")] #[assoc(side="left")]
     <e1:Expr> "+" <e2:Expr> => {
@@ -191,6 +273,7 @@ Expr: Expr = {
             op: BinOp::Sub 
         }
     },
+   
 
     #[precedence(level="4")] #[assoc(side="left")]
     <e1:Expr> "==" <e2:Expr> => {
@@ -223,6 +306,7 @@ Expr: Expr = {
             op: BinOp::And 
         }
     },
+   
 
     #[precedence(level="6")] #[assoc(side="left")]
     <e1:Expr> "||" <e2:Expr> => {
@@ -247,6 +331,20 @@ Expr: Expr = {
     Expr::Func {
         params, body: Box::new(e)
     },
+    "select" <mut cols: (<Ident> ",")*> <c: Ident?> "from" <t: Ident> "where" <cond: Expr> => Expr::Select {
+        table_name: t,
+        column_names: {
+            let mut v = cols;
+            if let Some(col) = c { 
+                v.push(col); }
+            v
+        },
+        where_clause: Box::new(cond)
+    },
+    "fold" "(" <args: Args> ")" => 
+    Expr::Fold {
+        args
+    }
 }
 
 Bool: bool = {
@@ -255,7 +353,7 @@ Bool: bool = {
 }
 
 Number: i32 = {
-    <n: "number"> => n.into_number().unwrap() // i32::from_str(s).unwrap()
+    <n:"num"> => n
 }
 
 Ident: String = {

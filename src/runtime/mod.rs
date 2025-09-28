@@ -47,6 +47,7 @@ pub mod def_actor;
 pub mod manager;
 pub mod pubsub;
 pub mod var_actor;
+pub mod table_actor;
 
 pub type TestId = (usize, usize);
 const MPSC_CHANNEL_SIZE: usize = 100;

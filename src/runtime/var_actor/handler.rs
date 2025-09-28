@@ -165,6 +165,20 @@ impl kameo::prelude::Message<Msg> for VarActor {
                 Msg::Unit
             }
 
+            Msg::TestRequestPred { from_mgr_addr, test_id } => {
+                info!("Only for asserts: Pred Request from {:?}", from_mgr_addr);
+
+                // will immediately send back latest pred id
+                let _ = from_mgr_addr.tell(
+                    Msg::TestRequestPredGranted { 
+                        from_name: self.name.clone(),
+                        test_id,
+                        pred_id: self.latest_write_txn.clone().map(|t| t.id) 
+                }).await;
+
+                Msg::Unit
+            }
+
             #[allow(unreachable_patterns)]
             _ => panic!("VarActor should not receive message {:?}", msg),
         }

@@ -10,7 +10,7 @@ use log::info;
 
 use crate::runtime::manager::Manager;
 use crate::{
-    ast::{Expr, Prog, Service},
+    ast::{Expr, Prog, Service, Decl},
     runtime::{def_actor::DefActor, evaluator::eval_srv, message::Msg, var_actor::VarActor},
     static_analysis::var_analysis::calc_dep_srv,
 };
@@ -27,6 +27,18 @@ impl Manager {
         self.dep_tran_vars = srv_info.dep_vars;
 
         for name in srv_info.topo_order.iter() {
+            
+            if srv_info.tables.contains(name) {
+                if let Some(Decl::TableDecl { name, fields}) = srv.decls.iter().find( |decl| {
+                    matches!(decl, Decl::TableDecl { name: n , .. } if n == name)
+                }) {
+                    info!("Allocating table actor");
+                    // println!("Fields: {:?}", fields);
+                    self.alloc_table_actor(name, Expr::Table {schema: fields.to_vec(), records: vec![] }).await;
+                }
+                
+            }
+            else if srv_info.vars.contains(name) {
             let val = self
                 .evaluator
                 .reactive_name_to_vals
@@ -35,9 +47,8 @@ impl Manager {
                     "Service alloc: var/def is not initialized: {}",
                     name
                 ));
-
-            if srv_info.vars.contains(name) {
                 self.alloc_var_actor(name, val.clone()).await;
+                info!("Allocating var actor");
             } else if srv_info.defs.contains(name) {
                 let def_expr = self.evaluator.def_name_to_exprs.get(name).expect(&format!(
                     "Service alloc: def expr is not initialized: {}",

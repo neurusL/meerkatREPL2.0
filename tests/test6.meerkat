@@ -9,5 +9,11 @@ service test6 {
     def a = !z; 
     def b = if a then x + y else x - y;
 
+    table first {id: number, name: string, };
+    var c = hello;
+
+}
+
+@test(test6) {
 
 }

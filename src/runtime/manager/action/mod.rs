@@ -31,6 +31,7 @@ pub struct TxnManager {
     pub preds: HashSet<Txn>,
 }
 
+/// states of transitive read (we need request lock for these names)
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum TransReadState {
     Requested,              // default
@@ -38,9 +39,16 @@ pub enum TransReadState {
     Aborted,                // lock aborted
 }
 
+<<<<<<< HEAD
+/// states of direct read (we need actual value for these names)
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum DirectReadState {
+    RequestedAndDepend(HashSet<String>), // requested read to name, and the set of vars it transitively depend on
+=======
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum DirectReadState {
     RequestedAndDepend(HashSet<String>), // requested read to name, depend on
+>>>>>>> efac05ae44f3496747f58a229b879ce97cb30f0e
     Read(Expr),                          // read result received
 }
 

@@ -28,7 +28,11 @@ impl kameo::prelude::Message<Msg> for DefActor {
                 }
             }
 
-            Msg::SubscribeGranted { name, value, preds } => {
+            Msg::SubscribeGranted {
+                name,
+                value,
+                preds,
+            } => {
                 // notice this is equivalent to a change message for def actor
                 self.state.receive_change(name, value, preds);
                 Msg::Unit
@@ -68,6 +72,8 @@ impl kameo::prelude::Message<Msg> for DefActor {
                 txn_id,
                 pred,
             } => {
+                // def actor will send back result only if all pred has been applied
+
                 // assert!(self.lock_state.has_granted(&txn));
                 // // remove read lock immediately
                 // self.lock_state.remove_granted_if_read(&txn);
@@ -155,8 +161,10 @@ impl DefActor {
 
         // if we search for new batch of changes
         let changes = self.state.search_batch();
+        info!("{:?} Search batch found: {:?}", self.name, changes);
         if changes.len() > 0 {
             self.value = self.state.apply_batch(&changes);
+            info!("{:?} Successfully apply batch function, got new value: {}", self.name, self.value);
             let preds = self.state.get_preds_of_changes(&changes);
 
             let msg = Msg::PropChange {
@@ -185,20 +193,6 @@ impl DefActor {
         for txn in processed {
             self.read_requests.remove(&txn); // removed processed read request
         }
-
-        // if let Some((test_id, manager)) = &self.is_assert_actor_of {
-        //     info!("{} has value {}", self.name, self.value);
-        //     if let Expr::Bool { val: true } = self.value {
-        //         info!("Def {} says Assert Succeeded: {}", self.state.expr, test_id);
-        //         manager
-        //             .tell(CmdMsg::AssertSucceeded { test_id: *test_id })
-        //             .await?;
-
-        //         // todo!("this is a hack, we should use a better way to get the actor ref
-        //         // and kill/stop_gracefully the actor")
-        //         self.is_assert_actor_of = None;
-        //     }
-        // }
 
         // if we have test read request and applied its preds
         if let Some((test_id, (from_mgr_addr, preds))) = &self.test_read_request {

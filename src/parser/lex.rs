@@ -78,8 +78,10 @@ impl<'a> fmt::Display for Token<'a> {
 #[derive(Clone, Logos, Debug, PartialEq, AsRefStr, EnumAsInner)]
 #[logos(subpattern identifier = r"[A-Za-z_][A-Za-z0-9_]*")]
 pub enum Token<'a> {
-    #[regex(r"(?&identifier)")]
-    Ident(&'a str),
+  #[regex(r#""[^"]*""#, |lex| lex.slice().trim_matches('"'))] // regex for string within ""
+  StrLit(&'a str),
+  #[regex(r"(?&identifier)")]
+  Ident(&'a str),
 
     #[regex(r"0|[1-9][0-9]*", from_num)]
     Number(i32),
@@ -114,55 +116,84 @@ pub enum Token<'a> {
     OR_OR,
     #[token("!")]
     NOT_NOT,
+  
+  //Punctuation
+  #[token("(")]
+  LParen,
+  #[token(")")]
+  RParen,
+  #[token("{")]
+  LBrace,
+  #[token("}")]
+  RBrace,
+  #[token("[")]
+  LSquare,
+  #[token("]")]
+  RSquare,
+  #[token(";")]
+  Semicolon,
+  #[token(",")]
+  Comma,
+  #[token(":")]
+  Colon,
+  #[token(".")]
+  Dot,
 
-    //Punctuation
-    #[token("(")]
-    LParen,
-    #[token(")")]
-    RParen,
-    #[token("{")]
-    LBrace,
-    #[token("}")]
-    RBrace,
-    #[token(";")]
-    Semicolon,
-    #[token(",")]
-    Comma,
-
-    // Reserved Keywords
-    #[token("service")]
-    SERVICE,
-    #[token("@test")]
-    TEST_KW,
-    #[token("do")]
-    DO_KW,
-    #[token("assert")]
-    ASSERT_KW,
-    #[token("import")]
-    IMPORT_KW,
-    #[token("var")]
-    VAR_KW,
-    #[token("pub")]
-    PUB_KW,
-    #[token("def")]
-    DEF_KW,
-    #[token("action")]
-    ACTION_KW,
-    #[token("fn")]
-    FN_KW,
-    #[token("then")]
-    THEN_KW,
-    #[token("if")]
-    IF_KW,
-    #[token("else")]
-    ELSE_KW,
+  // Reserved Keywords
+  #[token("service")]
+  SERVICE,
+  #[token("@test")]
+  TEST_KW,
+  #[token("do")]
+  DO_KW,
+  #[token("assert")]
+  ASSERT_KW,
+  #[token("import")]
+  IMPORT_KW,
+  #[token("var")]
+  VAR_KW,
+  #[token("pub")]
+  PUB_KW,
+  #[token("def")]
+  DEF_KW,
+  #[token("table")]
+  TABLE_KW,
+  #[token("insert")]
+  INSERT_KW,
+  #[token("select")]
+  SELECT_KW,
+  #[token("from")]
+  FROM_KW,
+  #[token("where")]
+  WHERE_KW,
+  #[token("into")]
+  INTO_KW,
+  #[token("fold")]
+  FOLD_KW,
+  #[token("action")]
+  ACTION_KW,
+  #[token("fn")]
+  FN_KW,
+  #[token("then")]
+  THEN_KW,
+  #[token("if")]
+  IF_KW,
+  #[token("else")]
+  ELSE_KW,
+  #[token("number")]
+  NUMBER_KW,
+  #[token("string")]
+  STRING_KW,
+  #[token("bool")]
+  BOOL_KW,
+  
 
     #[regex(r"\s*", logos::skip)]
     #[regex(r#"(//)[^\n]*"#, logos::skip)] // Regex for a single line comment
     // Yes there is regex for this no I could not get it to work
     #[token("/*", skip_multi_line_comments)] // Match start of multiline
     Comment,
-
+    
     #[error]
     #[regex(r#"[^\x00-\x7F]"#)] // Error on non ascii characters
     Error,

@@ -12,18 +12,22 @@ mod utils;
 
 use std::{collections::HashMap, fmt::Display};
 
-use crate::ast::Prog;
+use crate::ast::{Prog, DataType, Field};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Type {
     Int,
     Bool,
+    String,
+    Vector(Vec<Type>),
     Unit,
     Action,
 
     Fun(Vec<Type>, Box<Type>), // for instantiated type
 
     TypVar(String),
+    Table(Vec<Field>),
+    Row,
 }
 
 /// Type Scheme represents polymorphic types,
@@ -44,6 +48,8 @@ impl Display for Type {
         match self {
             Type::Int => write!(f, "int"),
             Type::Bool => write!(f, "bool"),
+            Type::String => write!(f, "string"),
+            Type::Vector( .. ) => write!(f, "vector"),
             Type::Unit => write!(f, "unit"),
             Type::Action => write!(f, "action"),
             Type::Fun(args, ret) => {
@@ -59,6 +65,8 @@ impl Display for Type {
                 }
             }
             Type::TypVar(name) => write!(f, "{}", name),
+            Type::Table( schema) => write!(f, "table {:?}", schema),
+            Type::Row => write!(f, "row")
         }
     }
 }
@@ -72,6 +80,7 @@ pub struct TypecheckEnv {
     pub typevar_id: u64,
     // Type::var to type (canonical form)
     pub acc_subst: HashMap<String, Type>,
+    
 }
 
 impl Display for TypecheckEnv {

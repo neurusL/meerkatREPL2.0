@@ -15,13 +15,23 @@ impl Expr {
         var_binded: &HashSet<String>, // should be initialized by all reactive name declared in the service
     ) -> HashSet<String> {
         match self {
-            Expr::Number { .. } | Expr::Bool { .. } => HashSet::new(),
+            Expr::Number { .. } | Expr::Bool { .. } | Expr::String { .. } | Expr::Table { .. }=> HashSet::new(),
             Expr::Variable { ident } => {
                 if var_binded.contains(ident) {
                     HashSet::new()
                 } else {
                     HashSet::from([ident.clone()])
                 }
+            }
+            Expr::KeyVal { value, .. } => {
+                value.free_var(reactive_names, var_binded)
+            }
+            Expr::Vector { val } => {
+                let mut free_vars = HashSet::new();
+                for item in val {
+                    free_vars.extend(item.free_var(reactive_names, var_binded));
+                }
+                free_vars
             }
             Expr::Unop { op, expr } => expr.free_var(reactive_names, var_binded),
             Expr::Binop { op, expr1, expr2 } => {
@@ -56,7 +66,7 @@ impl Expr {
             2. def f = fn y, z => action { x = y + z } to correctly evaluate say,
                f(1,2) to action { x = 3 }.
             */
-            Expr::Action { assns } => {
+            Expr::Action { assns, .. } => {
                 let mut free_vars = HashSet::new();
                 for assn in assns {
                     // dest should never be free, we do not allow such pattern
@@ -67,6 +77,22 @@ impl Expr {
 
                 // we exclude reactive names from free_vars in action
                 free_vars.difference(reactive_names).cloned().collect()
+            }
+            Expr::Select { table_name, where_clause, .. } => {
+                let mut free_vars = where_clause.free_var(reactive_names, var_binded);
+                free_vars.insert(table_name.clone());
+                free_vars
+            }
+            Expr::TableColumn { table_name, .. } => {
+                HashSet::from([table_name.to_string()])
+            }
+            Expr::Fold { args } => { 
+                let mut free_vars = HashSet::new();
+                free_vars.extend(args[0].free_var(reactive_names, var_binded));
+                free_vars.extend(args[1].free_var(reactive_names, var_binded));
+                free_vars.extend(args[2].free_var(reactive_names, var_binded));
+                
+                free_vars
             }
         }
     }

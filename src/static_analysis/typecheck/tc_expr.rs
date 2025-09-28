@@ -9,6 +9,15 @@ impl TypecheckEnv {
         match expr {
             Expr::Number { val: _ } => Int,
             Expr::Bool { val: _ } => Bool,
+            Expr::String {val: _} => String,
+            Expr::KeyVal { key, value } => self.infer_expr(&value),
+            Expr::Vector { val } => {
+                let mut type_vec = Vec::new();
+                for el in val {
+                    type_vec.push(self.infer_expr(el));
+                }
+                Type::Vector(type_vec)
+            }
             Expr::Variable { ident } => self
                 .var_context
                 .get(ident)
@@ -169,12 +178,87 @@ impl TypecheckEnv {
             }
 
             // more todo on Action type
-            Expr::Action { assns } => {
+            Expr::Action { assns , inserts} => {
                 assns.iter().for_each(|assn| self.typecheck_assn(assn));
+                inserts.iter().for_each(|insert| self.typecheck_insert(insert));
+
                 Action
             }
+            Expr::Select { table_name, column_names, where_clause } => {
+                let schema = {
+                    let table_type = self.var_context.get(table_name);    // check if table exists and extract schema
+                    match table_type {
+                        Some(Type::Table(fields)) => fields.clone(),
+                        _ => panic!("Table {} for selection not found or not a table type", table_name),
+                    }
+                };
+                let field_names: Vec<_> = schema.iter().map(|field| field.name.clone()).collect();   // get column names and check if columns to be selected exist
+                for column_name in column_names {
+                    if !field_names.contains(column_name) {
+                        panic!("{} field not found in table {}", column_name, table_name);
+                    }
+                }
+
+                let cond_type = self.infer_expr(where_clause);
+                
+                if cond_type != Type::Bool {
+                    panic!("Select where clause must be boolean, got {}", cond_type);
+                }
+                Type::Table(schema)    
+            }
+            Expr::TableColumn { table_name, column_name } => {
+                // Look up table type in context
+                let found_table = self.var_context.get(table_name);
+                match found_table {
+                    Some(Type::Table(fields)) => {
+                        let found_column = fields.iter().find(|field| &field.name == column_name);
+                        match found_column {
+                            Some(field) => match field.type_ {
+                                DataType::Bool => Type::Bool,
+                                DataType::Number => Type::Int,
+                                DataType::String => Type::String,
+                            },
+                            None => panic!("Column {} not found in table {}", column_name, table_name),
+                        }
+                    }
+                    _ => panic!("Table {} for TableColumn not found or not a table type", table_name),
+                }
+            }
+            Expr::Table {schema, records } => Table(schema.to_vec()),
+            Expr::Fold { args } => {
+                if args.len()!=3 {
+                    panic!("Fold expects 3 arguments, got {} arguments", args.len());
+                }
+                
+                let column_type = self.infer_expr(&args[0]);
+                let func_type = self.infer_expr(&args[1]);
+                let accum_type = self.infer_expr(&args[2]);
+
+                if let Expr::TableColumn { .. } = &args[0] {     // Maybe later we can have a tablecolumn type for typechecking here
+                    self.infer_expr(&args[0]);
+                } else {         
+                    panic!("First argument should be iterator (column)");
+                }
+
+                match func_type {
+                    Type::Fun(params, ret_type) => {
+                        if !self.unify(&accum_type, &*ret_type) {
+                            panic!("Accumulator type should be the same as function return type, expected {}, got {}", &*ret_type, &accum_type);
+                        }
+                        for param in params {
+                            if !self.unify(&param, &column_type) {
+                                panic!("Column type should be the same as function argument type, expected {}, got {}", &param, &column_type);
+                            }
+                        }
+                    },
+                    _ => panic!("Second argument must be function type")
+                }
+                self.find(&accum_type)
+                
+            },
+            
         }
-    }
+}
 }
 
 // TODO List

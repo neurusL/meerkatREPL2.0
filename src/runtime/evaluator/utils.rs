@@ -11,15 +11,42 @@ impl Evaluator {
         var
     }
 
+    pub fn fold(&mut self, vals: &Vec<Expr>, identity: Expr, operation: &Expr) -> Expr {
+        let mut result = identity;
+        for val in vals {
+            let mut func_apply = Expr::FuncApply { func: Box::new(operation.clone()), args: vec![result, val.clone()] };
+            self.eval_expr(&mut func_apply);
+            result = func_apply;
+        }
+        result
+    }
+
+    pub fn search_table(&mut self, name: &String) -> Result<Expr, String> {
+        if let Some(table) = self.reactive_name_to_vals.get(name).cloned() {
+            Ok(table)
+        }else {
+            return Err(format!("Table {} not found", name));
+        }
+    }
+
     /// subst all variables in expr if exists in var_to_expr
     pub fn subst(&mut self, expr: &mut Expr, var_to_expr: &HashMap<String, Expr>) {
         match expr {
             Expr::Number { val } => {}
             Expr::Bool { val } => {}
+            Expr::String {val} => {}
+            Expr::Vector { val } => {
+                for expr in val {
+                    self.subst(expr, var_to_expr);
+                }
+            }
             Expr::Variable { ident } => {
                 if let Some(e) = var_to_expr.get(ident) {
                     *expr = e.clone();
                 }
+            }
+            Expr::KeyVal { key, value } => {
+                self.subst(value, var_to_expr);
             }
             Expr::Unop { op, expr } => {
                 self.subst(expr, var_to_expr);
@@ -69,10 +96,27 @@ impl Evaluator {
                     self.subst(arg, var_to_expr);
                 }
             }
-            Expr::Action { assns } => {
+            Expr::Action { assns, inserts } => {
                 for assn in assns {
                     // dest should not be substituted, only src should
                     self.subst(&mut assn.src, var_to_expr);
+                }
+                for insert in inserts {
+                    self.subst(&mut insert.row, var_to_expr);
+                }
+            }
+            Expr::Select { where_clause, .. } => {
+                self.subst(where_clause, var_to_expr);
+            },
+            Expr::TableColumn { .. } => {},        // since table and column names are typically string literals
+            Expr::Table { records, .. } => {
+                for record in records {
+                    self.subst(record, var_to_expr);
+                }
+            },
+            Expr::Fold { args } => {
+                for arg in args {
+                    self.subst(arg, var_to_expr);
                 }
             }
         }

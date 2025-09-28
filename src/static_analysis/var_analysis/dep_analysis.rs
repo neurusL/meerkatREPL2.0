@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    vec,
-};
+use std::{ collections::{ HashMap, HashSet }, vec };
 
 use crate::ast;
 
@@ -12,6 +9,7 @@ impl DependAnalysis {
         let mut vars: HashSet<String> = HashSet::new();
         let mut defs: HashSet<String> = HashSet::new();
         let mut reactive_names = HashSet::new();
+        let mut tables: HashSet<String> = HashSet::new();
 
         let mut dep_graph: HashMap<String, HashSet<String>> = HashMap::new();
 
@@ -30,6 +28,10 @@ impl DependAnalysis {
                     let deps = val.free_var(&reactive_names, &HashSet::new());
                     dep_graph.insert(name.clone(), deps);
                 }
+                ast::Decl::TableDecl { name, .. } => {
+                    tables.insert(name.clone());
+                    dep_graph.insert(name.clone(), HashSet::new());
+                }
                 _ => {}
             }
         }
@@ -37,6 +39,7 @@ impl DependAnalysis {
         DependAnalysis {
             vars,
             defs,
+            tables,
             dep_graph,
             topo_order: Vec::new(),
             dep_transtive: HashMap::new(),
@@ -48,6 +51,7 @@ impl DependAnalysis {
     /// the transitive dependencies for a given variable or definition.
     /// # Arguments
     /// * `vars` - set of variable names (no dependencies).
+    /// * `tables` - set of table names (no dependencies).
     /// * `visited` - set of visited nodes in dfs.
     /// * `calced` - map of def to their computed dependencies, only appeared
     ///    when finished computing for a def.
@@ -56,10 +60,11 @@ impl DependAnalysis {
     fn dfs_helper(
         graph: &HashMap<String, HashSet<String>>,
         vars: &HashSet<String>,
+        tables: &HashSet<String>,
         visited: &mut HashSet<String>,
         finished: &mut Vec<String>,
         calced: &mut HashMap<String, HashSet<String>>,
-        name: &String,
+        name: &String
     ) {
         if calced.contains_key(name) {
             return;
@@ -71,7 +76,7 @@ impl DependAnalysis {
 
         visited.insert(name.clone());
         // if visit var, notice var is transitively depend on itself
-        if vars.contains(name) {
+        if vars.contains(name) || tables.contains(name) {
             calced.insert(name.clone(), HashSet::from([name.clone()]));
             finished.push(name.clone());
             return;
@@ -80,20 +85,16 @@ impl DependAnalysis {
         // else visit def
         let mut dep = HashSet::new();
 
-        for dep_name in graph
-            .get(name)
-            .expect(&format!("No such name in dep graph: {}", name))
-        {
-            Self::dfs_helper(graph, vars, visited, finished, calced, dep_name);
+        for dep_name in graph.get(name).expect(&format!("No such name in dep graph: {}", name)) {
+            Self::dfs_helper(graph, vars, tables, visited, finished, calced, dep_name);
             dep.extend(
                 calced
                     .get(dep_name)
-                    .expect(&format!(
-                        "Not finished transitive dependency 
-                        calculation of: {}",
-                        dep_name
-                    ))
-                    .clone(),
+                    .expect(
+                        &format!("Not finished transitive dependency 
+                        calculation of: {}", dep_name)
+                    )
+                    .clone()
             );
             dep.insert(dep_name.clone());
         }
@@ -105,26 +106,28 @@ impl DependAnalysis {
     pub fn calc_dep_vars(&mut self) {
         let mut visited = HashSet::new();
 
-        for name in self.vars.iter().chain(self.defs.iter()) {
+        for name in self.vars.iter().chain(self.defs.iter().chain(self.tables.iter())) {
             Self::dfs_helper(
                 &self.dep_graph,
                 &self.vars,
+                &self.tables,
                 &mut visited,
                 &mut self.topo_order,
                 &mut self.dep_transtive,
-                name,
+                name
             );
         }
 
-        for name in self.vars.iter().chain(self.defs.iter()) {
+        let vars_and_tables: HashSet<_> = self.vars.union(&self.tables).cloned().collect();
+        for name in self.vars.iter().chain(self.defs.iter().chain(self.tables.iter())) {
             self.dep_vars.insert(
                 name.clone(),
                 self.dep_transtive
                     .get(name)
                     .expect(&format!("cannot find def {} in trans dep", name))
-                    .intersection(&self.vars)
+                    .intersection(&vars_and_tables)
                     .cloned()
-                    .collect(),
+                    .collect()
             );
         }
     }

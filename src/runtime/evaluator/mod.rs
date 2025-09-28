@@ -1,4 +1,6 @@
-use crate::ast::{Assn, Decl, Expr, Prog, ReplCmd, Service, Test};
+use crate::ast::{
+    Assn, DataType, Decl, Entry, Expr, Field, Insert, Prog, Record, ReplCmd, Service, Test,
+};
 use std::{
     collections::{HashMap, HashSet},
     env,
@@ -15,7 +17,7 @@ mod utils;
 pub enum Val {
     Number(i32),
     Bool(bool),
-    Action(Vec<Assn>),
+    Action(Vec<Assn>, Vec<Insert>),
     Func(Vec<String>, Box<Expr>),
 }
 
@@ -31,6 +33,7 @@ pub struct Evaluator {
     /// lambda expr var name -> val
     /// exprvar_name_to_val: HashMap<String, Expr>,
     pub def_name_to_exprs: HashMap<String, Expr>,
+
 }
 
 impl Evaluator {
@@ -45,7 +48,10 @@ impl Evaluator {
 }
 
 /// used for def actor eval their expression
-pub fn eval_def_expr(def_expr: &Expr, env: &HashMap<String, Expr>) -> Expr {
+pub fn eval_def_expr(
+    def_expr: &Expr,
+    env: &HashMap<String, Expr>,
+) -> Expr {
     let mut eval = Evaluator::new(env.clone());
     let mut evaled_expr = def_expr.clone();
     eval.eval_expr(&mut evaled_expr);
@@ -79,7 +85,7 @@ impl From<Val> for Expr {
         match val {
             Val::Number(i) => Expr::Number { val: i },
             Val::Bool(b) => Expr::Bool { val: b },
-            Val::Action(assns) => Expr::Action { assns },
+            Val::Action(assns, inserts) => Expr::Action { assns, inserts },
             Val::Func(params, body) => Expr::Func { params, body },
         }
     }

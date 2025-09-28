@@ -26,7 +26,7 @@ use std::{
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    ast::{Assn, Expr},
+    ast::{Assn, Expr, Insert},
     runtime::{
         def_actor::state,
         evaluator::eval_assns,
@@ -47,13 +47,14 @@ impl Manager {
         &mut self,
         txn_id: TxnId,
         assns: Vec<Assn>,
+        inserts: Vec<Insert>,
         from_client: Sender<CmdMsg>,
     ) {
         // static info of txn, the read and write set, which may overlap
         let direct_read_set = calc_read_set(&assns, &self.evaluator.reactive_names);
         let write_set = calc_write_set(&assns);
 
-        let txn = Txn::new(txn_id.clone(), assns);
+        let txn = Txn::new(txn_id.clone(), assns, inserts);
 
         // set up txn manager
         let txn_mgr = TxnManager::new(
@@ -125,12 +126,16 @@ impl Manager {
 
             if let DirectReadState::RequestedAndDepend(name_trans_read) = state {
                 for name in name_trans_read.iter() {
+                    // together with granted lock, the var also returns a pred_id 
+                    // as a predecessor id needed to be applied
                     if let TransReadState::Granted(pred_id) = txn_mgr
                         .trans_reads
                         .get(name)
                         .expect(&format!("trans read state not found"))
                     {
                         pred_id.as_ref().map(|id| pred.push(id.clone()));
+                    } else {
+                        panic!("trans read state should be Granted");
                     }
                 }
             } else {
@@ -248,11 +253,17 @@ impl Manager {
         Ok(expr == Expr::Bool { val: true })
     }
 
-    pub fn eval_action(&mut self, mut expr: Expr) -> Result<Vec<Assn>, String> {
+    pub fn eval_insert(&mut self, insert: &Insert) -> Result<bool,String> { 
+        
+        self.evaluator.eval_insert(&mut insert.clone());
+        Ok(true)
+    }
+
+    pub fn eval_action(&mut self, mut expr: Expr) -> Result<(Vec<Assn>, Vec<Insert>), String> {
         self.evaluator.eval_expr(&mut expr)?;
 
-        if let Expr::Action { assns } = expr {
-            Ok(assns.clone())
+        if let Expr::Action { assns, inserts } = expr {
+            Ok((assns.clone(), inserts.clone()))
         } else {
             Err(format!("do requires action expression"))
         }

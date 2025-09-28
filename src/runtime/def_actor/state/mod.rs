@@ -12,6 +12,7 @@ use crate::{
 };
 
 use history::AppliedChanges;
+use log::info;
 use pending::PendingChanges;
 
 pub mod history;
@@ -55,8 +56,13 @@ impl ChangeState {
         }
     }
 
-    pub fn receive_change(&mut self, from_name: String, new_val: Expr, preds: HashSet<Txn>) {
-        // println!("received change: ({}, {:?}, {:#?})", from_name, new_val, preds);
+    pub fn receive_change(
+        &mut self,
+        from_name: String,
+        new_val: Expr,
+        preds: HashSet<Txn>,
+    ) {
+        // info!("received change: ({}, {:?}, {:#?})", from_name, new_val, preds);
         let change = PropChange {
             id: self.id_cnt,
             from_name,
@@ -65,6 +71,7 @@ impl ChangeState {
         };
 
         self.pending_changes.add_change(&change);
+        //info!("Adding change {:?}", &change);
 
         self.id_to_change.insert(self.id_cnt, change);
         self.id_cnt += 1;
@@ -75,15 +82,26 @@ impl ChangeState {
     }
 
     pub fn apply_batch(&mut self, changes: &HashSet<ChangeId>) -> Expr {
-        // println!("{} applying changes: {:#?}", self.expr, changes);
         self.pending_changes.remove_batch_from_pending(changes);
 
         for change_id in changes.iter() {
             let change = &self.id_to_change[change_id];
-            self.arg_to_values
+            info!("change being applied: {}", &change.from_name);
+
+            if let Some(Expr::Table { records, .. }) = self.arg_to_values.get_mut(&change.from_name) {
+                if let Expr::Vector { .. } = &change.new_val {
+                    records.push(change.new_val.clone());                // update table val if record is inserted
+                } else {
+                    self.arg_to_values.insert(change.from_name.clone(), change.new_val.clone()); 
+                }
+            } else {
+                self.arg_to_values
                 .insert(change.from_name.clone(), change.new_val.clone());
+            }
+
             self.applied_changes.add_change(change);
         }
+        info!("{:?}'s env before re-evaluating: {:#?}", self.expr, self.arg_to_values);
 
         eval_def_expr(&self.expr, &self.arg_to_values)
     }
