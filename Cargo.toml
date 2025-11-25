@@ -16,8 +16,8 @@ serde_json = "1.0.61"
 strum_macros = "0.25.3"
 lalrpop-util = { version = "0.20.2", features = ["lexer", "unicode"] }
 
-# distributed system related 
-kameo = "0.16"
+# distributed system related
+kameo = "0.18"
 tokio = { version = "1", features = ["full"] }
 json = "0.12.4"
 # tokio-util = "0.7.11"

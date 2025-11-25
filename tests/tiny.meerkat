@@ -1,0 +1,93 @@
+service hi {
+    var x = 2;
+}
+
+service  {
+    import hi;
+    def z = hi.x;
+
+    var a;
+}
+
+service  {
+    import hi;
+    def z = hi.x;
+
+    var a;
+}
+
+service  {
+    import hi;
+    def z = hi.x;
+
+    var a;
+}
+
+service  {
+    import hi;
+    def z = hi.x;
+
+    var a;
+}
+
+service two {
+    import hi;
+    def z = hi.x;
+
+    var a;
+}
+
+@test(hi) {
+    assert(x == 2);
+    do action {
+        hi.x = hi.x + 1;
+        // wait for propagation to happen
+        two.a = two.z;
+    };
+    assert((x == 2));
+    assert(x + y == x + x * 20);
+    assert(x == 3);
+}
+
+
+
+
+var a
+var b
+def c = b
+
+def x = a + c
+// ancestor variables: {a, b}
+
+
+service A: var a
+service B: var b
+service C: def c = b
+
+service X: def x = a + c
+// ancestor variables: {A.a, B.b}
+// roots: { A.a, C.c, B.b }
+
+
+
+
+service B: var b
+service C: var a
+service C: def c = a + b
+// "local" roots: { C.a, B.b }
+// "network" roots: { B.b }
+
+action { B.b = C.a }
+// C.c propagating basis stamp: { B.b: 1, C.a: 4, C.c: 4 }
+
+
+service X: def x = c
+// ancestor variables: {C.a, B.b}
+// roots: { C.c, B.b }
+
+x + y
+
+
+// { x, y = x, z = x }
+
+local roots: { node | node is a local export or a cross-network dependency }

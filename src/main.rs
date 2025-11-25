@@ -1,15 +1,12 @@
 use clap::Parser;
 use log::LevelFilter;
 use std::error::Error;
-use std::{env, fs};
-
-use parser::meerkat;
 
 use tokio;
 
 pub mod ast;
+pub mod new_runtime;
 pub mod parser;
-pub mod runtime;
 pub mod static_analysis;
 
 /// example usage
@@ -45,7 +42,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
         .map_err(|e| format!("Parse error: {e}"))?;
 
     let _ = static_analysis::typecheck::typecheck_prog(&prog);
-    let _ = runtime::run(&prog).await;
+    let _ = new_runtime::run(&prog).await;
 
     // runtime.repl
     Ok(())
