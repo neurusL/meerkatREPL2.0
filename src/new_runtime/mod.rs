@@ -9,7 +9,7 @@ use tokio::sync::oneshot;
 use crate::{
     ast::{Decl, Expr, Prog, ReplCmd},
     new_runtime::{
-        evaluator::Evaluator,
+        evaluator::{Evaluator},
         message::{
             BasisStamp, LockKind, MonotonicTimestampGenerator, Msg, ReactiveConfiguration, TxId,
         },
@@ -300,6 +300,7 @@ enum Doer {
         expr: Expr,
         partial_values: HashMap<ReactiveName, Expr>,
         needed: HashSet<ReactiveName>,
+        basis: BasisStamp,
         finished: oneshot::Sender<BasisStamp>,
     },
     PrepareRequested {
@@ -349,6 +350,110 @@ impl Actor for Doer {
     }
 }
 
+impl Doer {
+    async fn execute_expr(&mut self, service: ActorRef<ServiceActor>, txid: TxId, mut expr: Expr, basis:BasisStamp, partial_values: HashMap<ReactiveName, Expr>, finished: oneshot::Sender<BasisStamp>) {
+        let mut needed = HashSet::new();
+        let mut e = Evaluator::new();
+
+        let is_done = match expr {
+            Expr::Action { .. } => true,
+            _ => do_partial_eval(&service, &mut expr, &partial_values, &mut needed, &mut e),
+        };
+
+        if !is_done {
+            // request variables that are read and not yet available
+            request_vars(&service, &txid, &basis, &needed).await;
+
+            *self = Doer::AwaitingValues {
+                service,
+                txid,
+                expr,
+                partial_values,
+                needed,
+                basis,
+                finished,
+            };
+        } else {
+            // we have a value; make sure it is an Action
+            match expr {
+                Expr::Action { mut assns } => {
+                    // partially evaluate the code inside the action (RHS of assignments)
+                    let mut done = true;
+                    for assn in &mut assns {
+                        done = done && do_partial_eval(&service, &mut assn.src, &partial_values, &mut needed, &mut e);
+                    }
+                    
+                    if !done {
+                        // request variables that are read and not yet available
+                        request_vars(&service, &txid, &basis, &needed).await;
+
+                        *self = Doer::AwaitingValues {
+                            service,
+                            txid,
+                            expr: Expr::Action { assns },
+                            partial_values,
+                            needed,
+                            basis,
+                            finished,
+                        };
+                    } else {
+                        // All the right hand sides are values!  Commit the transaction.
+                        for assn in assns {
+                            let name: ReactiveName = ReactiveName(assn.dest.clone());
+
+                            service
+                                .tell(Msg::Write {
+                                    txid: txid.clone(),
+                                    reactive: name,
+                                    value: assn.src,
+                                })
+                                .await
+                                .unwrap();
+                        }
+
+                        service
+                            .tell(Msg::PrepareCommit { txid: txid.clone() })
+                            .await
+                            .unwrap();
+
+                        *self = Doer::PrepareRequested {
+                            service,
+                            txid,
+                            finished,
+                        };
+                    }
+                }
+                _ => panic!("Cannot evaluate a non-action {expr:?}"),
+            }
+        }
+
+    }
+}
+
+fn do_partial_eval(service: &ActorRef<ServiceActor>, expr: &mut Expr, partial_values: &HashMap<ReactiveName, Expr>, needed: &mut HashSet<ReactiveName>, e: &mut Evaluator) -> bool {
+    e.partial_eval(expr, service, &mut |read| {
+        assert_eq!(read.service.id(), service.id());
+        let opt_value = partial_values.get(&read.name);
+        if opt_value == None {
+            needed.insert(read.name);
+        }
+        opt_value.cloned()
+    }).unwrap()
+}
+
+async fn request_vars(service: &ActorRef<ServiceActor>, txid: &TxId, basis: &BasisStamp, needed: &HashSet<ReactiveName>) {
+    for reactive in needed {
+        service
+            .tell(Msg::ReadValue {
+                txid: txid.clone(),
+                reactive: reactive.clone(),
+                basis: basis.clone(),
+            })
+            .await
+            .unwrap();
+    }
+}
+
 impl Message<Msg> for Doer {
     type Reply = ();
 
@@ -369,32 +474,8 @@ impl Message<Msg> for Doer {
                     assert_eq!(txid, granted_txid);
                     assert_eq!(service, sender_service);
 
-                    let mut reads = HashSet::new();
-                    let mut e = Evaluator::new();
-                    e.visit_reads(&expr, &service, &mut |read| {
-                        assert_eq!(read.service.id(), service.id());
-                        reads.insert(read.name);
-                    });
-
-                    for reactive in &reads {
-                        service
-                            .tell(Msg::ReadValue {
-                                txid: txid.clone(),
-                                reactive: reactive.clone(),
-                                basis: basis.clone(),
-                            })
-                            .await
-                            .unwrap();
-                    }
-
-                    *self = Doer::AwaitingValues {
-                        service,
-                        txid,
-                        expr,
-                        partial_values: HashMap::new(),
-                        needed: reads,
-                        finished,
-                    };
+                    let partial_values = HashMap::new();
+                    self.execute_expr(service, txid, expr, basis, partial_values, finished).await;
                 }
                 _ => {
                     panic!("Unexpected message in current state: {msg:?}\nCurrent state: {self:?}")
@@ -406,6 +487,7 @@ impl Message<Msg> for Doer {
                 mut expr,
                 mut partial_values,
                 mut needed,
+                basis,
                 finished,
             } => match msg {
                 Msg::ReturnedValue {
@@ -422,46 +504,9 @@ impl Message<Msg> for Doer {
                     partial_values.insert(reactive, value);
 
                     if needed.is_empty() {
-                        let mut writes = HashMap::new();
-                        let mut e = Evaluator::new();
-                        e.eval_writes(
-                            &mut expr,
-                            &service,
-                            &mut |r| {
-                                if r.service == service {
-                                    partial_values.get(&r.name).cloned()
-                                } else {
-                                    None
-                                }
-                            },
-                            &mut |r, v| {
-                                assert_eq!(r.service, service);
-                                writes.insert(r.name, v);
-                            },
-                        )
-                        .unwrap();
+                        self.execute_expr(service, txid, expr, basis, partial_values, finished).await;
 
-                        for (name, value) in writes {
-                            service
-                                .tell(Msg::Write {
-                                    txid: txid.clone(),
-                                    reactive: name,
-                                    value,
-                                })
-                                .await
-                                .unwrap();
-                        }
 
-                        service
-                            .tell(Msg::PrepareCommit { txid: txid.clone() })
-                            .await
-                            .unwrap();
-
-                        *self = Doer::PrepareRequested {
-                            service,
-                            txid,
-                            finished,
-                        };
                     } else {
                         *self = Doer::AwaitingValues {
                             service,
@@ -469,6 +514,7 @@ impl Message<Msg> for Doer {
                             expr,
                             partial_values,
                             needed,
+                            basis,
                             finished,
                         };
                     }
@@ -637,6 +683,7 @@ impl Message<Msg> for Asserter {
 
                     if needed.is_empty() {
                         let mut e = Evaluator::new();
+                        let expr_string = expr.to_string();
                         e.eval_expr(&mut expr, &service, &mut |r| {
                             if r.service == service {
                                 partial_values.get(&r.name).cloned()
@@ -647,6 +694,7 @@ impl Message<Msg> for Asserter {
                         .unwrap();
 
                         assert_eq!(expr, Expr::Bool { val: true }, "assertion should succeed");
+                        println!("assertion {expr_string} succeeded");
 
                         service
                             .tell(Msg::PrepareCommit { txid: txid.clone() })

@@ -28,6 +28,29 @@ impl From<String> for EvalError {
     }
 }
 
+#[derive(Debug)]
+pub enum PartialEvalError {
+    UnknownVariable(String),    // may not need this case for PartialEvalError, but leaving it in for now
+    UnresolvedVariable(String),
+    Other(String),
+}
+
+impl Display for PartialEvalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PartialEvalError::UnknownVariable(var) => write!(f, "unknown variable: {var}"),
+            PartialEvalError::UnresolvedVariable(var) => write!(f, "unresolved variable: {var}"),
+            PartialEvalError::Other(msg) => write!(f, "other error: {msg}"),
+        }
+    }
+}
+
+impl From<String> for PartialEvalError {
+    fn from(value: String) -> Self {
+        PartialEvalError::Other(value)
+    }
+}
+
 pub struct Evaluator {
     /// Stack of local variable contexts (function parameters, let bindings, etc.)
     /// Each entry is a mapping from variable name to its value
@@ -118,22 +141,144 @@ impl Evaluator {
         }
     }
 
-    pub fn visit_writes(
+    /* Just like eval_expr but returns true or false
+     * depending on whether evaluation completed */
+    pub fn partial_eval(
         &mut self,
-        expr: &Expr,
+        expr: &mut Expr,
         service: &ActorRef<ServiceActor>,
-        f: &mut impl FnMut(ReactiveRef),
-    ) {
+        read: &mut impl FnMut(ReactiveRef) -> Option<Expr>,
+    ) -> Result<bool, EvalError> {
+        match self.partial_eval_rec(expr, service, read) {
+            Ok(_) => Ok(true),
+            Err(PartialEvalError::UnresolvedVariable(_)) => Ok(false),
+            Err(PartialEvalError::UnknownVariable(msg)) => Err(EvalError::UnknownVariable(msg)),
+            Err(PartialEvalError::Other(msg)) => Err(EvalError::Other(msg)),
+        }
+    }
+
+    pub fn partial_eval_rec(
+        &mut self,
+        expr: &mut Expr,
+        service: &ActorRef<ServiceActor>,
+        read: &mut impl FnMut(ReactiveRef) -> Option<Expr>,
+    ) -> Result<(), PartialEvalError> {
         match expr {
-            Expr::Action { assns } => {
-                for assn in assns {
-                    f(ReactiveRef {
+            Expr::Number { val: _ } => Ok(()),
+            Expr::Bool { val: _ } => Ok(()),
+            Expr::Variable { ident } => {
+                // First check local context stack
+                if let Some(local_value) = self.lookup_local(ident) {
+                    *expr = local_value.clone();
+                    Ok(())
+                } else {
+                    // Fall back to reactive read for global variables
+                    *expr = read(ReactiveRef {
                         service: service.clone(),
-                        name: ReactiveName(assn.dest.clone()),
-                    });
+                        name: ReactiveName(ident.clone()),
+                    })
+                    .ok_or_else(|| PartialEvalError::UnresolvedVariable(ident.clone()))?;
+                    Ok(())
                 }
             }
-            _ => panic!("Cannot visit writes of {expr:?}"),
+
+            Expr::Unop { op, expr: expr1 } => {
+                self.partial_eval_rec(expr1, service, read)?;
+                match expr1.as_mut() {
+                    Expr::Number { .. } | Expr::Bool { .. } => {
+                        *expr = calc_unop(*op, expr1)?;
+                        Ok(())
+                    }
+                    _ => Err(PartialEvalError::Other(format!(
+                        "unary operator {:?} cannot be applied to {}",
+                        op, **expr1
+                    ))),
+                }
+            }
+
+            Expr::Binop { op, expr1, expr2 } => {
+                self.partial_eval_rec(expr1, service, read)?;
+                self.partial_eval_rec(expr2, service, read)?;
+                use Expr::{Bool, Number};
+                match (expr1.as_mut(), expr2.as_mut()) {
+                    (Number { .. }, Number { .. }) | (Bool { .. }, Bool { .. }) => {
+                        *expr = calc_binop(*op, expr1, expr2)?;
+                        Ok(())
+                    }
+                    _ => Err(PartialEvalError::Other(format!(
+                        "binary operator {:?} cannot be applied to {} and {}",
+                        op, **expr1, **expr2
+                    ))),
+                }
+            }
+
+            Expr::If { cond, expr1, expr2 } => {
+                self.partial_eval_rec(cond, service, read)?;
+                match **cond {
+                    Expr::Bool { val } => {
+                        let new_expr = if val {
+                            mem::take(expr1)
+                        } else {
+                            mem::take(expr2)
+                        };
+                        *expr = *new_expr;
+                        self.partial_eval_rec(expr, service, read)
+                    }
+                    _ => Err(PartialEvalError::Other(format!(
+                        "if condition must be a boolean, got {}",
+                        **cond
+                    ))),
+                }
+            }
+
+            Expr::Func { params: _, body: _ } => {
+                // Functions are values and don't need evaluation until applied
+                Ok(())
+            }
+
+            Expr::FuncApply { func, args } => {
+                self.partial_eval_rec(func, service, read)?;
+
+                match func.as_mut() {
+                    Expr::Func { params, body } => {
+                        if params.len() != args.len() {
+                            Err(PartialEvalError::Other(format!(
+                                "function expects {} arguments, got {}",
+                                params.len(),
+                                args.len()
+                            )))
+                        } else {
+                            // Evaluate arguments in current context
+                            for arg in args.iter_mut() {
+                                self.partial_eval_rec(arg, service, read)?;
+                            }
+
+                            // Create new local context for function parameters
+                            let param_context = zip(params.clone(), args.iter())
+                                .map(|(param, arg)| (param, arg.clone()))
+                                .collect::<HashMap<String, Expr>>();
+
+                            // Push parameter context
+                            self.push_context(param_context);
+
+                            // Evaluate function body with parameter context
+                            *expr = body.as_ref().clone();
+                            let result = self.partial_eval_rec(expr, service, read);
+
+                            // Pop parameter context
+                            self.pop_context();
+
+                            result
+                        }
+                    }
+                    _ => Err(PartialEvalError::Other(format!("cannot apply non-function"))),
+                }
+            }
+
+            Expr::Action { assns: _ } => {
+                // Actions don't get evaluated in this context
+                Ok(())
+            }
         }
     }
 
@@ -197,9 +342,9 @@ impl Evaluator {
                 match **cond {
                     Expr::Bool { val } => {
                         let new_expr = if val {
-                            std::mem::take(expr1)
+                            mem::take(expr1)
                         } else {
-                            std::mem::take(expr2)
+                            mem::take(expr2)
                         };
                         *expr = *new_expr;
                         self.eval_expr(expr, service, read)
@@ -259,40 +404,6 @@ impl Evaluator {
                 // Actions don't get evaluated in this context
                 Ok(())
             }
-        }
-    }
-
-    pub fn eval_writes(
-        &mut self,
-        expr: &mut Expr,
-        service: &ActorRef<ServiceActor>,
-        read: &mut impl FnMut(ReactiveRef) -> Option<Expr>,
-        write: &mut impl FnMut(ReactiveRef, Expr),
-    ) -> Result<(), EvalError> {
-        match expr {
-            Expr::Action { assns } => {
-                let mut e = Evaluator::new();
-                while !assns.is_empty() {
-                    let mut assn = assns.remove(0);
-                    match e.eval_expr(&mut assn.src, &service, read) {
-                        Ok(()) => (),
-                        Err(e) => {
-                            assns.insert(0, assn);
-                            return Err(e);
-                        }
-                    }
-                    write(
-                        ReactiveRef {
-                            service: service.clone(),
-                            name: ReactiveName(assn.dest.clone()),
-                        },
-                        assn.src.clone(),
-                    );
-                }
-
-                Ok(())
-            }
-            _ => panic!("Cannot eval writes of {expr:?}"),
         }
     }
 }

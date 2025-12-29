@@ -5,7 +5,7 @@ use kameo::actor::ActorRef;
 use crate::{
     ast::Expr,
     new_runtime::{
-        evaluator::{self, EvalError, Evaluator},
+        evaluator::{EvalError, Evaluator},
         message::{BasisStamp, ReactiveConfiguration, StampedValue, Version},
         service::ServiceActor,
     },
