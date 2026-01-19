@@ -4,6 +4,8 @@ service s {
     pub def inc_x = action { x = x + 1; };
 
     pub def y = x + 1;
+
+    pub def inc_x_by = fn z => action { x = x + z; };
 }
 
 @test(s) {
@@ -13,4 +15,6 @@ service s {
     do inc_x;
     assert(x > 0);
     assert(y==3);
+    do inc_x_by(3);
+    assert(y==6);
 }

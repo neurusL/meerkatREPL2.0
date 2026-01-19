@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, iter::zip, mem};
+use std::{collections::{HashMap, HashSet}, fmt::Display, iter::zip, mem};
 
 use kameo::actor::ActorRef;
 
@@ -68,8 +68,8 @@ impl Evaluator {
         self.context_stack.push(context);
     }
 
-    fn pop_context(&mut self) {
-        self.context_stack.pop();
+    fn pop_context(&mut self) -> Option<HashMap<String, Expr>> {
+        self.context_stack.pop()
     }
 
     fn lookup_local(&self, ident: &str) -> Option<&Expr> {
@@ -113,7 +113,7 @@ impl Evaluator {
                 self.visit_reads(expr1, service, f);
                 self.visit_reads(expr2, service, f);
             }
-            Expr::Func { params, body } => {
+            Expr::Func { params, body, env:_ } => {
                 let param_context = params
                     .iter()
                     // We use placeholder values since we only care about variable names
@@ -132,7 +132,7 @@ impl Evaluator {
                 }
                 self.visit_reads(func, service, f);
             }
-            Expr::Action { assns } => {
+            Expr::Action { assns, env:_ } => {
                 for assn in assns {
                     self.visit_reads(&assn.src, service, f);
                 }
@@ -147,14 +147,18 @@ impl Evaluator {
         &mut self,
         expr: &mut Expr,
         service: &ActorRef<ServiceActor>,
+        env: HashMap<String, Expr>,
         read: &mut impl FnMut(ReactiveRef) -> Option<Expr>,
     ) -> Result<bool, EvalError> {
-        match self.partial_eval_rec(expr, service, read) {
+        self.push_context(env);
+        let result = match self.partial_eval_rec(expr, service, read) {
             Ok(_) => Ok(true),
             Err(PartialEvalError::UnresolvedVariable(_)) => Ok(false),
             Err(PartialEvalError::UnknownVariable(msg)) => Err(EvalError::UnknownVariable(msg)),
             Err(PartialEvalError::Other(msg)) => Err(EvalError::Other(msg)),
-        }
+        };
+        self.pop_context();
+        result
     }
 
     pub fn partial_eval_rec(
@@ -231,16 +235,26 @@ impl Evaluator {
                 }
             }
 
-            Expr::Func { params: _, body: _ } => {
-                // Functions are values and don't need evaluation until applied
-                Ok(())
+            Expr::Func { params, body, env } => {
+                match env {
+                    Some(_) => Ok(()), // already a closure, nothing to do
+                    None => {
+                        // it's not a closure, so create one
+                        let new_env = match self.context_stack.last() {
+                            Some(context) => context.into_iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                            None => Vec::new(),
+                        };
+                        *expr = Expr::Func { params: params.clone(), body: body.clone(), env: Some(new_env), };
+                        Ok(())
+                    },
+                }
             }
 
             Expr::FuncApply { func, args } => {
                 self.partial_eval_rec(func, service, read)?;
 
                 match func.as_mut() {
-                    Expr::Func { params, body } => {
+                    Expr::Func { params, body, env } => {
                         if params.len() != args.len() {
                             Err(PartialEvalError::Other(format!(
                                 "function expects {} arguments, got {}",
@@ -254,9 +268,22 @@ impl Evaluator {
                             }
 
                             // Create new local context for function parameters
-                            let param_context = zip(params.clone(), args.iter())
+                            let mut param_context = zip(params.clone(), args.iter())
                                 .map(|(param, arg)| (param, arg.clone()))
                                 .collect::<HashMap<String, Expr>>();
+
+                            // Include variables from closure if they don't have the same names
+                            match env {
+                                Some(env_bindings) => {
+                                    for binding in env_bindings.into_iter() {
+                                        // add binding to param_context only if not already present
+                                        if !param_context.contains_key(&binding.0) {
+                                            param_context.insert(binding.0.clone(), binding.1.clone());
+                                        }
+                                    }
+                                }
+                                None => (),
+                            }
 
                             // Push parameter context
                             self.push_context(param_context);
@@ -265,8 +292,32 @@ impl Evaluator {
                             *expr = body.as_ref().clone();
                             let result = self.partial_eval_rec(expr, service, read);
 
-                            // Pop parameter context
-                            self.pop_context();
+                            match result {
+                                Err(PartialEvalError::UnresolvedVariable(_)) => {
+                                    /* We got to an unresolved variable when evaluating the function
+                                     * so we need to preserve variable bindings.
+                                     * Therefore, we wrap the expression inside a let.
+                                     * For now, we don't have a let expression, so we use a function.
+                                     * 
+                                     * Either way, we pop the parameter context.
+                                     */
+
+                                    // small hack to get the expression out of expr so we can wrap it without a copy
+                                    let mut temp_expr = Expr::Number { val: 0 };
+                                    std::mem::swap(expr, &mut temp_expr);
+
+                                    // create new environment from current context stack
+                                    let new_env = match self.context_stack.last() {
+                                        Some(context) => context.into_iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                                        None => Vec::new(),
+                                    };
+
+                                    // TODO: add let to the core syntax and replace this code with a let
+                                    *expr = Expr::FuncApply { func: Box::new(Expr::Func { params: Vec::new(), body: Box::new(temp_expr), env: Some(new_env) }), args: Vec::new() }
+
+                                },
+                                _ => { self.pop_context(); }
+                            }
 
                             result
                         }
@@ -275,9 +326,19 @@ impl Evaluator {
                 }
             }
 
-            Expr::Action { assns: _ } => {
-                // Actions don't get evaluated in this context
-                Ok(())
+            Expr::Action { assns, env } => {
+                match env {
+                    Some(_) => Ok(()), // already a closure, nothing to do
+                    None => {
+                        // it's not a closure, so create one
+                        let new_env = match self.context_stack.last() {
+                            Some(context) => context.into_iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                            None => Vec::new(),
+                        };
+                        *expr = Expr::Action { assns: assns.clone(), env: Some(new_env), };
+                        Ok(())
+                    },
+                }
             }
         }
     }
@@ -356,7 +417,7 @@ impl Evaluator {
                 }
             }
 
-            Expr::Func { params: _, body: _ } => {
+            Expr::Func { params: _, body: _, env: _ } => {
                 // Functions are values and don't need evaluation until applied
                 Ok(())
             }
@@ -365,7 +426,7 @@ impl Evaluator {
                 self.eval_expr(func, service, read)?;
 
                 match func.as_mut() {
-                    Expr::Func { params, body } => {
+                    Expr::Func { params, body, env:_ } => {
                         if params.len() != args.len() {
                             Err(EvalError::Other(format!(
                                 "function expects {} arguments, got {}",
@@ -400,7 +461,7 @@ impl Evaluator {
                 }
             }
 
-            Expr::Action { assns: _ } => {
+            Expr::Action { assns: _, env: _ } => {
                 // Actions don't get evaluated in this context
                 Ok(())
             }

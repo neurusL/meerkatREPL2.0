@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UnOp {
@@ -59,6 +59,7 @@ pub enum Expr {
     Func {
         params: Vec<String>,
         body: Box<Expr>,
+        env: Option<Vec<(String, Expr)>>, // if Some, then this represents a closure
     },
     FuncApply {
         func: Box<Expr>,
@@ -68,6 +69,7 @@ pub enum Expr {
     /// Action
     Action {
         assns: Vec<Assn>,
+        env: Option<Vec<(String, Expr)>>, // if Some, then this represents a closure
     },
 }
 
@@ -157,7 +159,7 @@ impl Display for Expr {
             Expr::If { cond, expr1, expr2 } => {
                 write!(f, "if {} then {} else {}", cond, expr1, expr2)
             }
-            Expr::Func { params, body } => write!(f, "fn({})[{}]", params.join(","), body),
+            Expr::Func { params, body, env:_ } => write!(f, "fn({})[{}]", params.join(","), body),
             Expr::FuncApply { func, args } => write!(
                 f,
                 "{}({})",
@@ -167,7 +169,7 @@ impl Display for Expr {
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
-            Expr::Action { assns } => write!(
+            Expr::Action { assns, env:_  } => write!(
                 f,
                 "Action({:?})",
                 assns

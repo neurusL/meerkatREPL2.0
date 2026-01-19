@@ -702,7 +702,7 @@ impl Message<Msg> for ServiceActor {
                 };
 
                 let Some(r) = self.reactives.get(&reactive) else {
-                    panic!("attempted to read reactive that could not be found")
+                    panic!("attempted to read reactive {reactive:?} that could not be found")
                 };
 
                 let e = lock.reads.entry(reactive.clone());

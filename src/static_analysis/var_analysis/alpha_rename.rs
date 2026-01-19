@@ -29,7 +29,7 @@ impl Expr {
                 expr1.alpha_rename(var_binded, renames);
                 expr2.alpha_rename(var_binded, renames);
             }
-            Expr::Func { params, body } => {
+            Expr::Func { params, body, env: _ } => {
                 let mut new_binds = var_binded.clone();
                 new_binds.extend(params.iter().cloned());
                 body.alpha_rename(&new_binds, renames);
@@ -41,7 +41,7 @@ impl Expr {
                 }
             }
 
-            Expr::Action { assns } => {
+            Expr::Action { assns, env: _ } => {
                 for assn in assns {
                     // dest should never be renamed, not influenced by capture
                     // let dest = &mut assn.dest;

@@ -35,7 +35,7 @@ impl Expr {
                 free_vars.extend(expr2.free_var(reactive_names, var_binded));
                 free_vars
             }
-            Expr::Func { params, body } => {
+            Expr::Func { params, body, env: _ } => {
                 let mut new_binds = var_binded.clone();
                 new_binds.extend(params.iter().cloned());
                 body.free_var(reactive_names, &new_binds)
@@ -56,7 +56,7 @@ impl Expr {
             2. def f = fn y, z => action { x = y + z } to correctly evaluate say,
                f(1,2) to action { x = 3 }.
             */
-            Expr::Action { assns } => {
+            Expr::Action { assns, env:_ } => {
                 let mut free_vars = HashSet::new();
                 for assn in assns {
                     // dest should never be free, we do not allow such pattern

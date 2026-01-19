@@ -97,7 +97,9 @@ impl TypecheckEnv {
                 self.find(&typ1)
             }
 
-            Expr::Func { params, body } => {
+            Expr::Func { params, body, env } => {
+                assert!(env.is_none()); // should only typecheck source-level expressions that haven't been evaluated to closures
+
                 // check params are unique
                 let mut param_set = std::collections::HashSet::new();
                 for param in params.iter() {
@@ -169,7 +171,8 @@ impl TypecheckEnv {
             }
 
             // more todo on Action type
-            Expr::Action { assns } => {
+            Expr::Action { assns, env} => {
+                assert!(env.is_none()); // should only infer types for source-level expressions that haven't been evaluated to closures
                 assns.iter().for_each(|assn| self.typecheck_assn(assn));
                 Action
             }

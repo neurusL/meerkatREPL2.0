@@ -7,9 +7,9 @@ use kameo::{prelude::*, Actor};
 use tokio::sync::oneshot;
 
 use crate::{
-    ast::{Decl, Expr, Prog, ReplCmd},
+    ast::{self, Decl, Expr, Prog, ReplCmd},
     new_runtime::{
-        evaluator::{Evaluator},
+        evaluator::Evaluator,
         message::{
             BasisStamp, LockKind, MonotonicTimestampGenerator, Msg, ReactiveConfiguration, TxId,
         },
@@ -357,7 +357,7 @@ impl Doer {
 
         let is_done = match expr {
             Expr::Action { .. } => true,
-            _ => do_partial_eval(&service, &mut expr, &partial_values, &mut needed, &mut e),
+            _ => do_partial_eval(&service, &mut expr, &partial_values, &mut needed, &mut e, &None),
         };
 
         if !is_done {
@@ -376,11 +376,11 @@ impl Doer {
         } else {
             // we have a value; make sure it is an Action
             match expr {
-                Expr::Action { mut assns } => {
+                Expr::Action { mut assns, env } => {
                     // partially evaluate the code inside the action (RHS of assignments)
                     let mut done = true;
                     for assn in &mut assns {
-                        done = done && do_partial_eval(&service, &mut assn.src, &partial_values, &mut needed, &mut e);
+                        done = done && do_partial_eval(&service, &mut assn.src, &partial_values, &mut needed, &mut e, &env);
                     }
                     
                     if !done {
@@ -390,7 +390,7 @@ impl Doer {
                         *self = Doer::AwaitingValues {
                             service,
                             txid,
-                            expr: Expr::Action { assns },
+                            expr: Expr::Action { assns, env },
                             partial_values,
                             needed,
                             basis,
@@ -430,8 +430,14 @@ impl Doer {
     }
 }
 
-fn do_partial_eval(service: &ActorRef<ServiceActor>, expr: &mut Expr, partial_values: &HashMap<ReactiveName, Expr>, needed: &mut HashSet<ReactiveName>, e: &mut Evaluator) -> bool {
-    e.partial_eval(expr, service, &mut |read| {
+fn do_partial_eval(service: &ActorRef<ServiceActor>, expr: &mut Expr, partial_values: &HashMap<ReactiveName, Expr>, needed: &mut HashSet<ReactiveName>, e: &mut Evaluator, env: &Option<Vec<(std::string::String, ast::Expr)>>) -> bool {
+    let mut context = HashMap::new();
+    if let Some(bindings) = env {
+        for (name, val) in bindings.iter() {
+            context.insert(name.clone(), val.clone());
+        }
+    }   
+    e.partial_eval(expr, service, context, &mut |read| {
         assert_eq!(read.service.id(), service.id());
         let opt_value = partial_values.get(&read.name);
         if opt_value == None {
