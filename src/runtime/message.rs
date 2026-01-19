@@ -4,11 +4,7 @@ use kameo::{actor::ActorRef, Actor, Reply};
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-<<<<<<< HEAD
     ast::{Assn, Expr, Prog, Service, Test, Insert, Field},
-=======
-    ast::{Assn, Expr, Prog, Service, Test},
->>>>>>> efac05ae44f3496747f58a229b879ce97cb30f0e
     runtime::{
         lock::Lock,
         transaction::{TxnId, TxnPred},
@@ -36,10 +32,6 @@ pub enum Msg {
     UsrReadDefRequest {
         from_mgr_addr: ActorRef<Manager>,
         txn_id: TxnId,
-<<<<<<< HEAD
-=======
-
->>>>>>> efac05ae44f3496747f58a229b879ce97cb30f0e
         pred: Vec<TxnId>, // to obtain read result, def has to see pred in its applied txns
     },
     UsrReadDefResult {
